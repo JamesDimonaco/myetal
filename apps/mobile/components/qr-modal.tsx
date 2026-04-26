@@ -44,8 +44,8 @@ interface Props {
  * phone, Universal Links bounce them straight into the app.
  *
  * Vibe: celebratory. The card scales in with a soft spring, the QR sits
- * inside a rounded "paper" tile with a subtle teal halo that pulses once,
- * and the dismiss/share/copy actions live below as a real action row.
+ * inside a rounded "paper" tile with a subtle teal halo that pulses,
+ * and a Share / Done action row lives at the bottom.
  */
 export function QrModal({ visible, onClose, shortCode, collectionName }: Props) {
   const c = Colors[useColorScheme() ?? 'light'];
