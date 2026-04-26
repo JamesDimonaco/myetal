@@ -28,8 +28,10 @@ services:
       ENV: dev
       SECRET_KEY: dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX
       DATABASE_URL: postgresql+asyncpg://ceteris:ceteris@db:5432/ceteris
-      PUBLIC_API_URL: http://localhost:8000
-      PUBLIC_BASE_URL: http://localhost:3000
+      # PUBLIC_API_URL and PUBLIC_BASE_URL come from apps/api/.env so each
+      # developer can point at their own LAN IP / ngrok / staging without
+      # editing this file. Falls back to the application defaults
+      # (http://localhost:8000 / 3000) if .env doesn't set them.
     depends_on:
       db:
         condition: service_healthy
