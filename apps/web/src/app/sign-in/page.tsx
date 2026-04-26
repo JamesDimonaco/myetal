@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { GitHubIcon } from '@/components/github-icon';
+
 import { SignInForm } from './sign-in-form';
 
 /**
@@ -13,7 +15,7 @@ export default function SignInPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10 sm:py-16">
       <Link href="/" className="text-sm text-ink-muted hover:text-ink">
-        ← MyEtal
+        ← MyEtAl
       </Link>
 
       <h1 className="mt-12 font-serif text-4xl tracking-tight text-ink">
@@ -38,7 +40,7 @@ export default function SignInPage() {
           href="/api/auth/github/start"
           className="inline-flex items-center justify-center gap-2 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
         >
-          <span aria-hidden>{'{ }'}</span>
+          <GitHubIcon size={18} />
           Continue with GitHub
         </a>
         <button

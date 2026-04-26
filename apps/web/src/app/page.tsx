@@ -1,27 +1,66 @@
 import Link from 'next/link';
 
+import { SignOutButton } from '@/components/sign-out-button';
+import { ApiError } from '@/lib/api';
+import { serverFetch } from '@/lib/server-api';
+import type { UserResponse } from '@/types/auth';
+
 /**
- * Marketing landing. Pure server-rendered, no JS shipped beyond Next's tiny
- * runtime. Two CTAs: sign in (real) and "try the demo" which links to a
- * hardcoded short_code (DEMO_SHORT_CODE) — once a real demo collection
- * exists in the dev DB we'll point this at it; for now it lets the layout
- * exercise the public viewer.
+ * Marketing landing. Server-rendered. Tries to fetch /auth/me — if the user
+ * has a valid session, the header swaps to "Go to dashboard" + sign-out and
+ * the hero CTA changes to point at /dashboard. Anonymous users see the
+ * original sign-in / try-the-demo flow.
+ *
+ * Why server-fetch the session? It avoids a client flash where logged-in
+ * users briefly see a "Sign in" button before hydration kicks in.
+ *
+ * Cache opt-out: must be per-request because the page personalises.
  */
+export const dynamic = 'force-dynamic';
 
-const DEMO_SHORT_CODE = process.env.NEXT_PUBLIC_DEMO_SHORT_CODE ?? 'demo';
+async function getCurrentUser(): Promise<UserResponse | null> {
+  try {
+    return await serverFetch<UserResponse>('/auth/me', { cache: 'no-store' });
+  } catch (err) {
+    if (err instanceof ApiError && (err.isUnauthorized || err.isForbidden)) {
+      return null;
+    }
+    // API down / unexpected error — render the anonymous landing rather than
+    // breaking the whole homepage.
+    return null;
+  }
+}
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const user = await getCurrentUser();
+  const signedIn = user !== null;
+  const displayName = user?.name?.trim() || user?.email || null;
+
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-10 sm:py-16">
       <header className="flex items-center justify-between">
-        <span className="font-serif text-xl tracking-tight text-ink">MyEtal</span>
-        <nav className="text-sm text-ink-muted">
-          <Link
-            href="/sign-in"
-            className="rounded-md px-3 py-1.5 hover:text-ink"
-          >
-            Sign in
-          </Link>
+        <span className="font-serif text-xl tracking-tight text-ink">MyEtAl</span>
+        <nav className="flex items-center gap-2 text-sm text-ink-muted">
+          {signedIn ? (
+            <>
+              {displayName ? (
+                <span className="hidden text-ink-faint sm:inline">
+                  {displayName}
+                </span>
+              ) : null}
+              <Link
+                href="/dashboard"
+                className="rounded-md px-3 py-1.5 hover:text-ink"
+              >
+                Dashboard
+              </Link>
+              <SignOutButton className="rounded-md border border-rule bg-paper px-3 py-1.5 text-ink-muted transition hover:text-ink disabled:opacity-60" />
+            </>
+          ) : (
+            <Link href="/sign-in" className="rounded-md px-3 py-1.5 hover:text-ink">
+              Sign in
+            </Link>
+          )}
         </nav>
       </header>
 
@@ -36,18 +75,37 @@ export default function LandingPage() {
         </p>
 
         <div className="mt-10 flex flex-wrap gap-3">
-          <Link
-            href="/sign-in"
-            className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
-          >
-            Sign in
-          </Link>
-          <Link
-            href={`/c/${DEMO_SHORT_CODE}`}
-            className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
-          >
-            Try the demo
-          </Link>
+          {signedIn ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+              >
+                Go to dashboard
+              </Link>
+              <Link
+                href="/dashboard/share/new"
+                className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+              >
+                + New share
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/sign-in"
+                className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/demo"
+                className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+              >
+                Try the demo
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
