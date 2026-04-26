@@ -31,6 +31,11 @@ COPY --from=builder --chown=myetal:myetal /app/src /app/src
 # `docker exec myetal-api python -m scripts.cleanup_refresh_tokens`.
 COPY --chown=myetal:myetal scripts /app/scripts
 
+# Bundle alembic config + migrations so `alembic upgrade head` works at startup
+# without bind-mounts (dev compose mounts these from the host instead).
+COPY --chown=myetal:myetal alembic /app/alembic
+COPY --chown=myetal:myetal alembic.ini /app/alembic.ini
+
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
