@@ -16,6 +16,13 @@ class ShareType(enum.StrEnum):
     COLLECTION = "collection"
     POSTER = "poster"
     GRANT = "grant"
+    PROJECT = "project"
+
+
+class ItemKind(enum.StrEnum):
+    PAPER = "paper"
+    REPO = "repo"
+    LINK = "link"
 
 
 class Share(Base, TimestampMixin):
@@ -58,7 +65,16 @@ class ShareItem(Base, TimestampMixin):
         index=True,
     )
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    kind: Mapped[ItemKind] = mapped_column(
+        Enum(ItemKind, name="item_kind", values_callable=lambda e: [m.value for m in e]),
+        default=ItemKind.PAPER,
+        server_default=ItemKind.PAPER.value,
+        nullable=False,
+    )
     title: Mapped[str] = mapped_column(String(500), nullable=False)
+    subtitle: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     scholar_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     doi: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     authors: Mapped[str | None] = mapped_column(Text, nullable=True)

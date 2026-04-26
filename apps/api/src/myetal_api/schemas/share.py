@@ -3,11 +3,15 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from myetal_api.models import ShareType
+from myetal_api.models import ItemKind, ShareType
 
 
 class ShareItemCreate(BaseModel):
+    kind: ItemKind = ItemKind.PAPER
     title: str = Field(min_length=1, max_length=500)
+    subtitle: str | None = Field(default=None, max_length=500)
+    url: str | None = Field(default=None, max_length=2000)
+    image_url: str | None = Field(default=None, max_length=2000)
     scholar_url: str | None = Field(default=None, max_length=2000)
     doi: str | None = Field(default=None, max_length=255)
     authors: str | None = None
@@ -38,7 +42,11 @@ class ShareItemResponse(BaseModel):
 
     id: uuid.UUID
     position: int
+    kind: ItemKind
     title: str
+    subtitle: str | None
+    url: str | None
+    image_url: str | None
     scholar_url: str | None
     doi: str | None
     authors: str | None
