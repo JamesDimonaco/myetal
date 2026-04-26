@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeInDown,
   FadeInUp,
-  Layout,
+  LinearTransition,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -78,7 +78,7 @@ export default function LandingScreen() {
                 {recents!.length}
               </Text>
             </View>
-            <Animated.View layout={Layout.springify().damping(20)}>
+            <Animated.View layout={LinearTransition.springify().damping(20)}>
               {recents!.map((entry, i) => (
                 <Animated.View
                   key={entry.short_code}
