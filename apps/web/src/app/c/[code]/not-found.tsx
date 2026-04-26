@@ -15,7 +15,7 @@ export default function ShareNotFound() {
         href="/"
         className="mt-8 inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink hover:border-ink/40"
       >
-        Back to MyEtal
+        Back to MyEtAl
       </Link>
     </main>
   );

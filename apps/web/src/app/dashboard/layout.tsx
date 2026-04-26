@@ -37,7 +37,7 @@ export default async function DashboardLayout({
             href="/dashboard"
             className="font-serif text-xl tracking-tight text-ink"
           >
-            MyEtal
+            MyEtAl
           </Link>
           <nav className="flex items-center gap-6 text-sm">
             <Link href="/dashboard" className="text-ink-muted hover:text-ink">

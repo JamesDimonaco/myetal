@@ -4,8 +4,8 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'MyEtal — share your research with a QR',
-    template: '%s — MyEtal',
+    default: 'MyEtAl — share your research with a QR',
+    template: '%s — MyEtAl',
   },
   description:
     'Share a paper or a curated reading list with a single QR code. Built for researchers.',
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? 'https://myetal.app',
   ),
   openGraph: {
-    siteName: 'MyEtal',
+    siteName: 'MyEtAl',
     type: 'website',
   },
   twitter: {

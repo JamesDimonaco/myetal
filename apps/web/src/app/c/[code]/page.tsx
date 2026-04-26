@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const description =
     share.description?.trim() ||
-    `${formatItemCount(share.items.length)} shared via MyEtal`;
+    `${formatItemCount(share.items.length)} shared via MyEtAl`;
 
   const ogImage = `${API_BASE_URL}/public/c/${encodeURIComponent(code)}/qr.png`;
   const canonicalPath = `/c/${encodeURIComponent(code)}`;
@@ -63,7 +63,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: share.name,
       description,
       type: 'article',
-      siteName: 'MyEtal',
+      siteName: 'MyEtAl',
       url: canonicalPath,
       images: [
         {
@@ -96,7 +96,7 @@ export default async function PublicSharePage({ params }: PageProps) {
     <main className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
       <div className="text-sm text-ink-muted">
         <Link href="/" className="hover:text-ink">
-          MyEtal
+          MyEtAl
         </Link>
       </div>
 
@@ -147,7 +147,7 @@ export default async function PublicSharePage({ params }: PageProps) {
       </aside>
 
       <footer className="mt-16 text-xs text-ink-faint">
-        Built with MyEtal ·{' '}
+        Built with MyEtAl ·{' '}
         <Link href="/" className="underline-offset-2 hover:underline">
           myetal.app
         </Link>
