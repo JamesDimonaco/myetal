@@ -1,6 +1,6 @@
 # EAS Build & Universal Links — operator's guide
 
-This document is the runbook for taking Ceteris from "runs in Expo Go" to
+This document is the runbook for taking MyEtal from "runs in Expo Go" to
 "runs as a real iOS/Android app, with QR codes opening directly into the
 installed app via Universal Links / App Links."
 
@@ -19,7 +19,7 @@ EAS Build minutes. Those are listed below in order.
 - `.well-known/assetlinks.json` template (cert fingerprint placeholder)
 - `scripts/test-deeplinks.sh` — fires deep links into sim/emulator/device
 
-The Expo Go workflow (`pnpm --filter @ceteris/mobile start`) **still works
+The Expo Go workflow (`pnpm --filter @myetal/mobile start`) **still works
 exactly as before**. Dev builds are an additional path, not a replacement.
 
 ---
@@ -81,7 +81,7 @@ Dev builds give you the production native shell (real bundle ID, icon,
 splash, custom native modules) but with the JS bundle still served from
 your laptop's Metro server. This is what makes Universal Links work on a
 real device — Expo Go can't, because its bundle ID is `host.exp.Exponent`,
-not `app.ceteris.mobile`.
+not `app.myetal.mobile`.
 
 ```bash
 # iOS simulator build (no provisioning headaches, installs straight onto
@@ -126,7 +126,7 @@ This is the part that always bites. Follow it in order.
 
 - Open `apps/mobile/.well-known/apple-app-site-association`
 - Replace `TEAM_ID` with your actual Team ID (e.g. the file becomes
-  `"appID": "ABCDE12345.app.ceteris.mobile"`)
+  `"appID": "ABCDE12345.app.myetal.mobile"`)
 - Open `apps/mobile/.well-known/assetlinks.json`
 - Replace `TBD-FROM-EAS-CREDENTIALS` with your SHA-256 fingerprint(s).
   Multiple fingerprints? The `sha256_cert_fingerprints` array takes any
@@ -137,8 +137,8 @@ This is the part that always bites. Follow it in order.
 
 The two files MUST end up at:
 
-- `https://ceteris.app/.well-known/apple-app-site-association`
-- `https://ceteris.app/.well-known/assetlinks.json`
+- `https://myetal.app/.well-known/apple-app-site-association`
+- `https://myetal.app/.well-known/assetlinks.json`
 
 …served as `Content-Type: application/json`, **no redirects, no auth**.
 
@@ -148,7 +148,7 @@ symlink these two files into `apps/web/public/.well-known/`. Don't do
 that copy from this branch — coordinate at merge time.
 
 In the interim, if you need to test before the web app exists, you can
-host them on any HTTPS endpoint that resolves under `ceteris.app`
+host them on any HTTPS endpoint that resolves under `myetal.app`
 (temporary Cloudflare Worker, a static `nginx` container, Caddy on the
 same home server, etc.) — Apple/Google don't care who serves it as long
 as the domain matches.
@@ -158,7 +158,7 @@ as the domain matches.
 Apple has a public validator at:
 
 ```
-https://app-site-association.cdn-apple.com/a/v1/ceteris.app
+https://app-site-association.cdn-apple.com/a/v1/myetal.app
 ```
 
 That's the URL Apple's CDN will hit; if it returns valid JSON, you're
@@ -172,14 +172,14 @@ For Android:
 # Statement List Tester:
 # https://developers.google.com/digital-asset-links/tools/generator
 # Or hit the Google verification endpoint:
-curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://ceteris.app&relation=delegate_permission/common.handle_all_urls" | jq
+curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://myetal.app&relation=delegate_permission/common.handle_all_urls" | jq
 ```
 
 On a connected device:
 
 ```bash
-adb shell pm get-app-links app.ceteris.mobile
-# Should show: ceteris.app -> verified
+adb shell pm get-app-links app.myetal.mobile
+# Should show: myetal.app -> verified
 ```
 
 ### 4. Smoke-test the round trip
@@ -206,13 +206,13 @@ docker compose up backend          # if you want the API local
 # In another terminal, from apps/mobile:
 npx expo start --dev-client        # NOT just `expo start` — that targets Expo Go
 
-# On the device: open Ceteris (the dev build), shake for menu, "Reload"
+# On the device: open MyEtal (the dev build), shake for menu, "Reload"
 ```
 
 The Expo Go path still works for fast UI-only iteration:
 
 ```bash
-pnpm --filter @ceteris/mobile start    # Expo Go, no Universal Links
+pnpm --filter @myetal/mobile start    # Expo Go, no Universal Links
 ```
 
 Use whichever fits the task.
@@ -230,7 +230,7 @@ npx eas-cli build --profile production --platform all
 ```
 
 The `preview` profile currently points at
-`https://staging-api.ceteris.app` — set up that staging API in the EAS
+`https://staging-api.myetal.app` — set up that staging API in the EAS
 dashboard's project env vars, or override here in `eas.json` if you'd
 rather pin it in source.
 
@@ -262,16 +262,16 @@ service account JSON before automated submits work.
 The Expo Router file layout already maps routes correctly. No changes
 needed in `app/_layout.tsx` or `app/c/[code].tsx`:
 
-- `scheme: "ceteris"` in `app.json` → registers `ceteris://` URLs
-- `ios.associatedDomains: ["applinks:ceteris.app"]` → entitles the iOS app
-  to handle `https://ceteris.app/*` Universal Links
-- `android.intentFilters` with `autoVerify: true`, `host: "ceteris.app"`,
+- `scheme: "myetal"` in `app.json` → registers `myetal://` URLs
+- `ios.associatedDomains: ["applinks:myetal.app"]` → entitles the iOS app
+  to handle `https://myetal.app/*` Universal Links
+- `android.intentFilters` with `autoVerify: true`, `host: "myetal.app"`,
   `pathPrefix: "/c"` → registers Android App Link verification
 - File `app/c/[code].tsx` → automatically maps to the `/c/:code` path
   segment via expo-router's file-based routing
 
-Combined: a tap on `https://ceteris.app/c/abc123` (universal) or a scan
-of `ceteris://c/abc123` (custom-scheme fallback) will land in
+Combined: a tap on `https://myetal.app/c/abc123` (universal) or a scan
+of `myetal://c/abc123` (custom-scheme fallback) will land in
 `PublicShareScreen` with `params.code === "abc123"`. No extra
 `Linking.addEventListener` plumbing required — expo-router handles it.
 
@@ -287,9 +287,9 @@ fine for v1 because nothing else lives at `/c…`. If we ever add e.g.
 
 | Symptom | Likely cause |
 |---|---|
-| Tap on link opens Safari/Chrome instead of app | AASA file 404, wrong MIME, or behind a redirect. Check `curl -I https://ceteris.app/.well-known/apple-app-site-association` |
-| Apple validator (`cdn-apple.com/.../ceteris.app`) returns 404 | AASA hasn't propagated yet, or domain doesn't match `associatedDomains` exactly |
-| Android shows a chooser instead of opening app | `autoVerify` succeeded but other apps also claim `https://ceteris.app/c/*`. Check `adb shell pm get-app-links app.ceteris.mobile` |
+| Tap on link opens Safari/Chrome instead of app | AASA file 404, wrong MIME, or behind a redirect. Check `curl -I https://myetal.app/.well-known/apple-app-site-association` |
+| Apple validator (`cdn-apple.com/.../myetal.app`) returns 404 | AASA hasn't propagated yet, or domain doesn't match `associatedDomains` exactly |
+| Android shows a chooser instead of opening app | `autoVerify` succeeded but other apps also claim `https://myetal.app/c/*`. Check `adb shell pm get-app-links app.myetal.mobile` |
 | Dev build can't reach API on physical device | `EXPO_PUBLIC_API_URL=http://localhost:8000` doesn't resolve from a phone — use LAN IP or staging URL (see "First dev build" note) |
 | `eas build` says "no projectId" | You haven't run `eas init` yet, or the result wasn't committed |
-| iOS Universal Link works in Safari address bar but not from Notes/Messages | This is normal — Apple disables Universal Links for the same domain when navigated within Safari. Long-press + "Open in Ceteris" |
+| iOS Universal Link works in Safari address bar but not from Notes/Messages | This is normal — Apple disables Universal Links for the same domain when navigated within Safari. Long-press + "Open in MyEtal" |

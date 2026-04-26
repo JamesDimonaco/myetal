@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAM_ID.app.ceteris.mobile",
+        "appID": "TEAM_ID.app.myetal.mobile",
         "paths": ["/c/*"]
       }
     ]

@@ -34,7 +34,7 @@
         "resourceClass": "medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://staging-api.ceteris.app"
+        "EXPO_PUBLIC_API_URL": "https://staging-api.myetal.app"
       }
     },
     "production": {
@@ -49,7 +49,7 @@
         "resourceClass": "medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.ceteris.app"
+        "EXPO_PUBLIC_API_URL": "https://api.myetal.app"
       }
     }
   },

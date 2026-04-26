@@ -1,7 +1,7 @@
 # Universal Links / App Links manifests
 
-These two files declare the binding between the `ceteris.app` domain and the
-mobile app, so that taps on `https://ceteris.app/c/{shortcode}` open Ceteris
+These two files declare the binding between the `myetal.app` domain and the
+mobile app, so that taps on `https://myetal.app/c/{shortcode}` open MyEtal
 directly instead of bouncing through Safari / Chrome.
 
 ## Files
@@ -11,7 +11,7 @@ directly instead of bouncing through Safari / Chrome.
 
 ## Hosting requirements
 
-Both files MUST be served from `https://ceteris.app/.well-known/<filename>`
+Both files MUST be served from `https://myetal.app/.well-known/<filename>`
 with these exact characteristics:
 
 - `Content-Type: application/json` for both (yes, even AASA — Apple changed

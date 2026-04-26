@@ -18,13 +18,13 @@
 # (e.g. "abc123") for end-to-end testing.
 #
 # What each variant tests:
-#   universal  -> https://ceteris.app/c/<code>
+#   universal  -> https://myetal.app/c/<code>
 #                 (iOS Universal Link / Android App Link — only works
 #                  in a dev/preview/production build, NOT in Expo Go)
-#   scheme     -> ceteris://c/<code>
+#   scheme     -> myetal://c/<code>
 #                 (custom-scheme deep link — works in dev builds and the
 #                  standalone app, but NOT in Expo Go)
-#   expo-go    -> exp+ceteris://c/<code>
+#   expo-go    -> exp+myetal://c/<code>
 #                 (Expo Go's wrapped scheme — use this when iterating in
 #                  Expo Go before you have a dev build installed)
 #
@@ -39,7 +39,7 @@ PLATFORM="${1:-}"
 KIND="${2:-}"
 CODE="${3:-PLACEHOLDER}"
 
-ANDROID_PACKAGE="app.ceteris.mobile"
+ANDROID_PACKAGE="app.myetal.mobile"
 
 usage() {
   sed -n '2,30p' "$0"
@@ -61,18 +61,18 @@ android_open() {
 
 run_ios() {
   case "$KIND" in
-    universal) ios_open "https://ceteris.app/c/${CODE}" ;;
-    scheme)    ios_open "ceteris://c/${CODE}" ;;
-    expo-go)   ios_open "exp+ceteris://c/${CODE}" ;;
+    universal) ios_open "https://myetal.app/c/${CODE}" ;;
+    scheme)    ios_open "myetal://c/${CODE}" ;;
+    expo-go)   ios_open "exp+myetal://c/${CODE}" ;;
     *) usage ;;
   esac
 }
 
 run_android() {
   case "$KIND" in
-    universal) android_open "https://ceteris.app/c/${CODE}" ;;
-    scheme)    android_open "ceteris://c/${CODE}" ;;
-    expo-go)   android_open "exp+ceteris://c/${CODE}" ;;
+    universal) android_open "https://myetal.app/c/${CODE}" ;;
+    scheme)    android_open "myetal://c/${CODE}" ;;
+    expo-go)   android_open "exp+myetal://c/${CODE}" ;;
     *) usage ;;
   esac
 }
