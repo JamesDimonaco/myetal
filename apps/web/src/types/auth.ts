@@ -20,3 +20,11 @@ export interface RegisterInput {
   password: string;
   name?: string;
 }
+
+/** GET /auth/me/sessions — list of refresh-token rows (= signed-in devices). */
+export interface SessionResponse {
+  id: string;
+  issued_at: string;
+  expires_at: string;
+  revoked: boolean;
+}
