@@ -27,6 +27,11 @@ import {
   useUpdateShare,
 } from '@/hooks/useShares';
 import { ApiError } from '@/lib/api';
+import {
+  consumePendingPaper,
+  subscribePendingPaper,
+} from '@/lib/pending-paper';
+import type { Paper } from '@/types/paper';
 import type {
   ShareCreateInput,
   ShareItemInput,
@@ -89,6 +94,16 @@ const fromResponseItem = (it: ShareResponse['items'][number]): DraftItem => ({
   notes: it.notes ?? '',
 });
 
+const fromPaper = (p: Paper): DraftItem => ({
+  _key: newKey(),
+  title: p.title,
+  scholar_url: p.scholar_url ?? '',
+  doi: p.doi ?? '',
+  authors: p.authors ?? '',
+  year: p.year != null ? String(p.year) : '',
+  notes: '',
+});
+
 /**
  * Create / edit share. `id === 'new'` puts the screen in create mode; any
  * other value loads the existing share. After save we surface the QR via the
@@ -136,7 +151,36 @@ export default function ShareEditorScreen() {
     setItems((prev) => prev.map((it) => (it._key === key ? { ...it, ...patch } : it)));
   };
 
-  const addItem = () => setItems((prev) => [...prev, emptyItem()]);
+  /**
+   * Append a paper from the add-paper modal. If the only existing row is the
+   * blank seed (no title typed), replace it — that keeps the count honest for
+   * a fresh share where the user hadn't manually filled the empty row yet.
+   */
+  const appendPaper = (paper: Paper) => {
+    setItems((prev) => {
+      const draft = fromPaper(paper);
+      const onlySeedRow =
+        prev.length === 1 &&
+        !prev[0].title.trim() &&
+        !prev[0].doi.trim() &&
+        !prev[0].scholar_url.trim() &&
+        !prev[0].authors.trim();
+      return onlySeedRow ? [draft] : [...prev, draft];
+    });
+  };
+
+  // Pick up papers handed off by the add-paper modal. Both the immediate sync
+  // (subscribe fires before back-nav settles) and the focus-time consume cover
+  // the case where the screen unmounts/remounts during the modal lifecycle.
+  useEffect(() => {
+    const queued = consumePendingPaper();
+    if (queued) appendPaper(queued);
+    return subscribePendingPaper((p) => appendPaper(p));
+  }, []);
+
+  const openAddPaper = () => {
+    router.push('/(authed)/share/add-paper');
+  };
 
   const removeItem = (key: string) => {
     setItems((prev) => (prev.length === 1 ? prev : prev.filter((it) => it._key !== key)));
@@ -348,12 +392,12 @@ export default function ShareEditorScreen() {
           <View style={styles.itemsHeader}>
             <Text style={[styles.sectionLabel, { color: c.textMuted }]}>ITEMS</Text>
             <Pressable
-              onPress={addItem}
+              onPress={openAddPaper}
               hitSlop={8}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
             >
               <Ionicons name="add-circle-outline" size={20} color={c.text} />
-              <Text style={[styles.addText, { color: c.text }]}>Add</Text>
+              <Text style={[styles.addText, { color: c.text }]}>Add paper</Text>
             </Pressable>
           </View>
 

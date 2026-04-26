@@ -75,6 +75,10 @@ export default function AuthedLayout() {
       />
       {/* Hidden routes — reachable by navigation but not in the tab bar */}
       <Tabs.Screen name="share/[id]" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen
+        name="share/add-paper"
+        options={{ href: null, headerShown: false }}
+      />
     </Tabs>
   );
 }
