@@ -17,6 +17,17 @@ router = APIRouter(tags=["oauth"])
 ProviderName = Literal["orcid", "google", "github"]
 PlatformName = Literal["web", "mobile", "devjson"]
 
+# Schemes the OAuth callback is willing to bounce tokens to via mobile_redirect.
+# Tokens land in the URL fragment, so the OS's deep-link binding is the only
+# thing standing between us and a hostile app intercepting them — we accept the
+# same trust model as Universal Links here. Add new schemes deliberately.
+_ALLOWED_MOBILE_REDIRECT_SCHEMES = (
+    "myetal://",
+    "exp+myetal://",  # Expo Go dev client
+    "exp://",         # Expo Go on the local LAN (dev only — gated below)
+    "http://localhost",  # web fallback for local dev
+)
+
 
 @router.get("/auth/{provider}/start")
 @limiter.limit(AUTH_LIMIT)
@@ -28,10 +39,11 @@ async def oauth_start(
     mobile_redirect: str | None = Query(
         default=None,
         description=(
-            "Dev-only: a URL the callback should bounce to (with tokens in URL "
-            "fragment) instead of returning JSON. Used by mobile apps that want "
-            "to intercept the OAuth result via expo-web-browser's "
-            "openAuthSessionAsync. Refused outside ENV=dev."
+            "A deep-link URL the callback should bounce tokens to (in the URL "
+            "fragment) instead of going through the web finish page. Must start "
+            "with one of the app's registered schemes — see "
+            "_ALLOWED_MOBILE_REDIRECT_SCHEMES. Used by the mobile app via "
+            "expo-web-browser's openAuthSessionAsync."
         ),
     ),
 ) -> RedirectResponse:
@@ -40,11 +52,22 @@ async def oauth_start(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="devjson platform is only available when ENV=dev",
         )
-    if mobile_redirect and settings.env != "dev":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="mobile_redirect is only available when ENV=dev",
-        )
+    if mobile_redirect:
+        if not mobile_redirect.startswith(_ALLOWED_MOBILE_REDIRECT_SCHEMES):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="mobile_redirect URL must use a registered app scheme",
+            )
+        # exp:// and http://localhost are dev-only — they'd let anyone with a
+        # LAN-reachable Expo Go session steal tokens otherwise.
+        if (
+            mobile_redirect.startswith(("exp://", "http://localhost"))
+            and settings.env != "dev"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="this mobile_redirect scheme is only available when ENV=dev",
+            )
 
     try:
         url = oauth_service.start_oauth(

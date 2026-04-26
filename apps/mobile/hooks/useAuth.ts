@@ -119,7 +119,7 @@ export function useAuth() {
      * deep link and the rest of this code stays the same.
      */
     const startUrl =
-      `${API_BASE_URL}/auth/github/start?platform=devjson&return_to=/dashboard`;
+      `${API_BASE_URL}/auth/github/start?platform=mobile&return_to=/dashboard`;
 
     if (Platform.OS === 'web') {
       // On web the same flow doesn't apply — the production web app uses
