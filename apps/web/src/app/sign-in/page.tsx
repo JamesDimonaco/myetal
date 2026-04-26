@@ -14,7 +14,7 @@ export default function SignInPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10 sm:py-16">
       <Link href="/" className="text-sm text-ink-muted hover:text-ink">
-        ← Ceteris
+        ← MyEtal
       </Link>
 
       <h1 className="mt-12 font-serif text-4xl tracking-tight text-ink">

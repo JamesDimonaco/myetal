@@ -14,7 +14,7 @@ export default function LandingPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-10 sm:py-16">
       <header className="flex items-center justify-between">
-        <span className="font-serif text-xl tracking-tight text-ink">Ceteris</span>
+        <span className="font-serif text-xl tracking-tight text-ink">MyEtal</span>
         <nav className="text-sm text-ink-muted">
           <Link
             href="/sign-in"
@@ -68,7 +68,7 @@ export default function LandingPage() {
 
       <footer className="mt-auto pt-24 text-xs text-ink-faint">
         <div className="flex flex-wrap items-center gap-4">
-          <span>Ceteris paribus.</span>
+          <span>et al.</span>
           <span aria-hidden>·</span>
           <span>v0.1 dev</span>
         </div>

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /**
- * Ceteris paper-and-ink palette. Matches the warm off-white / dark ink /
+ * MyEtal paper-and-ink palette. Matches the warm off-white / dark ink /
  * deep teal accent the mobile app uses. Stays light-only on web for now —
  * the public viewer should look the same in any preview crawler regardless
  * of the visitor's system theme.
