@@ -41,6 +41,10 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -75,8 +79,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "TBD-set-via-eas-init"
-      }
-    }
+        "projectId": "d1238611-83b4-46e5-b398-48af391b9ad8"
+      },
+      "router": {}
+    },
+    "owner": "jamesdimonaco"
   }
 }
