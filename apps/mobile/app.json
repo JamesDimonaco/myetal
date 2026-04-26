@@ -57,6 +57,12 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Ceteris to access your camera so you can scan QR codes from posters and slides."
+        }
       ]
     ],
     "experiments": {
