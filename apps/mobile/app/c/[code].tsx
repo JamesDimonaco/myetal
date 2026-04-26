@@ -1,8 +1,9 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Pressable } from 'react-native';
 
+import { QrModal } from '@/components/qr-modal';
 import { ShareItemCard } from '@/components/share-item-card';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -15,6 +16,8 @@ export default function PublicShareScreen() {
   const params = useLocalSearchParams<{ code: string }>();
   const code = params.code;
   const c = Colors[useColorScheme() ?? 'light'];
+
+  const [qrVisible, setQrVisible] = useState(false);
 
   const { data, isLoading, error, refetch, isRefetching } = usePublicShare(code);
 
@@ -78,11 +81,23 @@ export default function PublicShareScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable onPress={handleShareLink} hitSlop={12}>
-              <Text style={{ color: c.accent, fontSize: 16, fontWeight: '500' }}>Share</Text>
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable onPress={() => setQrVisible(true)} hitSlop={12}>
+                <Text style={[styles.headerAction, { color: c.accent }]}>QR</Text>
+              </Pressable>
+              <Pressable onPress={handleShareLink} hitSlop={12}>
+                <Text style={[styles.headerAction, { color: c.accent }]}>Share</Text>
+              </Pressable>
+            </View>
           ),
         }}
+      />
+
+      <QrModal
+        visible={qrVisible}
+        onClose={() => setQrVisible(false)}
+        shortCode={data.short_code}
+        collectionName={data.name}
       />
 
       <ScrollView style={{ flex: 1, backgroundColor: c.background }}>
@@ -194,5 +209,13 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 13,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  headerAction: {
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
