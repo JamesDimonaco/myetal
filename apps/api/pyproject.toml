@@ -13,6 +13,7 @@ dependencies = [
     "pyjwt>=2.10.0",
     "argon2-cffi>=23.1.0",
     "email-validator>=2.2.0",
+    "qrcode[pil]>=7.4.0",
 ]
 
 [dependency-groups]
@@ -38,7 +39,13 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "S"]
-ignore = ["S101"]
+# N818: exception names without "Error" suffix (we follow the auth-lib idiom:
+#   `InvalidCredentials`, `EmailAlreadyRegistered`, etc.)
+# N806: PascalCase locals (we use `SessionLocal` per SQLAlchemy convention)
+# S101: `assert` allowed (production code never asserts; tests legitimately do)
+# S105: hardcoded-password heuristic flags every string literal "password",
+#   "token_type", and our intentionally-public DEV_SECRET_PLACEHOLDER. Noise.
+ignore = ["S101", "S105", "N818", "N806"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S"]

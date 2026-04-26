@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from quire_api.models.user import User
 
 
-class AuthProvider(str, enum.Enum):
+class AuthProvider(enum.StrEnum):
     ORCID = "orcid"
     GOOGLE = "google"
     GITHUB = "github"
@@ -21,9 +21,7 @@ class AuthProvider(str, enum.Enum):
 
 class AuthIdentity(Base):
     __tablename__ = "auth_identities"
-    __table_args__ = (
-        UniqueConstraint("provider", "subject_id", name="uq_auth_provider_subject"),
-    )
+    __table_args__ = (UniqueConstraint("provider", "subject_id", name="uq_auth_provider_subject"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(

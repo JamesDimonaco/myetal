@@ -31,9 +31,7 @@ async def register(body: RegisterRequest, db: DbSession) -> TokenPair:
 @router.post("/login", response_model=TokenPair)
 async def login(body: LoginRequest, db: DbSession) -> TokenPair:
     try:
-        _, access, refresh = await auth_service.login_with_password(
-            db, body.email, body.password
-        )
+        _, access, refresh = await auth_service.login_with_password(db, body.email, body.password)
     except auth_service.InvalidCredentials as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

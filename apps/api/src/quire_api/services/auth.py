@@ -150,7 +150,5 @@ async def _issue_token_pair(
 
 async def _revoke_family(db: AsyncSession, family_id: uuid.UUID) -> None:
     await db.execute(
-        update(RefreshToken)
-        .where(RefreshToken.family_id == family_id)
-        .values(revoked=True)
+        update(RefreshToken).where(RefreshToken.family_id == family_id).values(revoked=True)
     )

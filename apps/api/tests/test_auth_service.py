@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from quire_api.core.security import decode_access_token
-from quire_api.models import AuthIdentity, AuthProvider, RefreshToken, User
+from quire_api.models import AuthIdentity, AuthProvider, RefreshToken
 from quire_api.services import auth as auth_service
 
 
@@ -108,7 +108,5 @@ async def test_logout_revokes_family(db_session: AsyncSession) -> None:
 
 async def test_email_normalised_on_login(db_session: AsyncSession) -> None:
     await auth_service.register_with_password(db_session, "Foo@Example.COM", "hunter22", None)
-    user, _, _ = await auth_service.login_with_password(
-        db_session, "FOO@example.com", "hunter22"
-    )
+    user, _, _ = await auth_service.login_with_password(db_session, "FOO@example.com", "hunter22")
     assert user.email == "foo@example.com"

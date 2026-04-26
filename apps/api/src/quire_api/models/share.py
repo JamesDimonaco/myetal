@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from quire_api.models.user import User
 
 
-class ShareType(str, enum.Enum):
+class ShareType(enum.StrEnum):
     PAPER = "paper"
     COLLECTION = "collection"
     POSTER = "poster"

@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-04-26 12:00:00.000000
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -84,9 +85,7 @@ def upgrade() -> None:
         sa.Column(
             "rotated_to_id",
             sa.Uuid(),
-            sa.ForeignKey(
-                "refresh_tokens.id", use_alter=True, name="fk_refresh_tokens_rotated_to"
-            ),
+            sa.ForeignKey("refresh_tokens.id", use_alter=True, name="fk_refresh_tokens_rotated_to"),
             nullable=True,
         ),
         sa.Column("revoked", sa.Boolean(), server_default=sa.text("false"), nullable=False),
