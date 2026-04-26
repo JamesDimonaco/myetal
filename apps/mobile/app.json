@@ -36,7 +36,10 @@
               "pathPrefix": "/c"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -63,7 +66,8 @@
         {
           "cameraPermission": "Allow Ceteris to access your camera so you can scan QR codes from posters and slides."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
