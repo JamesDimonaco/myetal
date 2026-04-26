@@ -26,3 +26,41 @@ export interface PublicShareResponse {
   owner_name: string | null;
   updated_at: string;
 }
+
+/** Owner-facing share — returned by /shares CRUD (authed). */
+export interface ShareResponse {
+  id: string;
+  short_code: string;
+  name: string;
+  description: string | null;
+  type: ShareType;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  items: ShareItem[];
+}
+
+export interface ShareItemInput {
+  title: string;
+  scholar_url?: string | null;
+  doi?: string | null;
+  authors?: string | null;
+  year?: number | null;
+  notes?: string | null;
+}
+
+export interface ShareCreateInput {
+  name: string;
+  description?: string | null;
+  type: ShareType;
+  is_public: boolean;
+  items: ShareItemInput[];
+}
+
+export interface ShareUpdateInput {
+  name?: string;
+  description?: string | null;
+  type?: ShareType;
+  is_public?: boolean;
+  items?: ShareItemInput[];
+}
