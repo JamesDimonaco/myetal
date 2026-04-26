@@ -1,65 +1,87 @@
-import Image from "next/image";
+import Link from 'next/link';
 
-export default function Home() {
+/**
+ * Marketing landing. Pure server-rendered, no JS shipped beyond Next's tiny
+ * runtime. Two CTAs: sign in (real) and "try the demo" which links to a
+ * hardcoded short_code (DEMO_SHORT_CODE) — once a real demo collection
+ * exists in the dev DB we'll point this at it; for now it lets the layout
+ * exercise the public viewer.
+ */
+
+const DEMO_SHORT_CODE = process.env.NEXT_PUBLIC_DEMO_SHORT_CODE ?? 'demo';
+
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-10 sm:py-16">
+      <header className="flex items-center justify-between">
+        <span className="font-serif text-xl tracking-tight text-ink">Ceteris</span>
+        <nav className="text-sm text-ink-muted">
+          <Link
+            href="/sign-in"
+            className="rounded-md px-3 py-1.5 hover:text-ink"
+          >
+            Sign in
+          </Link>
+        </nav>
+      </header>
+
+      <section className="mt-16 sm:mt-28">
+        <h1 className="font-serif text-5xl leading-[1.05] tracking-tight text-ink sm:text-6xl">
+          Share your research with a QR.
+        </h1>
+        <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-muted">
+          A paper. A reading list. A poster you&apos;re standing in front of.
+          One QR code that resolves to a clean, shareable page — works whether
+          the scanner has the app or not.
+        </p>
+
+        <div className="mt-10 flex flex-wrap gap-3">
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+          >
+            Sign in
+          </Link>
+          <Link
+            href={`/c/${DEMO_SHORT_CODE}`}
+            className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+          >
+            Try the demo
+          </Link>
+        </div>
+      </section>
+
+      <section className="mt-24 grid gap-8 sm:mt-32 sm:grid-cols-3">
+        <Feature
+          title="One QR, many papers"
+          body="A share is the unit on a QR — one paper or a curated collection. Same flow, same code."
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        <Feature
+          title="No app required"
+          body="Scanned by someone without the app? They land on a fast, server-rendered web page."
+        />
+        <Feature
+          title="ORCID-aware"
+          body="Sign in with ORCID, Google, GitHub, or email. Built for the people who actually publish papers."
+        />
+      </section>
+
+      <footer className="mt-auto pt-24 text-xs text-ink-faint">
+        <div className="flex flex-wrap items-center gap-4">
+          <span>Ceteris paribus.</span>
+          <span aria-hidden>·</span>
+          <span>v0.1 dev</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </footer>
+    </main>
+  );
+}
+
+function Feature({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <h3 className="font-serif text-lg text-ink">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-ink-muted">{body}</p>
     </div>
   );
 }
