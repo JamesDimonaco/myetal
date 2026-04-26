@@ -1,11 +1,12 @@
 from typing import Literal
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from ceteris_api.api.deps import DbSession
 from ceteris_api.core.config import settings
+from ceteris_api.core.rate_limit import AUTH_LIMIT, limiter
 from ceteris_api.models import AuthProvider
 from ceteris_api.oauth_providers import ProviderNotConfigured
 from ceteris_api.services import oauth as oauth_service
@@ -18,7 +19,9 @@ PlatformName = Literal["web", "mobile", "devjson"]
 
 
 @router.get("/auth/{provider}/start")
+@limiter.limit(AUTH_LIMIT)
 async def oauth_start(
+    request: Request,
     provider: ProviderName,
     return_to: str = Query(default="/", description="Path on the web/mobile app to land on"),
     platform: PlatformName = Query(default="web"),

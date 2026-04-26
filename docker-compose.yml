@@ -42,6 +42,15 @@ services:
     # Apply any pending DB migrations, then start uvicorn with reload
     command: >
       sh -c "alembic upgrade head && uvicorn ceteris_api.main:app --host 0.0.0.0 --port 8000 --reload"
+    # /healthz never touches the DB, so this only reflects "is the process up".
+    # /readyz is the DB-aware probe; it's not used here because compose has
+    # no native concept of routing decisions, only restart triggers.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   ceteris_pgdata:
