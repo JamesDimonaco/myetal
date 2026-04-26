@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -10,11 +11,14 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 
+import { Button } from '@/components/button';
 import { QrModal } from '@/components/qr-modal';
 import { ShareItemCard } from '@/components/share-item-card';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useHaptics } from '@/hooks/useHaptics';
 import { usePublicShare } from '@/hooks/usePublicShare';
 import { ApiError } from '@/lib/api';
 import { trackRecentShare } from '@/lib/recent-shares';
@@ -24,6 +28,7 @@ export default function PublicShareScreen() {
   const params = useLocalSearchParams<{ code: string }>();
   const code = params.code;
   const c = Colors[useColorScheme() ?? 'light'];
+  const haptics = useHaptics();
 
   const [qrVisible, setQrVisible] = useState(false);
 
@@ -43,28 +48,35 @@ export default function PublicShareScreen() {
   if (isLoading) {
     return (
       <View style={[styles.centered, { backgroundColor: c.background }]}>
-        <ActivityIndicator color={c.text} />
+        <ActivityIndicator color={c.accent} />
       </View>
     );
   }
 
   if (error) {
-    const { title, body } = describeError(error);
+    const { title, body, icon } = describeError(error);
     return (
       <View style={[styles.centered, { backgroundColor: c.background }]}>
-        <Text style={[styles.errorTitle, { color: c.text }]}>{title}</Text>
-        <Text style={[styles.errorBody, { color: c.textMuted }]}>{body}</Text>
-        <Pressable
-          onPress={() => refetch()}
-          style={({ pressed }) => [
-            styles.retryButton,
-            { borderColor: c.text, opacity: pressed ? 0.7 : 1 },
+        <View
+          style={[
+            styles.errorIconWrap,
+            { backgroundColor: c.accentSoft },
           ]}
         >
-          <Text style={[styles.retryButtonText, { color: c.text }]}>
-            {isRefetching ? 'Retrying…' : 'Try again'}
-          </Text>
-        </Pressable>
+          <Ionicons name={icon} size={28} color={c.accent} />
+        </View>
+        <Text style={[styles.errorTitle, { color: c.text }]}>{title}</Text>
+        <Text style={[styles.errorBody, { color: c.textMuted }]}>{body}</Text>
+        <View style={styles.errorAction}>
+          <Button
+            label={isRefetching ? 'Retrying' : 'Try again'}
+            icon="refresh"
+            variant="secondary"
+            loading={isRefetching}
+            fullWidth={false}
+            onPress={() => refetch()}
+          />
+        </View>
       </View>
     );
   }
@@ -72,10 +84,16 @@ export default function PublicShareScreen() {
   if (!data) return null;
 
   const handleShareLink = async () => {
+    haptics.tap();
     await Share.share({
       message: `https://ceteris.app/c/${data.short_code}`,
       title: data.name,
     });
+  };
+
+  const handleOpenQr = () => {
+    haptics.tapStrong();
+    setQrVisible(true);
   };
 
   return (
@@ -84,11 +102,33 @@ export default function PublicShareScreen() {
         options={{
           headerRight: () => (
             <View style={styles.headerActions}>
-              <Pressable onPress={() => setQrVisible(true)} hitSlop={12}>
-                <Text style={[styles.headerAction, { color: c.accent }]}>QR</Text>
+              <Pressable
+                onPress={handleOpenQr}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Show QR code"
+                style={({ pressed }) => [
+                  styles.headerIconBtn,
+                  {
+                    backgroundColor: pressed ? c.accentSoft : 'transparent',
+                  },
+                ]}
+              >
+                <Ionicons name="qr-code-outline" size={22} color={c.accent} />
               </Pressable>
-              <Pressable onPress={handleShareLink} hitSlop={12}>
-                <Text style={[styles.headerAction, { color: c.accent }]}>Share</Text>
+              <Pressable
+                onPress={handleShareLink}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Share link"
+                style={({ pressed }) => [
+                  styles.headerIconBtn,
+                  {
+                    backgroundColor: pressed ? c.accentSoft : 'transparent',
+                  },
+                ]}
+              >
+                <Ionicons name="share-outline" size={22} color={c.accent} />
               </Pressable>
             </View>
           ),
@@ -104,71 +144,142 @@ export default function PublicShareScreen() {
 
       <ScrollView
         style={{ flex: 1, backgroundColor: c.background }}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            tintColor={c.textMuted}
+            tintColor={c.accent}
           />
         }
       >
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: c.text }]}>{data.name}</Text>
-
-          <View style={styles.bylineRow}>
-            {data.owner_name ? (
-              <Text style={[styles.byline, { color: c.textMuted }]}>by {data.owner_name}</Text>
-            ) : null}
-            <Text style={[styles.timestamp, { color: c.textMuted }]}>
+        <Animated.View entering={FadeInUp.duration(360)} style={styles.header}>
+          <View style={styles.codeChipRow}>
+            <View
+              style={[styles.codeChip, { backgroundColor: c.surfaceSunken }]}
+            >
+              <Ionicons name="link" size={11} color={c.textMuted} />
+              <Text style={[styles.codeChipText, { color: c.textMuted }]}>
+                {data.short_code}
+              </Text>
+            </View>
+            <Text style={[styles.timestamp, { color: c.textSubtle }]}>
               Updated {formatRelativeTime(data.updated_at)}
             </Text>
           </View>
 
-          {data.description ? (
-            <Text style={[styles.description, { color: c.text }]}>{data.description}</Text>
+          <Text style={[styles.title, { color: c.text }]}>{data.name}</Text>
+
+          {data.owner_name ? (
+            <View style={styles.bylineRow}>
+              <Ionicons name="person-circle-outline" size={16} color={c.textMuted} />
+              <Text style={[styles.byline, { color: c.textMuted }]}>
+                {data.owner_name}
+              </Text>
+            </View>
           ) : null}
-        </View>
+
+          {data.description ? (
+            <Text style={[styles.description, { color: c.text }]}>
+              {data.description}
+            </Text>
+          ) : null}
+        </Animated.View>
+
+        {data.items.length > 0 ? (
+          <Animated.View
+            entering={FadeInUp.duration(340).delay(80)}
+            style={styles.countRow}
+          >
+            <Text style={[styles.countLabel, { color: c.textSubtle }]}>
+              {data.items.length} {data.items.length === 1 ? 'PAPER' : 'PAPERS'}
+            </Text>
+            <View style={[styles.countRule, { backgroundColor: c.border }]} />
+          </Animated.View>
+        ) : null}
 
         <View style={styles.itemsList}>
           {data.items.length === 0 ? (
-            <Text style={[styles.empty, { color: c.textMuted }]}>
-              This collection is empty.
-            </Text>
+            <View
+              style={[
+                styles.emptyCard,
+                { backgroundColor: c.surface, borderColor: c.border },
+              ]}
+            >
+              <View
+                style={[styles.emptyIconWrap, { backgroundColor: c.accentSoft }]}
+              >
+                <Ionicons name="document-text-outline" size={22} color={c.accent} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>
+                Nothing here yet
+              </Text>
+              <Text style={[styles.emptyBody, { color: c.textMuted }]}>
+                The owner hasn&apos;t added any papers to this collection.
+              </Text>
+            </View>
           ) : (
-            data.items.map((item) => <ShareItemCard key={item.id} item={item} />)
+            data.items.map((item, i) => (
+              <Animated.View
+                key={item.id}
+                entering={FadeInUp.duration(340).delay(120 + i * 50)}
+              >
+                <ShareItemCard item={item} />
+              </Animated.View>
+            ))
           )}
         </View>
 
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: c.textMuted }]}>
-            {data.items.length} {data.items.length === 1 ? 'paper' : 'papers'}
-          </Text>
-        </View>
+        {/* Show-QR CTA also lives in the body for thumb-reach on the public page */}
+        {data.items.length > 0 ? (
+          <Animated.View
+            entering={FadeInUp.duration(360).delay(220)}
+            style={styles.bottomCta}
+          >
+            <Button
+              label="Show this collection's QR"
+              icon="qr-code"
+              variant="secondary"
+              onPress={handleOpenQr}
+            />
+          </Animated.View>
+        ) : null}
       </ScrollView>
     </>
   );
 }
 
-function describeError(error: unknown): { title: string; body: string } {
+function describeError(error: unknown): {
+  title: string;
+  body: string;
+  icon: 'alert-circle-outline' | 'cloud-offline-outline' | 'help-buoy-outline';
+} {
   if (error instanceof ApiError) {
     if (error.isNotFound) {
       return {
         title: 'Collection not found',
         body: "We couldn't find a public collection with that code. Double-check and try again.",
+        icon: 'help-buoy-outline',
       };
     }
     if (error.status >= 500) {
       return {
-        title: 'Server error',
+        title: 'Server hiccup',
         body: 'The Ceteris backend ran into a problem. Try again in a moment.',
+        icon: 'alert-circle-outline',
       };
     }
-    return { title: 'Something went wrong', body: error.detail };
+    return {
+      title: 'Something went wrong',
+      body: error.detail,
+      icon: 'alert-circle-outline',
+    };
   }
   // fetch() throws TypeError on network failure
   return {
     title: "Can't reach Ceteris",
     body: 'Check your connection and try again.',
+    icon: 'cloud-offline-outline',
   };
 }
 
@@ -179,9 +290,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: Spacing.lg,
   },
+  errorIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
   errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
@@ -190,21 +310,39 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: Spacing.lg,
     lineHeight: 22,
+    maxWidth: 320,
   },
-  retryButton: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm + 2,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth * 4,
+  errorAction: {
+    alignItems: 'center',
   },
-  retryButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
+
+  scrollContent: {
+    paddingBottom: Spacing.xxl,
   },
   header: {
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.lg,
+  },
+  codeChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  codeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+  },
+  codeChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    fontVariant: ['tabular-nums'],
   },
   title: {
     fontSize: 30,
@@ -214,42 +352,86 @@ const styles = StyleSheet.create({
   },
   bylineRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    columnGap: Spacing.sm,
+    alignItems: 'center',
+    gap: 4,
     marginTop: Spacing.sm,
   },
   byline: {
     fontSize: 14,
+    fontWeight: '500',
   },
   timestamp: {
-    fontSize: 14,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.4,
   },
   description: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
     marginTop: Spacing.md,
   },
+
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm + 2,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  countLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  countRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+
   itemsList: {
     paddingHorizontal: Spacing.lg,
   },
-  empty: {
-    fontSize: 15,
-    textAlign: 'center',
-    paddingVertical: Spacing.xl,
-  },
-  footer: {
+  emptyCard: {
     padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
+    marginVertical: Spacing.md,
   },
-  footerText: {
-    fontSize: 13,
+  emptyIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
   },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: Spacing.xs + 2,
+  },
+  emptyBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+
+  bottomCta: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+  },
+
   headerActions: {
     flexDirection: 'row',
-    gap: Spacing.md,
+    gap: 4,
+    marginRight: Spacing.xs,
   },
-  headerAction: {
-    fontSize: 16,
-    fontWeight: '500',
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
