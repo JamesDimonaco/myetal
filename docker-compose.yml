@@ -13,7 +13,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ceteris"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   api:
     build: ./apps/api
@@ -23,12 +23,20 @@ services:
       ENV: dev
       SECRET_KEY: dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX
       DATABASE_URL: postgresql+asyncpg://ceteris:ceteris@db:5432/ceteris
+      PUBLIC_API_URL: http://localhost:8000
+      PUBLIC_BASE_URL: http://localhost:3000
     depends_on:
       db:
         condition: service_healthy
     volumes:
+      # Live source reload — change a .py and uvicorn auto-reloads
       - ./apps/api/src:/app/src
-    command: uvicorn ceteris_api.main:app --host 0.0.0.0 --port 8000 --reload
+      # Mount alembic so the auto-migrate step on startup sees the latest revisions
+      - ./apps/api/alembic:/app/alembic
+      - ./apps/api/alembic.ini:/app/alembic.ini
+    # Apply any pending DB migrations, then start uvicorn with reload
+    command: >
+      sh -c "alembic upgrade head && uvicorn ceteris_api.main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
   ceteris_pgdata:
