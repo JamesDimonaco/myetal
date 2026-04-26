@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "d1238611-83b4-46e5-b398-48af391b9ad8"
+      }
+    },
+    "android": {
+      "package": "com.jamesdimonaco.myetal"
+    },
+    "ios": {
+      "bundleIdentifier": "com.jamesdimonaco.myetal",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
