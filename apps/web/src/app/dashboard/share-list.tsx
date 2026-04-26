@@ -8,6 +8,16 @@ import { ApiError } from '@/lib/api';
 import { useDeleteShare, useShares } from '@/lib/hooks/useShares';
 import type { ShareResponse } from '@/types/share';
 
+function publicUrlFor(shortCode: string): string {
+  // SSR has no `window`, so fall back to the canonical domain. On the client
+  // we prefer the live origin so a localhost/staging dashboard copies links
+  // that point to itself.
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/c/${shortCode}`;
+  }
+  return `https://myetal.app/c/${shortCode}`;
+}
+
 interface Props {
   initialShares: ShareResponse[];
 }
@@ -27,6 +37,33 @@ export function ShareList({ initialShares }: Props) {
   const [qrTarget, setQrTarget] = useState<ShareResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ShareResponse | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = async (share: ShareResponse) => {
+    const url = publicUrlFor(share.short_code);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Clipboard API can fail in non-secure contexts. Fall back to a
+      // throwaway textarea so the user still gets a copy.
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+      } catch {
+        /* ignore — the visual confirm below would be a lie */
+      }
+      ta.remove();
+    }
+    setCopiedId(share.id);
+    setTimeout(() => {
+      setCopiedId((current) => (current === share.id ? null : current));
+    }, 1800);
+  };
 
   const shares = data ?? [];
 
@@ -91,6 +128,14 @@ export function ShareList({ initialShares }: Props) {
                 className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft"
               >
                 Show QR
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopyLink(share)}
+                aria-label={`Copy link to ${share.name}`}
+                className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft"
+              >
+                {copiedId === share.id ? 'Copied!' : 'Copy link'}
               </button>
               <Link
                 href={`/dashboard/share/${share.id}`}

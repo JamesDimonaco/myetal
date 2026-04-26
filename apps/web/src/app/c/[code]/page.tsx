@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { ShareItemCard } from '@/components/share-item-card';
 import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { formatItemCount, formatRelativeTime } from '@/lib/format';
+import { lookupManyOpenAccess } from '@/lib/openalex';
 import type { PublicShareResponse } from '@/types/share';
 
 /**
@@ -89,6 +90,11 @@ export default async function PublicSharePage({ params }: PageProps) {
 
   if (!share) notFound();
 
+  // Parallel-resolve OpenAlex OA info for every item with a DOI. lookupMany
+  // dedupes and short-circuits on errors so a flaky upstream just hides the
+  // "View PDF" button rather than blocking the whole page.
+  const oaByDoi = await lookupManyOpenAccess(share.items.map((i) => i.doi));
+
   const qrUrl = `${API_BASE_URL}/public/c/${encodeURIComponent(code)}/qr.png`;
   const itemCount = share.items.length;
 
@@ -122,7 +128,13 @@ export default async function PublicSharePage({ params }: PageProps) {
             This collection is empty.
           </p>
         ) : (
-          share.items.map((item) => <ShareItemCard key={item.id} item={item} />)
+          share.items.map((item) => (
+            <ShareItemCard
+              key={item.id}
+              item={item}
+              oa={item.doi ? oaByDoi.get(item.doi.trim()) ?? null : null}
+            />
+          ))
         )}
       </section>
 
