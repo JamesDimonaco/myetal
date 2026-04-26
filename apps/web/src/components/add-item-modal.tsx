@@ -1,18 +1,21 @@
 'use client';
 
 /**
- * Add-paper modal — three input modes: DOI, Search, Manual. Mirrors the
- * mobile flow at apps/mobile/app/(authed)/share/add-paper.tsx, but laid out
- * as a centred dialog rather than a full-screen presentation.
+ * Add-item modal — top-level kind picker (Paper / Repo / Link), each kind
+ * with its own pane. The paper pane is the original three-mode flow (DOI /
+ * Search / Manual). The repo pane parses a GitHub URL, hits our same-origin
+ * `/api/github/repo` wrapper for metadata, and lets the user edit before
+ * saving. The link pane is pure manual entry — no upstream fetch.
  *
- * Wiring: parent owns visibility and receives the chosen Paper via `onPick`.
- * No outbox / pending-paper bus needed on web — the editor mounts the modal
- * directly so the callback path is straight-line.
+ * Wiring: parent owns visibility and receives the chosen draft via `onPick`,
+ * a discriminated-union payload so the editor can append it as the right
+ * kind without re-deriving the shape.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 
 import { ApiError } from '@/lib/api';
+import type { RepoInfo } from '@/lib/github';
 import {
   extractDoi,
   useLookupPaper,
@@ -20,14 +23,38 @@ import {
 } from '@/lib/hooks/usePapers';
 import type { Paper, PaperSearchResult } from '@/types/paper';
 
-type Mode = 'doi' | 'search' | 'manual';
+type Kind = 'paper' | 'repo' | 'link';
+type PaperMode = 'doi' | 'search' | 'manual';
+
+export type AddItemPaper = { kind: 'paper'; paper: Paper };
+export type AddItemRepo = {
+  kind: 'repo';
+  url: string;
+  title: string;
+  subtitle: string | null;
+  image_url: string | null;
+};
+export type AddItemLink = {
+  kind: 'link';
+  url: string;
+  title: string;
+  subtitle: string | null;
+  image_url: string | null;
+};
+export type AddItemPayload = AddItemPaper | AddItemRepo | AddItemLink;
 
 interface Props {
   onClose: () => void;
-  onPick: (paper: Paper) => void;
+  onPick: (item: AddItemPayload) => void;
 }
 
-const MODES: { id: Mode; label: string }[] = [
+const KINDS: { id: Kind; label: string }[] = [
+  { id: 'paper', label: 'Paper' },
+  { id: 'repo', label: 'Repo' },
+  { id: 'link', label: 'Link' },
+];
+
+const PAPER_MODES: { id: PaperMode; label: string }[] = [
   { id: 'doi', label: 'DOI' },
   { id: 'search', label: 'Search' },
   { id: 'manual', label: 'Manual' },
@@ -35,8 +62,8 @@ const MODES: { id: Mode; label: string }[] = [
 
 const DEBOUNCE_MS = 300;
 
-export function AddPaperModal({ onClose, onPick }: Props) {
-  const [mode, setMode] = useState<Mode>('doi');
+export function AddItemModal({ onClose, onPick }: Props) {
+  const [kind, setKind] = useState<Kind>('paper');
 
   // Lock body scroll + Escape to close — same UX contract as <QrModal>.
   useEffect(() => {
@@ -52,11 +79,17 @@ export function AddPaperModal({ onClose, onPick }: Props) {
     };
   }, [onClose]);
 
+  const titleByKind: Record<Kind, string> = {
+    paper: 'Add paper',
+    repo: 'Add repo',
+    link: 'Add link',
+  };
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="add-paper-title"
+      aria-labelledby="add-item-title"
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8 sm:items-center"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -64,8 +97,8 @@ export function AddPaperModal({ onClose, onPick }: Props) {
     >
       <div className="w-full max-w-xl rounded-xl border border-rule bg-paper shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-rule px-6 py-4">
-          <h2 id="add-paper-title" className="font-serif text-xl text-ink">
-            Add paper
+          <h2 id="add-item-title" className="font-serif text-xl text-ink">
+            {titleByKind[kind]}
           </h2>
           <button
             type="button"
@@ -86,13 +119,13 @@ export function AddPaperModal({ onClose, onPick }: Props) {
 
         <div className="px-6 pt-4">
           <div className="flex gap-1 rounded-full border border-rule bg-paper-soft p-1">
-            {MODES.map((m) => {
-              const active = mode === m.id;
+            {KINDS.map((k) => {
+              const active = kind === k.id;
               return (
                 <button
-                  key={m.id}
+                  key={k.id}
                   type="button"
-                  onClick={() => setMode(m.id)}
+                  onClick={() => setKind(k.id)}
                   className={[
                     'flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition',
                     active
@@ -100,7 +133,7 @@ export function AddPaperModal({ onClose, onPick }: Props) {
                       : 'text-ink-muted hover:text-ink',
                   ].join(' ')}
                 >
-                  {m.label}
+                  {k.label}
                 </button>
               );
             })}
@@ -108,9 +141,9 @@ export function AddPaperModal({ onClose, onPick }: Props) {
         </div>
 
         <div className="px-6 pb-6 pt-4">
-          {mode === 'doi' ? <DoiPane onPick={onPick} /> : null}
-          {mode === 'search' ? <SearchPane onPick={onPick} /> : null}
-          {mode === 'manual' ? <ManualPane onPick={onPick} /> : null}
+          {kind === 'paper' ? <PaperKindPane onPick={onPick} /> : null}
+          {kind === 'repo' ? <RepoKindPane onPick={onPick} /> : null}
+          {kind === 'link' ? <LinkKindPane onPick={onPick} /> : null}
         </div>
       </div>
     </div>
@@ -118,6 +151,39 @@ export function AddPaperModal({ onClose, onPick }: Props) {
 }
 
 // --------------------------------------------------------------------------
+// Paper
+
+function PaperKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
+  const [mode, setMode] = useState<PaperMode>('doi');
+  const handle = (paper: Paper) => onPick({ kind: 'paper', paper });
+
+  return (
+    <div className="grid gap-4">
+      <div className="flex gap-1 rounded-md border border-rule bg-paper-soft p-1">
+        {PAPER_MODES.map((m) => {
+          const active = mode === m.id;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setMode(m.id)}
+              className={[
+                'flex-1 rounded px-3 py-1 text-xs font-medium transition',
+                active ? 'bg-ink text-paper' : 'text-ink-muted hover:text-ink',
+              ].join(' ')}
+            >
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {mode === 'doi' ? <DoiPane onPick={handle} /> : null}
+      {mode === 'search' ? <SearchPane onPick={handle} /> : null}
+      {mode === 'manual' ? <ManualPane onPick={handle} /> : null}
+    </div>
+  );
+}
 
 function useDebouncedValue<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -318,6 +384,237 @@ function ManualPane({ onPick }: { onPick: (p: Paper) => void }) {
         className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
       >
         Add to collection
+      </button>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Repo
+
+function RepoKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState<RepoInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Editable buffer the user can tweak before saving.
+  const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [url, setUrl] = useState('');
+
+  const handleFetch = async () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await fetch(
+        `/api/github/repo?url=${encodeURIComponent(trimmed)}`,
+      );
+      if (!res.ok) {
+        if (res.status === 404) {
+          setError("GitHub doesn't know that repo, or the URL didn't parse.");
+        } else if (res.status === 400) {
+          setError("That doesn't look like a GitHub repo URL.");
+        } else {
+          setError('Lookup failed. Try again, or fill the fields manually.');
+        }
+        return;
+      }
+      const data = (await res.json()) as RepoInfo;
+      setInfo(data);
+      setTitle(data.fullName);
+      setSubtitle(data.description ?? '');
+      setImageUrl(data.avatarUrl ?? '');
+      setUrl(data.htmlUrl);
+    } catch {
+      setError('Network blip. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canSave = title.trim().length > 0 && url.trim().length > 0;
+
+  const handleAdd = () => {
+    if (!canSave) return;
+    onPick({
+      kind: 'repo',
+      url: url.trim(),
+      title: title.trim(),
+      subtitle: subtitle.trim() || null,
+      image_url: imageUrl.trim() || null,
+    });
+  };
+
+  return (
+    <div className="grid gap-4">
+      <label className="grid gap-1.5">
+        <span className="text-xs uppercase tracking-wider text-ink-muted">
+          GitHub URL
+        </span>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleFetch();
+              }
+            }}
+            placeholder="https://github.com/owner/repo"
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="flex-1 rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+          />
+          <button
+            type="button"
+            onClick={handleFetch}
+            disabled={loading || !input.trim()}
+            className="rounded-md bg-ink px-4 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          >
+            {loading ? '…' : 'Fetch'}
+          </button>
+        </div>
+        <span className="text-xs text-ink-faint">
+          We pull the description, stars, language, and license from GitHub.
+        </span>
+      </label>
+
+      {error ? (
+        <div className="rounded-md border border-rule bg-paper-soft px-4 py-3">
+          <p className="text-sm font-semibold text-ink">Couldn&apos;t fetch</p>
+          <p className="mt-1 text-sm text-ink-muted">{error}</p>
+        </div>
+      ) : null}
+
+      {info || title || url ? (
+        <div className="grid gap-3 rounded-md border border-rule bg-paper-soft p-4">
+          {info?.avatarUrl ? (
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={info.avatarUrl}
+                alt=""
+                width={40}
+                height={40}
+                className="h-10 w-10 rounded-md border border-rule bg-paper"
+              />
+              <div className="min-w-0">
+                <p className="truncate font-serif text-sm text-ink">
+                  {info.fullName}
+                </p>
+                <p className="text-xs text-ink-muted">
+                  {`★ ${info.stars.toLocaleString()}`}
+                  {info.language ? ` · ${info.language}` : ''}
+                  {info.license ? ` · ${info.license}` : ''}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <ManualField label="Title" value={title} onChange={setTitle} />
+          <ManualField
+            label="Description"
+            value={subtitle}
+            onChange={setSubtitle}
+          />
+          <ManualField
+            label="URL"
+            value={url}
+            onChange={setUrl}
+            placeholder="https://github.com/owner/repo"
+          />
+          <ManualField
+            label="Image URL"
+            value={imageUrl}
+            onChange={setImageUrl}
+            placeholder="https://avatars.githubusercontent.com/..."
+          />
+
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={!canSave}
+            className="mt-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          >
+            Add to project
+          </button>
+        </div>
+      ) : (
+        <EmptyHint
+          title="Paste a GitHub repo URL"
+          body="We'll fetch the description and metadata."
+        />
+      )}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Link
+
+function LinkKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+
+  const canSave = url.trim().length > 0 && title.trim().length > 0;
+
+  const handleAdd = () => {
+    if (!canSave) return;
+    onPick({
+      kind: 'link',
+      url: url.trim(),
+      title: title.trim(),
+      subtitle: subtitle.trim() || null,
+      image_url: imageUrl.trim() || null,
+    });
+  };
+
+  return (
+    <div className="grid gap-3">
+      <p className="text-xs text-ink-faint">
+        For blog posts, slides, lab pages, datasets — anything with a URL.
+      </p>
+      <ManualField
+        label="URL (required)"
+        value={url}
+        onChange={setUrl}
+        placeholder="https://..."
+      />
+      <ManualField
+        label="Title (required)"
+        value={title}
+        onChange={setTitle}
+      />
+      <ManualField
+        label="Description"
+        value={subtitle}
+        onChange={setSubtitle}
+        placeholder="Optional one-liner"
+      />
+      <ManualField
+        label="Image URL"
+        value={imageUrl}
+        onChange={setImageUrl}
+        placeholder="https://..."
+      />
+      <button
+        type="button"
+        onClick={handleAdd}
+        disabled={!canSave}
+        className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+      >
+        Add to project
       </button>
     </div>
   );

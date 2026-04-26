@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
 
-import { AddPaperModal } from '@/components/add-paper-modal';
+import {
+  AddItemModal,
+  type AddItemPayload,
+} from '@/components/add-item-modal';
+import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
 import { ApiError } from '@/lib/api';
 import {
@@ -18,45 +22,62 @@ import type { Paper } from '@/types/paper';
 import type {
   ShareCreateInput,
   ShareItemInput,
+  ShareItemKind,
   ShareResponse,
   ShareType,
 } from '@/types/share';
 
-const SHARE_TYPES: ShareType[] = ['paper', 'collection', 'poster', 'grant'];
+const SHARE_TYPES: ShareType[] = [
+  'paper',
+  'collection',
+  'poster',
+  'grant',
+  'project',
+];
 
-const itemSchema = z.object({
-  title: z.string().trim().min(1, 'Item title required').max(500),
-  scholar_url: z
-    .string()
-    .trim()
-    .url('Invalid URL')
-    .max(2000)
-    .optional()
-    .or(z.literal('')),
-  doi: z.string().trim().max(255).optional().or(z.literal('')),
-  authors: z.string().trim().optional().or(z.literal('')),
-  year: z
-    .union([z.string().regex(/^\d{4}$/, '4-digit year'), z.literal('')])
-    .optional(),
-  notes: z.string().trim().optional().or(z.literal('')),
-});
+// Per-kind validation. Paper only requires title. Repo and link require both
+// title and a URL — that's what makes them useful as a destination.
+const itemSchema = z
+  .object({
+    _key: z.string(),
+    kind: z.enum(['paper', 'repo', 'link']),
+    title: z.string().trim().min(1, 'Item title required').max(500),
+    scholar_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    doi: z.string().trim().max(255).optional().or(z.literal('')),
+    authors: z.string().trim().optional().or(z.literal('')),
+    year: z
+      .union([z.string().regex(/^\d{4}$/, '4-digit year'), z.literal('')])
+      .optional(),
+    notes: z.string().trim().optional().or(z.literal('')),
+    url: z.string().trim().max(2000).optional().or(z.literal('')),
+    subtitle: z.string().trim().optional().or(z.literal('')),
+    image_url: z.string().trim().max(2000).optional().or(z.literal('')),
+  })
+  .refine((it) => it.kind === 'paper' || (it.url && it.url.length > 0), {
+    message: 'URL required for repo/link items',
+    path: ['url'],
+  });
 
 const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
   description: z.string().trim().optional().or(z.literal('')),
-  type: z.enum(['paper', 'collection', 'poster', 'grant']),
+  type: z.enum(['paper', 'collection', 'poster', 'grant', 'project']),
   is_public: z.boolean(),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
 interface DraftItem {
   _key: string;
+  kind: ShareItemKind;
   title: string;
   scholar_url: string;
   doi: string;
   authors: string;
   year: string;
   notes: string;
+  url: string;
+  subtitle: string;
+  image_url: string;
 }
 
 let _itemKeySeed = 0;
@@ -64,35 +85,64 @@ const newKey = () => `item_${++_itemKeySeed}_${Date.now()}`;
 
 const emptyItem = (): DraftItem => ({
   _key: newKey(),
+  kind: 'paper',
   title: '',
   scholar_url: '',
   doi: '',
   authors: '',
   year: '',
   notes: '',
+  url: '',
+  subtitle: '',
+  image_url: '',
 });
 
 const fromResponseItem = (
   it: ShareResponse['items'][number],
 ): DraftItem => ({
   _key: newKey(),
+  kind: it.kind ?? 'paper',
   title: it.title,
   scholar_url: it.scholar_url ?? '',
   doi: it.doi ?? '',
   authors: it.authors ?? '',
   year: it.year != null ? String(it.year) : '',
   notes: it.notes ?? '',
+  url: it.url ?? '',
+  subtitle: it.subtitle ?? '',
+  image_url: it.image_url ?? '',
 });
 
 const fromPaper = (p: Paper): DraftItem => ({
   _key: newKey(),
+  kind: 'paper',
   title: p.title,
   scholar_url: p.scholar_url ?? '',
   doi: p.doi ?? '',
   authors: p.authors ?? '',
   year: p.year != null ? String(p.year) : '',
   notes: '',
+  url: '',
+  subtitle: '',
+  image_url: '',
 });
+
+const fromAddPayload = (payload: AddItemPayload): DraftItem => {
+  if (payload.kind === 'paper') return fromPaper(payload.paper);
+  return {
+    _key: newKey(),
+    kind: payload.kind,
+    title: payload.title,
+    scholar_url: '',
+    doi: '',
+    authors: '',
+    year: '',
+    notes: '',
+    url: payload.url,
+    subtitle: payload.subtitle ?? '',
+    image_url: payload.image_url ?? '',
+  };
+};
 
 interface Props {
   /** Existing share — when present, the form is in edit mode. */
@@ -138,7 +188,7 @@ export function ShareEditor({ initial, id }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [savedShare, setSavedShare] = useState<ShareResponse | null>(null);
   const [showQr, setShowQr] = useState(false);
-  const [showAddPaper, setShowAddPaper] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const updateItem = (key: string, patch: Partial<DraftItem>) => {
@@ -148,19 +198,21 @@ export function ShareEditor({ initial, id }: Props) {
   };
 
   /**
-   * Append a paper from the add-paper modal. If the only existing row is the
-   * blank seed (no title typed), replace it — that keeps the count honest for
-   * a fresh share where the user hadn't manually filled the empty row yet.
+   * Append an item from the add-item modal. If the only existing row is the
+   * blank seed (no fields filled), replace it — keeps the count honest for a
+   * fresh share where the user hadn't manually touched the empty row yet.
    */
-  const appendPaper = (paper: Paper) => {
+  const appendItem = (payload: AddItemPayload) => {
     setItems((prev) => {
-      const draft = fromPaper(paper);
+      const draft = fromAddPayload(payload);
       const onlySeedRow =
         prev.length === 1 &&
         !prev[0].title.trim() &&
         !prev[0].doi.trim() &&
         !prev[0].scholar_url.trim() &&
-        !prev[0].authors.trim();
+        !prev[0].authors.trim() &&
+        !prev[0].url.trim() &&
+        !prev[0].subtitle.trim();
       return onlySeedRow ? [draft] : [...prev, draft];
     });
   };
@@ -200,12 +252,16 @@ export function ShareEditor({ initial, id }: Props) {
     }
 
     const apiItems: ShareItemInput[] = parsed.data.items.map((it) => ({
+      kind: it.kind,
       title: it.title,
       scholar_url: it.scholar_url ? it.scholar_url : null,
       doi: it.doi ? it.doi : null,
       authors: it.authors ? it.authors : null,
       year: it.year ? Number(it.year) : null,
       notes: it.notes ? it.notes : null,
+      url: it.url ? it.url : null,
+      subtitle: it.subtitle ? it.subtitle : null,
+      image_url: it.image_url ? it.image_url : null,
     }));
 
     const payload: ShareCreateInput = {
@@ -335,10 +391,10 @@ export function ShareEditor({ initial, id }: Props) {
             </h2>
             <button
               type="button"
-              onClick={() => setShowAddPaper(true)}
+              onClick={() => setShowAddItem(true)}
               className="text-sm font-medium text-accent hover:underline"
             >
-              + Add paper
+              + Add item
             </button>
           </div>
 
@@ -349,9 +405,12 @@ export function ShareEditor({ initial, id }: Props) {
                 className="rounded-md border border-rule bg-paper-soft p-4"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-                    #{idx + 1}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                      #{idx + 1}
+                    </span>
+                    <KindBadge kind={it.kind} />
+                  </div>
                   <div className="flex items-center gap-1">
                     <IconBtn
                       label="Move up"
@@ -378,44 +437,13 @@ export function ShareEditor({ initial, id }: Props) {
                 </div>
 
                 <div className="mt-3 grid gap-3">
-                  <ItemField
-                    label="Title"
-                    value={it.title}
-                    onChange={(v) => updateItem(it._key, { title: v })}
-                    placeholder="Paper title"
-                  />
-                  <ItemField
-                    label="Scholar URL"
-                    value={it.scholar_url}
-                    onChange={(v) => updateItem(it._key, { scholar_url: v })}
-                    placeholder="https://scholar.google.com/..."
-                    type="url"
-                  />
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <ItemField
-                      label="DOI"
-                      value={it.doi}
-                      onChange={(v) => updateItem(it._key, { doi: v })}
-                      placeholder="10.1000/xyz123"
-                    />
-                    <ItemField
-                      label="Year"
-                      value={it.year}
-                      onChange={(v) =>
-                        updateItem(it._key, {
-                          year: v.replace(/[^0-9]/g, '').slice(0, 4),
-                        })
-                      }
-                      placeholder="2026"
-                      inputMode="numeric"
-                    />
-                  </div>
-                  <ItemField
-                    label="Authors"
-                    value={it.authors}
-                    onChange={(v) => updateItem(it._key, { authors: v })}
-                    placeholder="Lovelace A, Babbage C"
-                  />
+                  {it.kind === 'paper' ? (
+                    <PaperFields item={it} onChange={(p) => updateItem(it._key, p)} />
+                  ) : it.kind === 'repo' ? (
+                    <RepoFields item={it} onChange={(p) => updateItem(it._key, p)} />
+                  ) : (
+                    <LinkFields item={it} onChange={(p) => updateItem(it._key, p)} />
+                  )}
                   <ItemField
                     label="Notes"
                     value={it.notes}
@@ -467,12 +495,12 @@ export function ShareEditor({ initial, id }: Props) {
         </div>
       </form>
 
-      {showAddPaper ? (
-        <AddPaperModal
-          onClose={() => setShowAddPaper(false)}
-          onPick={(paper) => {
-            appendPaper(paper);
-            setShowAddPaper(false);
+      {showAddItem ? (
+        <AddItemModal
+          onClose={() => setShowAddItem(false)}
+          onPick={(payload) => {
+            appendItem(payload);
+            setShowAddItem(false);
           }}
         />
       ) : null}
@@ -521,6 +549,158 @@ export function ShareEditor({ initial, id }: Props) {
         </div>
       ) : null}
     </>
+  );
+}
+
+// --- per-kind field groups ---
+
+function PaperFields({
+  item,
+  onChange,
+}: {
+  item: DraftItem;
+  onChange: (p: Partial<DraftItem>) => void;
+}) {
+  return (
+    <>
+      <ItemField
+        label="Title"
+        value={item.title}
+        onChange={(v) => onChange({ title: v })}
+        placeholder="Paper title"
+      />
+      <ItemField
+        label="Scholar URL"
+        value={item.scholar_url}
+        onChange={(v) => onChange({ scholar_url: v })}
+        placeholder="https://scholar.google.com/..."
+        type="url"
+      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ItemField
+          label="DOI"
+          value={item.doi}
+          onChange={(v) => onChange({ doi: v })}
+          placeholder="10.1000/xyz123"
+        />
+        <ItemField
+          label="Year"
+          value={item.year}
+          onChange={(v) =>
+            onChange({ year: v.replace(/[^0-9]/g, '').slice(0, 4) })
+          }
+          placeholder="2026"
+          inputMode="numeric"
+        />
+      </div>
+      <ItemField
+        label="Authors"
+        value={item.authors}
+        onChange={(v) => onChange({ authors: v })}
+        placeholder="Lovelace A, Babbage C"
+      />
+    </>
+  );
+}
+
+function RepoFields({
+  item,
+  onChange,
+}: {
+  item: DraftItem;
+  onChange: (p: Partial<DraftItem>) => void;
+}) {
+  return (
+    <>
+      <ItemField
+        label="Title (owner/repo)"
+        value={item.title}
+        onChange={(v) => onChange({ title: v })}
+        placeholder="owner/repo"
+      />
+      <ItemField
+        label="GitHub URL"
+        value={item.url}
+        onChange={(v) => onChange({ url: v })}
+        placeholder="https://github.com/owner/repo"
+        type="url"
+      />
+      <ItemField
+        label="Description"
+        value={item.subtitle}
+        onChange={(v) => onChange({ subtitle: v })}
+        placeholder="One-liner from the repo's About"
+      />
+      <ItemField
+        label="Image URL"
+        value={item.image_url}
+        onChange={(v) => onChange({ image_url: v })}
+        placeholder="https://avatars.githubusercontent.com/..."
+        type="url"
+      />
+    </>
+  );
+}
+
+function LinkFields({
+  item,
+  onChange,
+}: {
+  item: DraftItem;
+  onChange: (p: Partial<DraftItem>) => void;
+}) {
+  return (
+    <>
+      <ItemField
+        label="Title"
+        value={item.title}
+        onChange={(v) => onChange({ title: v })}
+        placeholder="What is this?"
+      />
+      <ItemField
+        label="URL"
+        value={item.url}
+        onChange={(v) => onChange({ url: v })}
+        placeholder="https://..."
+        type="url"
+      />
+      <ItemField
+        label="Description"
+        value={item.subtitle}
+        onChange={(v) => onChange({ subtitle: v })}
+        placeholder="Optional one-liner"
+      />
+      <ItemField
+        label="Image URL"
+        value={item.image_url}
+        onChange={(v) => onChange({ image_url: v })}
+        placeholder="https://..."
+        type="url"
+      />
+    </>
+  );
+}
+
+function KindBadge({ kind }: { kind: ShareItemKind }) {
+  if (kind === 'repo') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+        <GitHubIcon size={11} />
+        Repo
+      </span>
+    );
+  }
+  if (kind === 'link') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+        Link
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+      Paper
+    </span>
   );
 }
 
