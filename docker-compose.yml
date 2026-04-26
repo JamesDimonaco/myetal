@@ -21,7 +21,7 @@ services:
       - "8000:8000"
     environment:
       ENV: dev
-      SECRET_KEY: dev-secret-change-me
+      SECRET_KEY: dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX
       DATABASE_URL: postgresql+asyncpg://quire:quire@db:5432/quire
     depends_on:
       db:

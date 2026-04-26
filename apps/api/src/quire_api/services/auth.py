@@ -1,0 +1,156 @@
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from quire_api.core.security import (
+    create_access_token,
+    generate_refresh_token,
+    hash_password,
+    hash_refresh_token,
+    refresh_token_expiry,
+    verify_password,
+)
+from quire_api.models import AuthIdentity, AuthProvider, RefreshToken, User
+
+
+class AuthError(Exception):
+    """Base for auth-flow errors translated to HTTP responses by routes."""
+
+
+class EmailAlreadyRegistered(AuthError):
+    pass
+
+
+class InvalidCredentials(AuthError):
+    pass
+
+
+class InvalidRefreshToken(AuthError):
+    pass
+
+
+async def register_with_password(
+    db: AsyncSession,
+    email: str,
+    password: str,
+    name: str | None,
+) -> tuple[User, str, str]:
+    normalized = email.lower()
+    existing = await db.scalar(
+        select(AuthIdentity).where(
+            AuthIdentity.provider == AuthProvider.PASSWORD,
+            AuthIdentity.subject_id == normalized,
+        )
+    )
+    if existing is not None:
+        raise EmailAlreadyRegistered
+
+    user = User(name=name, email=normalized)
+    db.add(user)
+    await db.flush()
+
+    db.add(
+        AuthIdentity(
+            user_id=user.id,
+            provider=AuthProvider.PASSWORD,
+            subject_id=normalized,
+            password_hash=hash_password(password),
+        )
+    )
+
+    access, raw_refresh, _ = await _issue_token_pair(db, user.id, family_id=None)
+    await db.commit()
+    return user, access, raw_refresh
+
+
+async def login_with_password(
+    db: AsyncSession,
+    email: str,
+    password: str,
+) -> tuple[User, str, str]:
+    normalized = email.lower()
+    identity = await db.scalar(
+        select(AuthIdentity).where(
+            AuthIdentity.provider == AuthProvider.PASSWORD,
+            AuthIdentity.subject_id == normalized,
+        )
+    )
+    if identity is None or identity.password_hash is None:
+        raise InvalidCredentials
+    if not verify_password(password, identity.password_hash):
+        raise InvalidCredentials
+
+    user = await db.get(User, identity.user_id)
+    if user is None:
+        raise InvalidCredentials
+
+    access, raw_refresh, _ = await _issue_token_pair(db, user.id, family_id=None)
+    await db.commit()
+    return user, access, raw_refresh
+
+
+async def rotate_refresh_token(db: AsyncSession, raw_refresh: str) -> tuple[str, str]:
+    digest = hash_refresh_token(raw_refresh)
+    token = await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == digest))
+    if token is None:
+        raise InvalidRefreshToken
+
+    if token.revoked or token.rotated_to_id is not None:
+        # Reuse / replay attempt — burn the whole family
+        await _revoke_family(db, token.family_id)
+        await db.commit()
+        raise InvalidRefreshToken
+
+    expires_at = token.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at < datetime.now(UTC):
+        raise InvalidRefreshToken
+
+    access, new_raw, new_token = await _issue_token_pair(
+        db, token.user_id, family_id=token.family_id
+    )
+    token.rotated_to_id = new_token.id
+
+    await db.commit()
+    return access, new_raw
+
+
+async def logout(db: AsyncSession, raw_refresh: str) -> None:
+    digest = hash_refresh_token(raw_refresh)
+    token = await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == digest))
+    if token is None:
+        return
+    await _revoke_family(db, token.family_id)
+    await db.commit()
+
+
+# ---------- internals ----------
+
+
+async def _issue_token_pair(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    family_id: uuid.UUID | None,
+) -> tuple[str, str, RefreshToken]:
+    access = create_access_token(user_id)
+    raw, digest = generate_refresh_token()
+    rt = RefreshToken(
+        user_id=user_id,
+        token_hash=digest,
+        expires_at=refresh_token_expiry(),
+        family_id=family_id or uuid.uuid4(),
+    )
+    db.add(rt)
+    await db.flush()
+    return access, raw, rt
+
+
+async def _revoke_family(db: AsyncSession, family_id: uuid.UUID) -> None:
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.family_id == family_id)
+        .values(revoked=True)
+    )

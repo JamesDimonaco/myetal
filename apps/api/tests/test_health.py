@@ -19,7 +19,7 @@ def test_dev_secret_rejected_in_prod(monkeypatch) -> None:
     from quire_api.core import config as config_module
 
     monkeypatch.setenv("ENV", "production")
-    monkeypatch.setenv("SECRET_KEY", "dev-secret-change-me")
+    monkeypatch.setenv("SECRET_KEY", "dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX")
 
     try:
         importlib.reload(config_module)

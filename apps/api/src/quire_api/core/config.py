@@ -1,7 +1,7 @@
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEV_SECRET_PLACEHOLDER = "dev-secret-change-me"
+DEV_SECRET_PLACEHOLDER = "dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX"
 
 
 class Settings(BaseSettings):
