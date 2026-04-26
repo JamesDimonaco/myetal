@@ -34,7 +34,7 @@
         "resourceClass": "medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://staging-api.myetal.app"
+        "EXPO_PUBLIC_API_URL": "https://api.myetal.app"
       }
     },
     "production": {
