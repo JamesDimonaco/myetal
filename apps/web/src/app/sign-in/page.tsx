@@ -6,9 +6,8 @@ import { SignInForm } from './sign-in-form';
 /**
  * Sign-in shell — server component for layout, hands the form (with its
  * useState / fetch) off to a client component. OAuth buttons sit underneath:
- * GitHub is wired (the only provider with credentials right now); ORCID and
- * Google show as disabled "Coming soon" so the academic audience can see
- * we're not pretending those don't exist.
+ * GitHub and Google are wired; ORCID shows as disabled "Coming soon" so the
+ * academic audience can see we're not pretending it doesn't exist.
  */
 export default function SignInPage() {
   return (
@@ -53,17 +52,13 @@ export default function SignInPage() {
             soon
           </span>
         </button>
-        <button
-          type="button"
-          disabled
-          title="Coming soon — Google client is in registration"
-          className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-md border border-rule bg-paper-soft px-5 py-3 text-sm font-medium text-ink-faint"
+        <a
+          href="/api/auth/google/start"
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
         >
+          <span aria-hidden>G</span>
           Continue with Google
-          <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] uppercase tracking-wider">
-            soon
-          </span>
-        </button>
+        </a>
       </div>
 
       <p className="mt-10 text-xs text-ink-faint">

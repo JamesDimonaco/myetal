@@ -12,6 +12,7 @@
       "bundleIdentifier": "app.myetal.mobile",
       "supportsTablet": true,
       "associatedDomains": [
+        "applinks:myetal.app",
         "applinks:myetal.app"
       ]
     },
@@ -40,9 +41,26 @@
             "BROWSABLE",
             "DEFAULT"
           ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "myetal.app",
+              "pathPrefix": "/c"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
@@ -83,6 +101,12 @@
       },
       "router": {}
     },
-    "owner": "jamesdimonaco"
+    "owner": "jamesdimonaco",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d1238611-83b4-46e5-b398-48af391b9ad8"
+    }
   }
 }
