@@ -1,47 +1,91 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useHaptics } from '@/hooks/useHaptics';
+import { usePressScale } from '@/hooks/usePressScale';
 import type { RecentShare } from '@/lib/recent-shares';
 import { formatRelativeTime } from '@/lib/time';
 
 export function RecentShareCard({ entry }: { entry: RecentShare }) {
   const c = Colors[useColorScheme() ?? 'light'];
+  const haptics = useHaptics();
+  const press = usePressScale(0.985);
 
-  const subtitle = [
-    entry.owner_name,
-    `${entry.item_count} ${entry.item_count === 1 ? 'paper' : 'papers'}`,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const itemLabel = `${entry.item_count} ${entry.item_count === 1 ? 'paper' : 'papers'}`;
 
   return (
     <Link href={`/c/${entry.short_code}`} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`Open ${entry.name}`}
-        style={({ pressed }) => [
-          styles.card,
-          {
-            backgroundColor: c.surface,
-            borderColor: c.border,
-            opacity: pressed ? 0.7 : 1,
-          },
-        ]}
+        onPress={() => haptics.tap()}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
       >
-        <View style={styles.headerRow}>
-          <Text style={[styles.code, { color: c.textMuted }]}>{entry.short_code}</Text>
-          <Text style={[styles.code, { color: c.textMuted }]}>
-            {formatRelativeTime(entry.viewed_at)}
-          </Text>
-        </View>
-        <Text style={[styles.title, { color: c.text }]} numberOfLines={2}>
-          {entry.name}
-        </Text>
-        {subtitle ? (
-          <Text style={[styles.subtitle, { color: c.textMuted }]}>{subtitle}</Text>
-        ) : null}
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              backgroundColor: c.surface,
+              borderColor: c.border,
+            },
+            Shadows.sm,
+            press.style,
+          ]}
+        >
+          {/* Left: tinted icon tile mirroring the empty-state's accent */}
+          <View
+            style={[
+              styles.iconTile,
+              { backgroundColor: c.accentSoft },
+            ]}
+          >
+            <Ionicons name="documents-outline" size={20} color={c.accent} />
+          </View>
+
+          {/* Body */}
+          <View style={styles.body}>
+            <Text style={[styles.title, { color: c.text }]} numberOfLines={2}>
+              {entry.name}
+            </Text>
+            <View style={styles.metaRow}>
+              {entry.owner_name ? (
+                <>
+                  <Text
+                    style={[styles.meta, { color: c.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {entry.owner_name}
+                  </Text>
+                  <Text style={[styles.dot, { color: c.textSubtle }]}>·</Text>
+                </>
+              ) : null}
+              <Text style={[styles.meta, { color: c.textMuted }]}>
+                {itemLabel}
+              </Text>
+            </View>
+            <View style={styles.footerRow}>
+              <Text style={[styles.code, { color: c.textSubtle }]}>
+                {entry.short_code}
+              </Text>
+              <Text style={[styles.dot, { color: c.textSubtle }]}>·</Text>
+              <Text style={[styles.code, { color: c.textSubtle }]}>
+                {formatRelativeTime(entry.viewed_at)}
+              </Text>
+            </View>
+          </View>
+
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={c.textSubtle}
+            style={styles.chevron}
+          />
+        </Animated.View>
       </Pressable>
     </Link>
   );
@@ -49,28 +93,57 @@ export function RecentShareCard({ entry }: { entry: RecentShare }) {
 
 const styles = StyleSheet.create({
   card: {
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: Spacing.sm,
-  },
-  headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.xs,
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.sm + 2,
+    gap: Spacing.md,
   },
-  code: {
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
-    letterSpacing: 0.5,
+  iconTile: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: {
+    flex: 1,
+    gap: 2,
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
-    lineHeight: 22,
+    letterSpacing: -0.1,
+    lineHeight: 21,
   },
-  subtitle: {
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: 2,
+  },
+  meta: {
     fontSize: 13,
-    marginTop: Spacing.xs,
+    flexShrink: 1,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: 4,
+  },
+  code: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    fontVariant: ['tabular-nums'],
+  },
+  dot: {
+    fontSize: 13,
+  },
+  chevron: {
+    opacity: 0.7,
   },
 });
