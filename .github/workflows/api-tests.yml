@@ -1,0 +1,52 @@
+name: api-tests
+
+# Lint + test the FastAPI backend on every PR that touches it.
+# Pushes to main are also tested so the protected-branch status check is
+# always populated even if a PR was merged via the "rebase" path.
+
+on:
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/api-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          # Pin to the same uv major as the Dockerfile so behaviour matches.
+          version: "0.5.4"
+
+      - name: Set up Python
+        # uv reads .python-version automatically, but installing it explicitly
+        # gives clearer logs when the cache is cold.
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --all-groups --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Pytest
+        run: uv run pytest
