@@ -1,17 +1,71 @@
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { api, API_BASE_URL } from '@/lib/api';
+
+WebBrowser.maybeCompleteAuthSession();
+
+interface MeResponse {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
 
 /**
- * Sign-in placeholder. The real auth flow (ORCID + Google + GitHub +
- * email/password) lands in a follow-up commit. For now this exists so the
- * landing footer has somewhere to navigate to and we can preview the layout.
+ * Sign-in placeholder + a working "Sign in with GitHub (dev test)" button so
+ * James can verify the OAuth pipeline end-to-end before the auth agent ships
+ * the real flow. ORCID/Google/Email-password buttons stay disabled until
+ * credentials land + the auth agent's branch merges.
  */
 export default function SignInScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
+  const [loading, setLoading] = useState(false);
+
+  const handleGitHubTest = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const returnUrl = Linking.createURL('/auth-finish');
+      const startUrl =
+        `${API_BASE_URL}/auth/github/start` +
+        `?platform=devjson` +
+        `&mobile_redirect=${encodeURIComponent(returnUrl)}` +
+        `&return_to=/`;
+
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, returnUrl);
+
+      if (result.type !== 'success') {
+        // user cancelled or browser was dismissed
+        return;
+      }
+
+      const url = new URL(result.url);
+      const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+      const accessToken = fragment.get('access_token');
+      if (!accessToken) {
+        Alert.alert('Auth failed', 'No access_token in callback URL.');
+        return;
+      }
+
+      const me = await api<MeResponse>('/auth/me', { auth: accessToken });
+      Alert.alert(
+        'Signed in!',
+        `Hello ${me.name ?? me.email ?? 'researcher'}\n\n` +
+          `id: ${me.id}\n\n` +
+          `(This is a dev test — the auth agent's branch will replace this with persistent token storage + a real authed flow.)`,
+      );
+    } catch (e) {
+      Alert.alert('Auth error', e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: c.background }]}>
@@ -23,7 +77,30 @@ export default function SignInScreen() {
         </Text>
 
         <View style={styles.providerStack}>
-          {(['ORCID', 'Google', 'GitHub'] as const).map((provider) => (
+          {/* Working dev-test button for GitHub */}
+          <Pressable
+            onPress={handleGitHubTest}
+            disabled={loading}
+            style={({ pressed }) => [
+              styles.providerButton,
+              {
+                borderColor: c.text,
+                backgroundColor: c.text,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator color={c.background} />
+            ) : (
+              <Text style={[styles.providerText, { color: c.background }]}>
+                Continue with GitHub  ·  dev test
+              </Text>
+            )}
+          </Pressable>
+
+          {/* Disabled placeholders */}
+          {(['ORCID', 'Google'] as const).map((provider) => (
             <Pressable
               key={provider}
               disabled
@@ -33,16 +110,17 @@ export default function SignInScreen() {
               ]}
             >
               <Text style={[styles.providerText, { color: c.text }]}>
-                Continue with {provider}
+                Continue with {provider}  ·  coming soon
               </Text>
             </Pressable>
           ))}
         </View>
 
         <Text style={[styles.disclosure, { color: c.textMuted }]}>
-          Sign-in arrives shortly. ORCID is the primary path for verified
-          researcher identity; Google and GitHub are alternates. Email/password
-          will live behind a small disclosure as a fallback.
+          GitHub is wired up for dev testing only — tokens land in an alert,
+          they aren't persisted yet. The auth agent's branch will add proper
+          token storage, refresh, and the dashboard. ORCID and Google land
+          when their credentials do.
         </Text>
       </View>
 
