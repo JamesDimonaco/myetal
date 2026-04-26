@@ -1,49 +1,76 @@
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { RecentShareCard } from '@/components/recent-share-card';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRecentShares } from '@/hooks/useRecentShares';
 
 export default function LandingScreen() {
   const scheme = useColorScheme() ?? 'light';
   const c = Colors[scheme];
+  const recents = useRecentShares();
+  const hasRecents = (recents?.length ?? 0) > 0;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
-      <View style={styles.hero}>
-        <Text style={[styles.title, { color: c.text }]}>Ceteris</Text>
-        <Text style={[styles.tagline, { color: c.textMuted }]}>
-          Scan a researcher&apos;s QR. See their work.
-        </Text>
-      </View>
+    <SafeAreaView
+      edges={['top', 'bottom']}
+      style={[styles.container, { backgroundColor: c.background }]}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero */}
+        <View style={styles.hero}>
+          <Text style={[styles.title, { color: c.text }]}>Ceteris</Text>
+          <Text style={[styles.tagline, { color: c.textMuted }]}>
+            Scan a researcher&apos;s QR. See their work.
+          </Text>
+        </View>
 
-      <View style={styles.actions}>
-        <Link href="/scan" asChild>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { backgroundColor: c.text, opacity: pressed ? 0.85 : 1 },
-            ]}
-          >
-            <Text style={[styles.primaryButtonText, { color: c.background }]}>
-              Scan a QR code
-            </Text>
-          </Pressable>
-        </Link>
+        {/* Primary actions */}
+        <View style={styles.actions}>
+          <Link href="/scan" asChild>
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryButton,
+                { backgroundColor: c.text, opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <Text style={[styles.primaryButtonText, { color: c.background }]}>
+                Scan a QR code
+              </Text>
+            </Pressable>
+          </Link>
 
-        <Link href="/enter-code" asChild>
-          <Pressable
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              { borderColor: c.text, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text style={[styles.secondaryButtonText, { color: c.text }]}>Enter a code</Text>
-          </Pressable>
-        </Link>
-      </View>
+          <Link href="/enter-code" asChild>
+            <Pressable
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                { borderColor: c.text, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Text style={[styles.secondaryButtonText, { color: c.text }]}>
+                Enter a code
+              </Text>
+            </Pressable>
+          </Link>
+        </View>
 
+        {/* Recently viewed */}
+        {hasRecents ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: c.textMuted }]}>RECENTLY VIEWED</Text>
+            {recents!.map((entry) => (
+              <RecentShareCard key={entry.short_code} entry={entry} />
+            ))}
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {/* Footer */}
       <View style={styles.footer}>
         <Text style={[styles.footerText, { color: c.textMuted }]}>
           Sign in to create your own collection · coming soon
@@ -56,11 +83,14 @@ export default function LandingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.lg,
   },
   hero: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.xl,
   },
   title: {
     fontSize: 56,
@@ -74,7 +104,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: Spacing.sm,
-    marginBottom: Spacing.lg,
   },
   primaryButton: {
     paddingVertical: 18,
@@ -95,8 +124,18 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
+  section: {
+    marginTop: Spacing.xl,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: Spacing.md,
+  },
   footer: {
-    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     alignItems: 'center',
   },
   footerText: {

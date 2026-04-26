@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Pressable } from 'react-native';
 
@@ -7,6 +8,7 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePublicShare } from '@/hooks/usePublicShare';
 import { ApiError } from '@/lib/api';
+import { trackRecentShare } from '@/lib/recent-shares';
 import { formatRelativeTime } from '@/lib/time';
 
 export default function PublicShareScreen() {
@@ -15,6 +17,17 @@ export default function PublicShareScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
 
   const { data, isLoading, error, refetch, isRefetching } = usePublicShare(code);
+
+  // Persist this view to recent-shares so it shows up on the landing
+  useEffect(() => {
+    if (!data) return;
+    trackRecentShare({
+      short_code: data.short_code,
+      name: data.name,
+      owner_name: data.owner_name,
+      item_count: data.items.length,
+    });
+  }, [data]);
 
   if (isLoading) {
     return (
