@@ -11,8 +11,8 @@
 
 import type { ResponseCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 
-export const ACCESS_COOKIE = 'ceteris_access';
-export const REFRESH_COOKIE = 'ceteris_refresh';
+export const ACCESS_COOKIE = 'myetal_access';
+export const REFRESH_COOKIE = 'myetal_refresh';
 
 const isProd = process.env.NODE_ENV === 'production';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@ceteris/mobile",
+  "name": "@myetal/mobile",
   "main": "expo-router/entry",
   "version": "0.1.0",
   "scripts": {

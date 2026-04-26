@@ -5,7 +5,7 @@
  * extra things vs. mobile:
  *
  *  1. Server components (RSC) never have access to localStorage; they pull the
- *     bearer token out of the httpOnly `ceteris_access` cookie via Next's
+ *     bearer token out of the httpOnly `myetal_access` cookie via Next's
  *     `cookies()` helper. See `serverFetch` below.
  *  2. Public endpoints (the `/c/{code}` viewer) call `api()` directly without
  *     an `auth` token — the wrapper just hits the backend with no Authorization

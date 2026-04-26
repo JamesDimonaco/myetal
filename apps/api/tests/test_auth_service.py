@@ -2,9 +2,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ceteris_api.core.security import decode_access_token
-from ceteris_api.models import AuthIdentity, AuthProvider, RefreshToken
-from ceteris_api.services import auth as auth_service
+from myetal_api.core.security import decode_access_token
+from myetal_api.models import AuthIdentity, AuthProvider, RefreshToken
+from myetal_api.services import auth as auth_service
 
 
 async def test_register_creates_user_and_password_identity(db_session: AsyncSession) -> None:

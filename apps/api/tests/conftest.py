@@ -1,6 +1,6 @@
 import os
 
-# Set OAuth test credentials BEFORE any ceteris_api imports — otherwise pydantic
+# Set OAuth test credentials BEFORE any myetal_api imports — otherwise pydantic
 # Settings reads empty defaults and the OAuth provider wiring fails on
 # ProviderNotConfigured. setdefault means a real env var still wins if present.
 os.environ.setdefault("ORCID_CLIENT_ID", "test-orcid-client-id")
@@ -22,9 +22,9 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
     create_async_engine,
 )
 
-from ceteris_api.core.database import get_db  # noqa: E402
-from ceteris_api.main import app  # noqa: E402
-from ceteris_api.models import Base  # noqa: E402
+from myetal_api.core.database import get_db  # noqa: E402
+from myetal_api.main import app  # noqa: E402
+from myetal_api.models import Base  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -53,7 +53,7 @@ def api_client(db_session: AsyncSession) -> Iterator[TestClient]:
     """FastAPI TestClient with the DB dependency wired to the per-test
     SQLite session. Also resets slowapi's in-memory counter between tests
     so rate-limit tests don't bleed into each other."""
-    from ceteris_api.core.rate_limit import limiter
+    from myetal_api.core.rate_limit import limiter
 
     async def _override() -> AsyncIterator[AsyncSession]:
         yield db_session

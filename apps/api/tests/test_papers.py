@@ -20,11 +20,11 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ceteris_api.api.deps import get_current_user
-from ceteris_api.core.database import get_db
-from ceteris_api.main import app
-from ceteris_api.services import papers as papers_service
-from ceteris_api.services.auth import register_with_password
+from myetal_api.api.deps import get_current_user
+from myetal_api.core.database import get_db
+from myetal_api.main import app
+from myetal_api.services import papers as papers_service
+from myetal_api.services.auth import register_with_password
 
 # ---------- fixtures ----------
 
@@ -163,8 +163,8 @@ def _crossref_work(doi: str = "10.1038/nature12373") -> dict[str, Any]:
 def test_lookup_happy_path(authed_client: TestClient) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert "api.crossref.org" in str(request.url)
-        assert "mailto=team%40ceteris.app" in str(request.url)
-        assert "CeterisAPI" in request.headers.get("user-agent", "")
+        assert "mailto=team%40myetal.app" in str(request.url)
+        assert "MyEtalAPI" in request.headers.get("user-agent", "")
         return httpx.Response(200, json=_crossref_work())
 
     _install_handler(handler)
@@ -263,7 +263,7 @@ def _openalex_results() -> dict[str, Any]:
 def test_search_happy_path(authed_client: TestClient) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert "api.openalex.org" in str(request.url)
-        assert "mailto=team%40ceteris.app" in str(request.url)
+        assert "mailto=team%40myetal.app" in str(request.url)
         assert "search=" in str(request.url)
         return httpx.Response(200, json=_openalex_results())
 

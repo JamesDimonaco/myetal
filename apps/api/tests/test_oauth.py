@@ -6,16 +6,16 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ceteris_api.core.config import settings
-from ceteris_api.core.oauth import (
+from myetal_api.core.config import settings
+from myetal_api.core.oauth import (
     STATE_ALGORITHM,
     StateError,
     decode_state,
     encode_state,
 )
-from ceteris_api.core.security import decode_access_token
-from ceteris_api.models import AuthIdentity, AuthProvider, User
-from ceteris_api.services import oauth as oauth_service
+from myetal_api.core.security import decode_access_token
+from myetal_api.models import AuthIdentity, AuthProvider, User
+from myetal_api.services import oauth as oauth_service
 
 # ---------- state ----------
 
@@ -61,7 +61,10 @@ def test_state_expiry_rejected() -> None:
 # ---------- start_oauth ----------
 
 
-def test_start_oauth_builds_orcid_authorize_url() -> None:
+def test_start_oauth_builds_orcid_authorize_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pin PUBLIC_API_URL so this test isn't affected by a developer's .env
+    # override (e.g. LAN IP for testing OAuth from a real phone).
+    monkeypatch.setattr(settings, "public_api_url", "http://localhost:8000")
     url = oauth_service.start_oauth(AuthProvider.ORCID, "/dashboard", "web")
     assert "sandbox.orcid.org/oauth/authorize" in url
     assert "client_id=test-orcid-client-id" in url
@@ -71,7 +74,8 @@ def test_start_oauth_builds_orcid_authorize_url() -> None:
     assert "state=" in url
 
 
-def test_start_oauth_builds_google_authorize_url() -> None:
+def test_start_oauth_builds_google_authorize_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "public_api_url", "http://localhost:8000")
     url = oauth_service.start_oauth(AuthProvider.GOOGLE, "/x", "mobile")
     assert "accounts.google.com" in url
     assert "client_id=test-google-client-id" in url
@@ -150,7 +154,7 @@ async def test_complete_oauth_does_not_link_by_email(db_session: AsyncSession) -
     """A new provider with the same email must NOT auto-link to an existing user.
     Auto-linking by email is a known account-takeover vector — we link only on
     explicit user action (not yet implemented)."""
-    from ceteris_api.services import auth as auth_service
+    from myetal_api.services import auth as auth_service
 
     existing, _, _ = await auth_service.register_with_password(
         db_session, "test@example.com", "hunter22", "Existing User"

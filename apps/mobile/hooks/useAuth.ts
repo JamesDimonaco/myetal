@@ -115,7 +115,7 @@ export function useAuth() {
      * GitHub OAuth — uses the backend's dev `mobile_redirect` parameter so the
      * /auth/github/callback bounces tokens to a URL Expo can intercept,
      * eliminating the manual-paste step. When EAS Universal Links land,
-     * swap `mobile_redirect` for the production `https://ceteris.app/...`
+     * swap `mobile_redirect` for the production `https://myetal.app/...`
      * deep link and the rest of this code stays the same.
      */
     const startUrl =
@@ -132,8 +132,8 @@ export function useAuth() {
     }
 
     // expo-linking gives us the right scheme for THIS environment:
-    //   - Expo Go:    exp+ceteris://expo-development-client/...?path=auth-finish
-    //   - Dev build:  ceteris:///auth-finish
+    //   - Expo Go:    exp+myetal://expo-development-client/...?path=auth-finish
+    //   - Dev build:  myetal:///auth-finish
     const returnUrl = Linking.createURL('/auth-finish');
     const url =
       `${startUrl}&mobile_redirect=${encodeURIComponent(returnUrl)}`;

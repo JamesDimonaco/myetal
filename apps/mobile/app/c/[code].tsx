@@ -86,7 +86,7 @@ export default function PublicShareScreen() {
   const handleShareLink = async () => {
     haptics.tap();
     await Share.share({
-      message: `https://ceteris.app/c/${data.short_code}`,
+      message: `https://myetal.app/c/${data.short_code}`,
       title: data.name,
     });
   };
@@ -265,7 +265,7 @@ function describeError(error: unknown): {
     if (error.status >= 500) {
       return {
         title: 'Server hiccup',
-        body: 'The Ceteris backend ran into a problem. Try again in a moment.',
+        body: 'The MyEtal backend ran into a problem. Try again in a moment.',
         icon: 'alert-circle-outline',
       };
     }
@@ -277,7 +277,7 @@ function describeError(error: unknown): {
   }
   // fetch() throws TypeError on network failure
   return {
-    title: "Can't reach Ceteris",
+    title: "Can't reach MyEtal",
     body: 'Check your connection and try again.',
     icon: 'cloud-offline-outline',
   };

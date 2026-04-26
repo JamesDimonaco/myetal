@@ -4,16 +4,16 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Ceteris — share your research with a QR',
-    template: '%s — Ceteris',
+    default: 'MyEtal — share your research with a QR',
+    template: '%s — MyEtal',
   },
   description:
     'Share a paper or a curated reading list with a single QR code. Built for researchers.',
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ceteris.app',
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://myetal.app',
   ),
   openGraph: {
-    siteName: 'Ceteris',
+    siteName: 'MyEtal',
     type: 'website',
   },
   twitter: {

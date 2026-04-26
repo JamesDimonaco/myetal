@@ -1,6 +1,6 @@
 /**
  * Server-side wrapper around `api()` that pulls the bearer token from the
- * httpOnly `ceteris_access` cookie set by /api/auth/login (or the OAuth finish
+ * httpOnly `myetal_access` cookie set by /api/auth/login (or the OAuth finish
  * route). Use this from server components, server actions, and route handlers
  * — never from client components (cookies() is a server-only API).
  */
@@ -8,8 +8,8 @@
 import { cookies } from 'next/headers';
 import { api, type RequestOptions } from './api';
 
-export const ACCESS_COOKIE = 'ceteris_access';
-export const REFRESH_COOKIE = 'ceteris_refresh';
+export const ACCESS_COOKIE = 'myetal_access';
+export const REFRESH_COOKIE = 'myetal_refresh';
 
 export async function getAccessToken(): Promise<string | undefined> {
   const store = await cookies();

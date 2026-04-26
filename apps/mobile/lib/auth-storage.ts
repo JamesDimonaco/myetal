@@ -7,14 +7,14 @@
  *   `localStorage` (only meaningful for `expo start --web` during dev — the
  *   real public web UI lives in apps/web with httpOnly cookies).
  *
- * Storage key is namespaced `ceteris.auth.v1` so we can roll formats later
+ * Storage key is namespaced `myetal.auth.v1` so we can roll formats later
  * without colliding with old installs.
  */
 
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const STORAGE_KEY = 'ceteris.auth.v1';
+const STORAGE_KEY = 'myetal.auth.v1';
 
 export interface StoredTokens {
   access: string;

@@ -1,22 +1,22 @@
 {
   "expo": {
-    "name": "Ceteris",
-    "slug": "ceteris",
+    "name": "MyEtal",
+    "slug": "myetal",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "ceteris",
+    "scheme": "myetal",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "app.ceteris.mobile",
+      "bundleIdentifier": "app.myetal.mobile",
       "supportsTablet": true,
       "associatedDomains": [
-        "applinks:ceteris.app"
+        "applinks:myetal.app"
       ]
     },
     "android": {
-      "package": "app.ceteris.mobile",
+      "package": "app.myetal.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -32,7 +32,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "ceteris.app",
+              "host": "myetal.app",
               "pathPrefix": "/c"
             }
           ],
@@ -64,7 +64,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Ceteris to access your camera so you can scan QR codes from posters and slides."
+          "cameraPermission": "Allow MyEtal to access your camera so you can scan QR codes from posters and slides."
         }
       ],
       "expo-secure-store"

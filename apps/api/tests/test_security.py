@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import pytest
 
-from ceteris_api.core.security import (
+from myetal_api.core.security import (
     TokenError,
     create_access_token,
     decode_access_token,

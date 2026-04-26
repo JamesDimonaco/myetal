@@ -1,7 +1,7 @@
 /**
- * The Ceteris wordmark. Serif type ("ui-serif" on iOS, Georgia on web,
+ * The MyEtal wordmark. Serif type ("ui-serif" on iOS, Georgia on web,
  * platform serif on Android) with a hairline italic "paribus." underneath
- * to nod at *ceteris paribus* — the academic shibboleth the brand is
+ * to nod at *myetal paribus* — the academic shibboleth the brand is
  * named for. Tagline is optional; on the landing it gets the marker,
  * elsewhere (e.g. modals) we hide it.
  */
@@ -33,7 +33,7 @@ export function Wordmark({ size = 'lg', showTagline = false, align = 'left' }: P
           },
         ]}
       >
-        Ceteris
+        MyEtal
       </Text>
       {showTagline ? (
         <Text

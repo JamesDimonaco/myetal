@@ -1,8 +1,8 @@
-# Ceteris API — Deployment
+# MyEtal API — Deployment
 
 This is the operational runbook for the FastAPI backend. v1 deploy target is
 James's always-on Linux box behind Caddy, talking to Neon Postgres in
-`eu-west-2`. Image is published to GHCR by `.github/workflows/api-image.yml`
+`eu-west-2`. Image is published to Docker Hub by `.github/workflows/api-image.yml`
 on every push to `main` that touches `apps/api/**`.
 
 ---
@@ -34,11 +34,11 @@ sudo apt install -y caddy
 ### Caddyfile
 
 `/etc/caddy/Caddyfile` — Caddy auto-provisions a Let's Encrypt cert for the
-domain on first request. DNS for `api.ceteris.app` must already point at the
+domain on first request. DNS for `api.myetal.app` must already point at the
 host's public IP.
 
 ```caddy
-api.ceteris.app {
+api.myetal.app {
     encode zstd gzip
 
     # Add a stable request id so backend logs and client traces correlate.
@@ -67,19 +67,19 @@ sudo systemctl reload caddy
 
 ## 1. Environment file
 
-The API reads a `.env`-style file. Production lives at `/etc/ceteris/.env`,
+The API reads a `.env`-style file. Production lives at `/etc/myetal/.env`,
 NOT in the repo. **Mode 600, owned root:root**, mounted read-only into the
 container.
 
 ```bash
-sudo install -d -m 700 /etc/ceteris
-sudo install -m 600 -o root -g root /dev/stdin /etc/ceteris/.env <<'EOF'
+sudo install -d -m 700 /etc/myetal
+sudo install -m 600 -o root -g root /dev/stdin /etc/myetal/.env <<'EOF'
 ENV=production
 SECRET_KEY=<openssl rand -hex 32>
-DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@<project>-pooler.eu-west-2.aws.neon.tech/ceteris?ssl=require
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@<project>-pooler.eu-west-2.aws.neon.tech/myetal?ssl=require
 
-PUBLIC_API_URL=https://api.ceteris.app
-PUBLIC_BASE_URL=https://app.ceteris.app
+PUBLIC_API_URL=https://api.myetal.app
+PUBLIC_BASE_URL=https://app.myetal.app
 
 # OAuth — fill from each provider's console
 ORCID_CLIENT_ID=...
@@ -117,7 +117,7 @@ is still the placeholder — verified by `tests/test_health.py`.
 4. From your dev machine, run baseline migrations once:
 
    ```bash
-   DATABASE_URL='postgresql+asyncpg://...neon.tech/ceteris?ssl=require' \
+   DATABASE_URL='postgresql+asyncpg://...neon.tech/myetal?ssl=require' \
      uv run alembic upgrade head
    ```
 
@@ -128,24 +128,23 @@ is still the placeholder — verified by `tests/test_health.py`.
 
 ## 3. First-time `docker run`
 
-Pull the latest image from GHCR (login first if the repo is private:
-`echo $CR_PAT | docker login ghcr.io -u <username> --password-stdin`):
+Pull the latest image from Docker Hub:
 
 ```bash
-docker pull ghcr.io/jamesdimonaco/ceteris-api:latest
+docker pull docker.io/jamesdimonaco/myetal-api:latest
 ```
 
 Run it:
 
 ```bash
 docker run -d \
-  --name ceteris-api \
+  --name myetal-api \
   --restart unless-stopped \
   --log-opt max-size=10m \
   --log-opt max-file=3 \
   -p 127.0.0.1:8000:8000 \
-  -v /etc/ceteris/.env:/app/.env:ro \
-  ghcr.io/jamesdimonaco/ceteris-api:latest
+  -v /etc/myetal/.env:/app/.env:ro \
+  docker.io/jamesdimonaco/myetal-api:latest
 ```
 
 Notes:
@@ -170,12 +169,13 @@ slowapi backend, not more workers. That's a v1.x change, not v1.
 
 ## 5. Rolling out a new version
 
-The CI workflow tags both `:latest` and `:<sha>`. For predictability, prefer
-the SHA tag on the host so you have an exact rollback target:
+The CI workflow tags `:latest`, `:<version>` (from pyproject.toml), and
+`:<sha>`. For predictability, prefer the version or SHA tag on the host so
+you have an exact rollback target:
 
 ```bash
 NEW_SHA=<the-sha-from-the-merge-commit>
-docker pull ghcr.io/jamesdimonaco/ceteris-api:$NEW_SHA
+docker pull docker.io/jamesdimonaco/myetal-api:$NEW_SHA
 
 # If a migration is part of the release, run it FIRST against Neon:
 DATABASE_URL='postgresql+asyncpg://...' uv run alembic upgrade head
@@ -185,8 +185,8 @@ DATABASE_URL='postgresql+asyncpg://...' uv run alembic upgrade head
 docker compose up -d --pull always
 
 # Verify.
-curl -fsS https://api.ceteris.app/healthz
-curl -fsS https://api.ceteris.app/readyz
+curl -fsS https://api.myetal.app/healthz
+curl -fsS https://api.myetal.app/readyz
 ```
 
 To roll back: `docker compose stop api && docker run … <previous SHA>`.
@@ -200,7 +200,7 @@ nightly via cron on the host:
 
 ```cron
 # /etc/crontab — runs as root, output mailed via cron-mailto
-@daily root docker exec ceteris-api python -m scripts.cleanup_refresh_tokens >> /var/log/ceteris-cleanup.log 2>&1
+@daily root docker exec myetal-api python -m scripts.cleanup_refresh_tokens >> /var/log/myetal-cleanup.log 2>&1
 ```
 
 The script deletes rows where `revoked=True` OR `expires_at < now()` and
@@ -224,24 +224,24 @@ rclone config  # interactive — pick "Backblaze B2", paste keyId + appKey,
 Cron — `/etc/crontab`:
 
 ```cron
-30 3 * * * root /usr/local/bin/ceteris-backup.sh
+30 3 * * * root /usr/local/bin/myetal-backup.sh
 ```
 
-`/usr/local/bin/ceteris-backup.sh`:
+`/usr/local/bin/myetal-backup.sh`:
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 TS=$(date -u +%Y%m%dT%H%M%SZ)
-OUT=/tmp/ceteris-${TS}.dump
+OUT=/tmp/myetal-${TS}.dump
 # Use the Neon DIRECT (non-pooled) URL for pg_dump — pooled mode rejects
 # replication-style commands. Source from a root-owned file with mode 600.
-source /etc/ceteris/backup.env
+source /etc/myetal/backup.env
 pg_dump --format=custom --no-owner --no-acl "$NEON_DIRECT_URL" > "$OUT"
-rclone copyto "$OUT" "b2:ceteris-backups/postgres/ceteris-${TS}.dump"
+rclone copyto "$OUT" "b2:myetal-backups/postgres/myetal-${TS}.dump"
 rm -f "$OUT"
 # Keep 30 daily backups, prune the rest
-rclone delete --min-age 30d "b2:ceteris-backups/postgres"
+rclone delete --min-age 30d "b2:myetal-backups/postgres"
 ```
 
 Test the backup is restorable at least once before launch — an unverified
@@ -251,7 +251,7 @@ backup is theatre.
 
 ## 8. Observability checklist
 
-- **Sentry** — set `SENTRY_DSN` in `/etc/ceteris/.env`. On startup the
+- **Sentry** — set `SENTRY_DSN` in `/etc/myetal/.env`. On startup the
   process logs `init_sentry returned True/False` (via structlog); confirm
   True on first prod boot.
 - **Logs** — JSON to stdout when `ENV != "dev"`. Captured by Docker's

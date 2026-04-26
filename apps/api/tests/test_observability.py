@@ -6,15 +6,15 @@ import importlib
 
 from fastapi.testclient import TestClient
 
-from ceteris_api.core import observability
-from ceteris_api.core.observability import REQUEST_ID_HEADER, init_sentry
-from ceteris_api.main import app
+from myetal_api.core import observability
+from myetal_api.core.observability import REQUEST_ID_HEADER, init_sentry
+from myetal_api.main import app
 
 
 def test_init_sentry_noop_when_dsn_empty(monkeypatch) -> None:
     """The whole point of `SENTRY_DSN=""` defaulting is that prod-ready code
     can ship without a DSN and not blow up. init_sentry must report False."""
-    from ceteris_api.core import config as config_module
+    from myetal_api.core import config as config_module
 
     monkeypatch.setattr(config_module.settings, "sentry_dsn", "")
     importlib.reload(observability)
@@ -22,7 +22,7 @@ def test_init_sentry_noop_when_dsn_empty(monkeypatch) -> None:
 
 
 def test_init_sentry_reports_true_when_dsn_present(monkeypatch) -> None:
-    from ceteris_api.core import config as config_module
+    from myetal_api.core import config as config_module
 
     # Sentry's DSN parser accepts this synthetic format without trying to
     # contact the network. We're testing the branch in init_sentry, not Sentry.

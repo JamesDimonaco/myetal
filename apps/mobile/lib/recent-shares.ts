@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'ceteris.recent_shares.v1';
+const STORAGE_KEY = 'myetal.recent_shares.v1';
 const MAX_ENTRIES = 20;
 
 export interface RecentShare {

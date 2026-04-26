@@ -40,7 +40,7 @@ interface Props {
 /**
  * Full-screen modal that shows the public QR for a collection. The image is
  * served by the backend at /public/c/{code}/qr.png and embeds the canonical
- * https://ceteris.app/c/{code} URL — so when someone scans this with another
+ * https://myetal.app/c/{code} URL — so when someone scans this with another
  * phone, Universal Links bounce them straight into the app.
  *
  * Vibe: celebratory. The card scales in with a soft spring, the QR sits
@@ -51,7 +51,7 @@ export function QrModal({ visible, onClose, shortCode, collectionName }: Props) 
   const c = Colors[useColorScheme() ?? 'light'];
   const haptics = useHaptics();
   const qrUrl = `${API_BASE_URL}/public/c/${shortCode}/qr.png`;
-  const shareUrl = `https://ceteris.app/c/${shortCode}`;
+  const shareUrl = `https://myetal.app/c/${shortCode}`;
 
   const cardScale = useSharedValue(0.92);
   const cardOpacity = useSharedValue(0);
@@ -197,7 +197,7 @@ export function QrModal({ visible, onClose, shortCode, collectionName }: Props) 
             >
               <Ionicons name="link" size={14} color={c.textMuted} />
               <Text style={[styles.codeChipText, { color: c.text }]}>
-                ceteris.app/c/{shortCode}
+                myetal.app/c/{shortCode}
               </Text>
             </View>
 

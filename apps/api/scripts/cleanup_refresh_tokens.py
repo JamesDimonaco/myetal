@@ -11,7 +11,7 @@ stdout (so cron-mailto / journalctl shows something useful).
 Usage:
     uv run python -m scripts.cleanup_refresh_tokens
     # or
-    docker exec ceteris-api python -m scripts.cleanup_refresh_tokens
+    docker exec myetal-api python -m scripts.cleanup_refresh_tokens
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from ceteris_api.core.config import settings
-from ceteris_api.models import RefreshToken
+from myetal_api.core.config import settings
+from myetal_api.models import RefreshToken
 
 
 async def cleanup() -> int:

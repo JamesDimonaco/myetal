@@ -1,4 +1,4 @@
-from ceteris_api.models import (
+from myetal_api.models import (
     AuthIdentity,
     AuthProvider,
     Base,

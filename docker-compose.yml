@@ -2,15 +2,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ceteris
-      POSTGRES_PASSWORD: ceteris
-      POSTGRES_DB: ceteris
+      POSTGRES_USER: myetal
+      POSTGRES_PASSWORD: myetal
+      POSTGRES_DB: myetal
     ports:
       - "5432:5432"
     volumes:
-      - ceteris_pgdata:/var/lib/postgresql/data
+      - myetal_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ceteris"]
+      test: ["CMD-SHELL", "pg_isready -U myetal"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,7 +27,7 @@ services:
     environment:
       ENV: dev
       SECRET_KEY: dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX
-      DATABASE_URL: postgresql+asyncpg://ceteris:ceteris@db:5432/ceteris
+      DATABASE_URL: postgresql+asyncpg://myetal:myetal@db:5432/myetal
       # PUBLIC_API_URL and PUBLIC_BASE_URL come from apps/api/.env so each
       # developer can point at their own LAN IP / ngrok / staging without
       # editing this file. Falls back to the application defaults
@@ -43,7 +43,7 @@ services:
       - ./apps/api/alembic.ini:/app/alembic.ini
     # Apply any pending DB migrations, then start uvicorn with reload
     command: >
-      sh -c "alembic upgrade head && uvicorn ceteris_api.main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "alembic upgrade head && uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --reload"
     # /healthz never touches the DB, so this only reflects "is the process up".
     # /readyz is the DB-aware probe; it's not used here because compose has
     # no native concept of routing decisions, only restart triggers.
@@ -55,4 +55,4 @@ services:
       start_period: 15s
 
 volumes:
-  ceteris_pgdata:
+  myetal_pgdata:

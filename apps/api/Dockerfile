@@ -21,22 +21,22 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Non-root runtime user. Renamed from quire -> ceteris to match the project rename.
-RUN groupadd -r ceteris && useradd -r -g ceteris ceteris
+# Non-root runtime user. Renamed from quire -> myetal to match the project rename.
+RUN groupadd -r myetal && useradd -r -g myetal myetal
 
-COPY --from=builder --chown=ceteris:ceteris /app/.venv /app/.venv
-COPY --from=builder --chown=ceteris:ceteris /app/src /app/src
+COPY --from=builder --chown=myetal:myetal /app/.venv /app/.venv
+COPY --from=builder --chown=myetal:myetal /app/src /app/src
 
 # Bundle the cleanup script into the image so cron/host can invoke it via
-# `docker exec ceteris-api python -m scripts.cleanup_refresh_tokens`.
-COPY --chown=ceteris:ceteris scripts /app/scripts
+# `docker exec myetal-api python -m scripts.cleanup_refresh_tokens`.
+COPY --chown=myetal:myetal scripts /app/scripts
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app
 
-USER ceteris
+USER myetal
 
 EXPOSE 8000
 
@@ -49,7 +49,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # multi-worker deployments would multiply the effective limit. See DEPLOY.md.
 # --proxy-headers makes uvicorn trust X-Forwarded-For from Caddy so slowapi
 # rate-limits by the real client IP, not the loopback address.
-CMD ["uvicorn", "ceteris_api.main:app", \
+CMD ["uvicorn", "myetal_api.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--workers", "1", \

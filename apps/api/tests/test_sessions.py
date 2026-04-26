@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ceteris_api.models import RefreshToken
-from ceteris_api.services import auth as auth_service
+from myetal_api.models import RefreshToken
+from myetal_api.services import auth as auth_service
 
 
 async def _register(api_client: TestClient, email: str) -> tuple[str, str]:

@@ -6,8 +6,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from ceteris_api.core.config import settings
-from ceteris_api.models import Base  # noqa: F401  ensures all models are registered
+from myetal_api.core.config import settings
+from myetal_api.models import Base  # noqa: F401  ensures all models are registered
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

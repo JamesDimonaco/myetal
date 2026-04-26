@@ -1,6 +1,6 @@
 /**
  * Gatekeeper for /dashboard/*. Anything under /dashboard requires the
- * `ceteris_access` cookie; missing → bounce to /sign-in?return_to=<original>.
+ * `myetal_access` cookie; missing → bounce to /sign-in?return_to=<original>.
  *
  * NOTE on Next.js 16: `middleware` is deprecated in favour of `proxy`. Both
  * still work in 16.x; we use `middleware` per the build spec. When we

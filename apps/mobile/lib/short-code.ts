@@ -1,6 +1,6 @@
 /**
  * A QR scanned at a poster or slide can encode either:
- *  1. A canonical Universal Link:  https://ceteris.app/c/{code}
+ *  1. A canonical Universal Link:  https://myetal.app/c/{code}
  *  2. A bare short code:           Kp7vRq
  *
  * Both should land us on the same screen. Older shares may also use other

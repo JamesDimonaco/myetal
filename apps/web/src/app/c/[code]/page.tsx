@@ -9,7 +9,7 @@ import type { PublicShareResponse } from '@/types/share';
 
 /**
  * The public, no-auth-required collection viewer. THIS IS THE GROWTH LOOP —
- * when someone shares a `https://ceteris.app/c/X` link in Slack/Twitter/email,
+ * when someone shares a `https://myetal.app/c/X` link in Slack/Twitter/email,
  * the recipient lands here. Server-rendered for fast first paint, indexed by
  * search engines, and (crucially) crawlable by social-preview bots so the
  * embed shows the collection title + a QR thumbnail.
@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const description =
     share.description?.trim() ||
-    `${formatItemCount(share.items.length)} shared via Ceteris`;
+    `${formatItemCount(share.items.length)} shared via MyEtal`;
 
   const ogImage = `${API_BASE_URL}/public/c/${encodeURIComponent(code)}/qr.png`;
   const canonicalPath = `/c/${encodeURIComponent(code)}`;
@@ -63,7 +63,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: share.name,
       description,
       type: 'article',
-      siteName: 'Ceteris',
+      siteName: 'MyEtal',
       url: canonicalPath,
       images: [
         {
@@ -96,7 +96,7 @@ export default async function PublicSharePage({ params }: PageProps) {
     <main className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
       <div className="text-sm text-ink-muted">
         <Link href="/" className="hover:text-ink">
-          Ceteris
+          MyEtal
         </Link>
       </div>
 
@@ -147,9 +147,9 @@ export default async function PublicSharePage({ params }: PageProps) {
       </aside>
 
       <footer className="mt-16 text-xs text-ink-faint">
-        Built with Ceteris ·{' '}
+        Built with MyEtal ·{' '}
         <Link href="/" className="underline-offset-2 hover:underline">
-          ceteris.app
+          myetal.app
         </Link>
       </footer>
     </main>

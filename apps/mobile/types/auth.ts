@@ -1,5 +1,5 @@
 /**
- * Mirrors backend Pydantic shapes (apps/api/src/ceteris_api/schemas/auth.py
+ * Mirrors backend Pydantic shapes (apps/api/src/myetal_api/schemas/auth.py
  * and user.py). Hand-written until the OpenAPI codegen pipeline lands.
  */
 

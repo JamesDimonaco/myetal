@@ -8,8 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ceteris_api.core.database import get_db
-from ceteris_api.main import app
+from myetal_api.core.database import get_db
+from myetal_api.main import app
 
 
 def test_healthz_always_200(api_client: TestClient) -> None:

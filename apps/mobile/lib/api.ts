@@ -25,7 +25,7 @@ function resolveApiBaseUrl(): string {
     return `http://${host}:8000`;
   }
 
-  return 'https://api.ceteris.app';
+  return 'https://api.myetal.app';
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
