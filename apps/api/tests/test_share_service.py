@@ -1,6 +1,7 @@
+from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from myetal_api.models import ShareType
+from myetal_api.models import ItemKind, ShareType
 from myetal_api.schemas.share import ShareCreate, ShareItemCreate, ShareUpdate
 from myetal_api.services import auth as auth_service
 from myetal_api.services import share as share_service
@@ -118,6 +119,95 @@ async def test_update_with_items_none_leaves_items_alone(db_session: AsyncSessio
     )
     updated = await share_service.update_share(db_session, share, ShareUpdate(name="renamed"))
     assert [i.title for i in updated.items] == ["keep me"]
+
+
+async def test_create_item_with_repo_kind_round_trips(db_session: AsyncSession) -> None:
+    user = await _make_user(db_session)
+    payload = ShareCreate(
+        name="Project page",
+        type=ShareType.PROJECT,
+        items=[
+            ShareItemCreate(
+                kind=ItemKind.REPO,
+                title="myetal/api",
+                subtitle="Backend API",
+                url="https://github.com/myetal/api",
+                image_url="https://avatars.githubusercontent.com/u/1?v=4",
+            ),
+        ],
+    )
+    share = await share_service.create_share(db_session, user.id, payload)
+
+    assert share.type == ShareType.PROJECT
+    assert len(share.items) == 1
+    item = share.items[0]
+    assert item.kind == ItemKind.REPO
+    assert item.title == "myetal/api"
+    assert item.subtitle == "Backend API"
+    assert item.url == "https://github.com/myetal/api"
+    assert item.image_url == "https://avatars.githubusercontent.com/u/1?v=4"
+
+    # Re-read to confirm persistence.
+    fetched = await share_service.get_share_for_owner(db_session, share.id, user.id)
+    assert fetched is not None
+    assert fetched.items[0].kind == ItemKind.REPO
+    assert fetched.items[0].url == "https://github.com/myetal/api"
+
+
+async def test_default_item_kind_is_paper(db_session: AsyncSession) -> None:
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x", items=[ShareItemCreate(title="legacy paper")]),
+    )
+    assert share.items[0].kind == ItemKind.PAPER
+    assert share.items[0].subtitle is None
+    assert share.items[0].url is None
+    assert share.items[0].image_url is None
+
+
+async def test_share_type_project_is_accepted(db_session: AsyncSession) -> None:
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session, user.id, ShareCreate(name="proj", type=ShareType.PROJECT)
+    )
+    assert share.type == ShareType.PROJECT
+
+
+async def test_public_share_response_includes_new_fields(
+    api_client: TestClient, db_session: AsyncSession
+) -> None:
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(
+            name="proj",
+            type=ShareType.PROJECT,
+            is_public=True,
+            items=[
+                ShareItemCreate(
+                    kind=ItemKind.LINK,
+                    title="Lab page",
+                    subtitle="Group website",
+                    url="https://example.org/lab",
+                    image_url="https://example.org/og.png",
+                ),
+            ],
+        ),
+    )
+
+    r = api_client.get(f"/public/c/{share.short_code}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["type"] == "project"
+    assert len(body["items"]) == 1
+    item = body["items"][0]
+    assert item["kind"] == "link"
+    assert item["subtitle"] == "Group website"
+    assert item["url"] == "https://example.org/lab"
+    assert item["image_url"] == "https://example.org/og.png"
 
 
 async def test_delete_share_cascades_items(db_session: AsyncSession) -> None:

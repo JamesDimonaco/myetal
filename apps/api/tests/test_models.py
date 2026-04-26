@@ -2,6 +2,7 @@ from myetal_api.models import (
     AuthIdentity,
     AuthProvider,
     Base,
+    ItemKind,
     RefreshToken,
     Share,
     ShareComment,
@@ -29,7 +30,17 @@ def test_auth_provider_values() -> None:
 
 
 def test_share_type_values() -> None:
-    assert {t.value for t in ShareType} == {"paper", "collection", "poster", "grant"}
+    assert {t.value for t in ShareType} == {
+        "paper",
+        "collection",
+        "poster",
+        "grant",
+        "project",
+    }
+
+
+def test_item_kind_values() -> None:
+    assert {k.value for k in ItemKind} == {"paper", "repo", "link"}
 
 
 def test_models_are_classes() -> None:

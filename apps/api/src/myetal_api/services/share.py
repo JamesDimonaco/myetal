@@ -107,7 +107,11 @@ async def _allocate_short_code(db: AsyncSession) -> str:
 def _make_item(position: int, payload: ShareItemCreate) -> ShareItem:
     return ShareItem(
         position=position,
+        kind=payload.kind,
         title=payload.title,
+        subtitle=payload.subtitle,
+        url=payload.url,
+        image_url=payload.image_url,
         scholar_url=payload.scholar_url,
         doi=payload.doi,
         authors=payload.authors,
