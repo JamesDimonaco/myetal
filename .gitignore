@@ -15,10 +15,10 @@ __pycache__/
 *.egg-info/
 uv.lock.local
 
-# Env
+# Env — catch .env, .env.local, .env.prod, .env.staging, anything starting
+# with .env. Only .env.example is allowed in the repo.
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
 
 # OS
