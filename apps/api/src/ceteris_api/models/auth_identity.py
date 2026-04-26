@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, Enum, ForeignKey, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from quire_api.models.base import Base
+from ceteris_api.models.base import Base
 
 if TYPE_CHECKING:
-    from quire_api.models.user import User
+    from ceteris_api.models.user import User
 
 
 class AuthProvider(enum.StrEnum):

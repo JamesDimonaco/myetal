@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from quire_api.core.security import (
+from ceteris_api.core.security import (
     create_access_token,
     generate_refresh_token,
     hash_password,
@@ -12,7 +12,7 @@ from quire_api.core.security import (
     refresh_token_expiry,
     verify_password,
 )
-from quire_api.models import AuthIdentity, AuthProvider, RefreshToken, User
+from ceteris_api.models import AuthIdentity, AuthProvider, RefreshToken, User
 
 
 class AuthError(Exception):

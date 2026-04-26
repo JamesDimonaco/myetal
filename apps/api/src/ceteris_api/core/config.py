@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     env: str = "dev"
     secret_key: SecretStr = SecretStr(DEV_SECRET_PLACEHOLDER)
-    database_url: str = "postgresql+asyncpg://quire:quire@localhost:5432/quire"
+    database_url: str = "postgresql+asyncpg://ceteris:ceteris@localhost:5432/ceteris"
     public_base_url: str = "http://localhost:3000"
 
     @model_validator(mode="after")

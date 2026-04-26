@@ -1,15 +1,15 @@
 from fastapi import APIRouter, HTTPException, status
 
-from quire_api.api.deps import CurrentUser, DbSession
-from quire_api.schemas.auth import (
+from ceteris_api.api.deps import CurrentUser, DbSession
+from ceteris_api.schemas.auth import (
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
     RegisterRequest,
     TokenPair,
 )
-from quire_api.schemas.user import UserResponse
-from quire_api.services import auth as auth_service
+from ceteris_api.schemas.user import UserResponse
+from ceteris_api.services import auth as auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

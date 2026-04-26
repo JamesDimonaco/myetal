@@ -4,9 +4,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from quire_api.core.security import generate_short_code
-from quire_api.models import Share, ShareItem
-from quire_api.schemas.share import ShareCreate, ShareItemCreate, ShareUpdate
+from ceteris_api.core.security import generate_short_code
+from ceteris_api.models import Share, ShareItem
+from ceteris_api.schemas.share import ShareCreate, ShareItemCreate, ShareUpdate
 
 _MAX_SHORT_CODE_ATTEMPTS = 10
 

@@ -3,10 +3,10 @@ import io
 import qrcode
 from fastapi import APIRouter, HTTPException, Response, status
 
-from quire_api.api.deps import DbSession
-from quire_api.core.config import settings
-from quire_api.schemas.share import PublicShareResponse, ShareItemResponse
-from quire_api.services import share as share_service
+from ceteris_api.api.deps import DbSession
+from ceteris_api.core.config import settings
+from ceteris_api.schemas.share import PublicShareResponse, ShareItemResponse
+from ceteris_api.services import share as share_service
 
 router = APIRouter(prefix="/public", tags=["public"])
 

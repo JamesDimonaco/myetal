@@ -4,7 +4,7 @@ import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from quire_api.models import Base
+from ceteris_api.models import Base
 
 
 @pytest_asyncio.fixture

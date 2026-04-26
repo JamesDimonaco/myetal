@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from quire_api.models import ShareType
+from ceteris_api.models import ShareType
 
 
 class ShareItemCreate(BaseModel):

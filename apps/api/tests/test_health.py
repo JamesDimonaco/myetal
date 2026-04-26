@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from quire_api.main import app
+from ceteris_api.main import app
 
 
 def test_health_returns_ok() -> None:
@@ -16,7 +16,7 @@ def test_health_returns_ok() -> None:
 def test_dev_secret_rejected_in_prod(monkeypatch) -> None:
     import importlib
 
-    from quire_api.core import config as config_module
+    from ceteris_api.core import config as config_module
 
     monkeypatch.setenv("ENV", "production")
     monkeypatch.setenv("SECRET_KEY", "dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX")

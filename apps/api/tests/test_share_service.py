@@ -1,9 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from quire_api.models import ShareType
-from quire_api.schemas.share import ShareCreate, ShareItemCreate, ShareUpdate
-from quire_api.services import auth as auth_service
-from quire_api.services import share as share_service
+from ceteris_api.models import ShareType
+from ceteris_api.schemas.share import ShareCreate, ShareItemCreate, ShareUpdate
+from ceteris_api.services import auth as auth_service
+from ceteris_api.services import share as share_service
 
 
 async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
@@ -123,7 +123,7 @@ async def test_update_with_items_none_leaves_items_alone(db_session: AsyncSessio
 async def test_delete_share_cascades_items(db_session: AsyncSession) -> None:
     from sqlalchemy import select
 
-    from quire_api.models import ShareItem
+    from ceteris_api.models import ShareItem
 
     user = await _make_user(db_session)
     share = await share_service.create_share(

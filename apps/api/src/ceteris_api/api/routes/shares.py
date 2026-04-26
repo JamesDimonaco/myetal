@@ -2,9 +2,9 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 
-from quire_api.api.deps import CurrentUser, DbSession
-from quire_api.schemas.share import ShareCreate, ShareResponse, ShareUpdate
-from quire_api.services import share as share_service
+from ceteris_api.api.deps import CurrentUser, DbSession
+from ceteris_api.schemas.share import ShareCreate, ShareResponse, ShareUpdate
+from ceteris_api.services import share as share_service
 
 router = APIRouter(prefix="/shares", tags=["shares"])
 

@@ -2,15 +2,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: quire
-      POSTGRES_PASSWORD: quire
-      POSTGRES_DB: quire
+      POSTGRES_USER: ceteris
+      POSTGRES_PASSWORD: ceteris
+      POSTGRES_DB: ceteris
     ports:
       - "5432:5432"
     volumes:
-      - quire_pgdata:/var/lib/postgresql/data
+      - ceteris_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U quire"]
+      test: ["CMD-SHELL", "pg_isready -U ceteris"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,13 +22,13 @@ services:
     environment:
       ENV: dev
       SECRET_KEY: dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX
-      DATABASE_URL: postgresql+asyncpg://quire:quire@db:5432/quire
+      DATABASE_URL: postgresql+asyncpg://ceteris:ceteris@db:5432/ceteris
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ./apps/api/src:/app/src
-    command: uvicorn quire_api.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn ceteris_api.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
-  quire_pgdata:
+  ceteris_pgdata:

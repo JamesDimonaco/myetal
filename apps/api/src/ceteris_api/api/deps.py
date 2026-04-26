@@ -4,9 +4,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from quire_api.core.database import get_db
-from quire_api.core.security import TokenError, decode_access_token
-from quire_api.models import User
+from ceteris_api.core.database import get_db
+from ceteris_api.core.security import TokenError, decode_access_token
+from ceteris_api.models import User
 
 _bearer = HTTPBearer(auto_error=False)
 

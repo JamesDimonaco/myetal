@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from quire_api.models.base import Base, TimestampMixin
+from ceteris_api.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from quire_api.models.auth_identity import AuthIdentity
-    from quire_api.models.share import Share
+    from ceteris_api.models.auth_identity import AuthIdentity
+    from ceteris_api.models.share import Share
 
 
 class User(Base, TimestampMixin):

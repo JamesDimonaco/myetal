@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from quire_api.models.base import Base
+from ceteris_api.models.base import Base
 
 
 class RefreshToken(Base):

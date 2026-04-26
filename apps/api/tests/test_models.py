@@ -1,4 +1,4 @@
-from quire_api.models import (
+from ceteris_api.models import (
     AuthIdentity,
     AuthProvider,
     Base,

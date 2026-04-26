@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from quire_api.models.base import Base, TimestampMixin
+from ceteris_api.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from quire_api.models.user import User
+    from ceteris_api.models.user import User
 
 
 class ShareType(enum.StrEnum):
