@@ -28,6 +28,8 @@ export default function RootLayout() {
             name="sign-in"
             options={{ presentation: 'modal', title: 'Sign in' }}
           />
+          {/* Authed group owns its own bottom-tab navigator + nested stack */}
+          <Stack.Screen name="(authed)" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
