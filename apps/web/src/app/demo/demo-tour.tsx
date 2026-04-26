@@ -5,21 +5,30 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useMemo, useState } from 'react';
 
 import { ShareItemCard } from '@/components/share-item-card';
-import type { ShareItem, ShareType } from '@/types/share';
+import type { ShareItem, ShareItemKind, ShareType } from '@/types/share';
 
 /**
  * Interactive product tour. Lives entirely client-side — no API calls. The
  * right column is built to look identical to the real /c/[code] viewer
  * (same <ShareItemCard />, same typography), so what the user sees here is
  * what their scanners will see.
+ *
+ * Seeded with a *project* share (paper + repo + link) so the new mixed-kind
+ * UX is visible on first render — no clicking required to discover it.
  */
 
 type DemoItemDraft = {
   id: string;
+  kind: ShareItemKind;
   title: string;
+  // paper-only
   authors: string;
   year: string;
   doi: string;
+  // repo / link
+  url: string;
+  subtitle: string;
+  image_url: string;
   notes: string;
 };
 
@@ -28,37 +37,59 @@ const SHARE_TYPES: { value: ShareType; label: string }[] = [
   { value: 'collection', label: 'Collection' },
   { value: 'poster', label: 'Poster' },
   { value: 'grant', label: 'Grant' },
+  { value: 'project', label: 'Project' },
 ];
 
-// A pre-filled share so the demo is rich on first render — feels like a
-// product, not a blank canvas. Tweak freely; it's just example content.
-const INITIAL_NAME = 'Mitochondrial dynamics in zebrafish embryos';
+const INITIAL_NAME = 'Single-cell mito imaging — project page';
 const INITIAL_DESCRIPTION =
-  'A short reading list I put together for the lab journal club — the three papers I reach for when explaining what we do.';
-const INITIAL_TYPE: ShareType = 'collection';
+  'Everything someone needs to find our work: the paper, the analysis code, and the lab page.';
+const INITIAL_TYPE: ShareType = 'project';
+
+const blankFields = {
+  authors: '',
+  year: '',
+  doi: '',
+  url: '',
+  subtitle: '',
+  image_url: '',
+  notes: '',
+};
+
 const INITIAL_ITEMS: DemoItemDraft[] = [
   {
     id: 'd1',
+    kind: 'paper',
     title: 'Mitochondrial fission, fusion, and stress',
     authors: 'Youle & van der Bliek',
     year: '2012',
     doi: '10.1126/science.1219855',
-    notes: 'The review I send to every new student. Still the clearest framing.',
+    url: '',
+    subtitle: '',
+    image_url: '',
+    notes: 'The review I send to every new student.',
   },
   {
     id: 'd2',
-    title: 'Live imaging of mitochondrial dynamics in zebrafish',
-    authors: 'Plucińska et al.',
-    year: '2012',
-    doi: '10.1523/jneurosci.0993-12.2012',
+    kind: 'repo',
+    title: 'mito-lab/mito-tools',
+    authors: '',
+    year: '',
+    doi: '',
+    url: 'https://github.com/mito-lab/mito-tools',
+    subtitle: 'Image-analysis pipeline for live mitochondrial dynamics.',
+    image_url: '',
     notes: '',
   },
   {
     id: 'd3',
-    title: 'Mitochondrial form and function',
-    authors: 'Friedman & Nunnari',
-    year: '2014',
-    doi: '10.1038/nature12985',
+    kind: 'link',
+    title: 'Mito Lab — group page',
+    authors: '',
+    year: '',
+    doi: '',
+    url: 'https://example.edu/labs/mito',
+    subtitle: 'Members, publications, and current openings.',
+    image_url: '',
     notes: '',
   },
 ];
@@ -95,6 +126,7 @@ export function DemoTour() {
         .map((item, index) => ({
           id: item.id,
           position: index,
+          kind: item.kind,
           title: item.title.trim(),
           authors: item.authors.trim() || null,
           year: item.year.trim() ? Number(item.year) || null : null,
@@ -103,6 +135,9 @@ export function DemoTour() {
             ? `https://doi.org/${item.doi.trim()}`
             : null,
           notes: item.notes.trim() || null,
+          url: item.url.trim() || null,
+          subtitle: item.subtitle.trim() || null,
+          image_url: item.image_url.trim() || null,
         })),
     [items],
   );
@@ -115,10 +150,15 @@ export function DemoTour() {
     setItems((prev) => prev.filter((it) => it.id !== id));
   }
 
-  function addItem() {
+  function addItem(kind: ShareItemKind) {
     setItems((prev) => [
       ...prev,
-      { id: newId(), title: '', authors: '', year: '', doi: '', notes: '' },
+      {
+        id: newId(),
+        kind,
+        title: '',
+        ...blankFields,
+      },
     ]);
   }
 
@@ -184,7 +224,7 @@ export function DemoTour() {
             >
               <div className="flex items-baseline justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
-                  Item {index + 1}
+                  Item {index + 1} · {item.kind}
                 </span>
                 <button
                   type="button"
@@ -207,43 +247,76 @@ export function DemoTour() {
                   />
                 </Field>
 
-                <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
-                  <Field label="Authors">
-                    <input
-                      type="text"
-                      value={item.authors}
-                      onChange={(e) =>
-                        updateItem(item.id, { authors: e.target.value })
-                      }
-                      placeholder="Smith et al."
-                      className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-                    />
-                  </Field>
-                  <Field label="Year">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={item.year}
-                      onChange={(e) =>
-                        updateItem(item.id, { year: e.target.value })
-                      }
-                      placeholder="2024"
-                      className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
-                    />
-                  </Field>
-                </div>
+                {item.kind === 'paper' ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+                      <Field label="Authors">
+                        <input
+                          type="text"
+                          value={item.authors}
+                          onChange={(e) =>
+                            updateItem(item.id, { authors: e.target.value })
+                          }
+                          placeholder="Smith et al."
+                          className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                        />
+                      </Field>
+                      <Field label="Year">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={item.year}
+                          onChange={(e) =>
+                            updateItem(item.id, { year: e.target.value })
+                          }
+                          placeholder="2024"
+                          className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                        />
+                      </Field>
+                    </div>
 
-                <Field label="DOI">
-                  <input
-                    type="text"
-                    value={item.doi}
-                    onChange={(e) =>
-                      updateItem(item.id, { doi: e.target.value })
-                    }
-                    placeholder="10.1038/nature12985"
-                    className="w-full rounded-md border border-rule bg-paper px-3 py-2 font-mono text-xs text-ink outline-none focus:border-accent"
-                  />
-                </Field>
+                    <Field label="DOI">
+                      <input
+                        type="text"
+                        value={item.doi}
+                        onChange={(e) =>
+                          updateItem(item.id, { doi: e.target.value })
+                        }
+                        placeholder="10.1038/nature12985"
+                        className="w-full rounded-md border border-rule bg-paper px-3 py-2 font-mono text-xs text-ink outline-none focus:border-accent"
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <>
+                    <Field label={item.kind === 'repo' ? 'GitHub URL' : 'URL'}>
+                      <input
+                        type="url"
+                        value={item.url}
+                        onChange={(e) =>
+                          updateItem(item.id, { url: e.target.value })
+                        }
+                        placeholder={
+                          item.kind === 'repo'
+                            ? 'https://github.com/owner/repo'
+                            : 'https://...'
+                        }
+                        className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                      />
+                    </Field>
+                    <Field label="Description">
+                      <input
+                        type="text"
+                        value={item.subtitle}
+                        onChange={(e) =>
+                          updateItem(item.id, { subtitle: e.target.value })
+                        }
+                        placeholder="Optional one-liner"
+                        className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                      />
+                    </Field>
+                  </>
+                )}
 
                 <Field label="Notes">
                   <textarea
@@ -261,17 +334,33 @@ export function DemoTour() {
           ))}
         </ul>
 
-        <button
-          type="button"
-          onClick={addItem}
-          className="mt-4 inline-flex items-center gap-2 rounded-md border border-dashed border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink"
-        >
-          + Add item
-        </button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => addItem('paper')}
+            className="inline-flex items-center gap-2 rounded-md border border-dashed border-rule bg-paper px-3 py-2 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink"
+          >
+            + Paper
+          </button>
+          <button
+            type="button"
+            onClick={() => addItem('repo')}
+            className="inline-flex items-center gap-2 rounded-md border border-dashed border-rule bg-paper px-3 py-2 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink"
+          >
+            + Repo
+          </button>
+          <button
+            type="button"
+            onClick={() => addItem('link')}
+            className="inline-flex items-center gap-2 rounded-md border border-dashed border-rule bg-paper px-3 py-2 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink"
+          >
+            + Link
+          </button>
+        </div>
 
         <p className="mt-6 text-xs text-ink-faint">
-          In the real app, you can paste a DOI or search Crossref/OpenAlex
-          and the metadata is pulled in automatically.
+          In the real app, you can paste a DOI or a GitHub URL and the metadata
+          is pulled in automatically.
         </p>
       </section>
 

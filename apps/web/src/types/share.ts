@@ -4,17 +4,28 @@
  * pipeline lands these will be generated and live in packages/types.
  */
 
-export type ShareType = 'paper' | 'collection' | 'poster' | 'grant';
+export type ShareType =
+  | 'paper'
+  | 'collection'
+  | 'poster'
+  | 'grant'
+  | 'project';
+
+export type ShareItemKind = 'paper' | 'repo' | 'link';
 
 export interface ShareItem {
   id: string;
   position: number;
+  kind: ShareItemKind;
   title: string;
   scholar_url: string | null;
   doi: string | null;
   authors: string | null;
   year: number | null;
   notes: string | null;
+  url: string | null;
+  subtitle: string | null;
+  image_url: string | null;
 }
 
 /** What the public viewer (`GET /public/c/{code}`) returns. No auth required. */
@@ -41,14 +52,20 @@ export interface ShareResponse {
   items: ShareItem[];
 }
 
-/** Item input shape — matches ShareItemCreate on the backend. */
+/** Item input shape — matches ShareItemCreate on the backend. `kind` defaults
+ *  to `'paper'` server-side for back-compat, so existing single-paper / paper
+ *  collection clients keep working unchanged. */
 export interface ShareItemInput {
+  kind?: ShareItemKind;
   title: string;
   scholar_url?: string | null;
   doi?: string | null;
   authors?: string | null;
   year?: number | null;
   notes?: string | null;
+  url?: string | null;
+  subtitle?: string | null;
+  image_url?: string | null;
 }
 
 export interface ShareCreateInput {

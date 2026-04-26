@@ -6,7 +6,23 @@ import { useState } from 'react';
 import { QrModal } from '@/components/qr-modal';
 import { ApiError } from '@/lib/api';
 import { useDeleteShare, useShares } from '@/lib/hooks/useShares';
-import type { ShareResponse } from '@/types/share';
+import type { ShareItemKind, ShareResponse } from '@/types/share';
+
+function kindSummary(items: ShareResponse['items']): string {
+  if (items.length === 0) return '0 items';
+  const counts: Record<ShareItemKind, number> = { paper: 0, repo: 0, link: 0 };
+  for (const it of items) {
+    const k = (it.kind ?? 'paper') as ShareItemKind;
+    counts[k] += 1;
+  }
+  // Mixed kinds → "3 papers, 1 repo". Single-kind → just "3 papers" (current
+  // wording, just plural-aware) so legacy paper-only shares look unchanged.
+  const parts: string[] = [];
+  if (counts.paper) parts.push(`${counts.paper} ${counts.paper === 1 ? 'paper' : 'papers'}`);
+  if (counts.repo) parts.push(`${counts.repo} ${counts.repo === 1 ? 'repo' : 'repos'}`);
+  if (counts.link) parts.push(`${counts.link} ${counts.link === 1 ? 'link' : 'links'}`);
+  return parts.join(', ');
+}
 
 function publicUrlFor(shortCode: string): string {
   // SSR has no `window`, so fall back to the canonical domain. On the client
@@ -113,8 +129,7 @@ export function ShareList({ initialShares }: Props) {
                 {share.name}
               </h3>
               <p className="mt-1 text-sm text-ink-muted">
-                {share.items.length}{' '}
-                {share.items.length === 1 ? 'item' : 'items'}
+                {kindSummary(share.items)}
                 {share.is_public ? '' : ' · private'}
                 {' · '}
                 <span className="capitalize">{share.type}</span>
