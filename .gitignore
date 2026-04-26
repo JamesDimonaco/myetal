@@ -1,0 +1,36 @@
+# Node
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+uv.lock.local
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs and coverage
+*.log
+coverage/
+htmlcov/

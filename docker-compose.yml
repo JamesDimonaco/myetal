@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: quire
+      POSTGRES_PASSWORD: quire
+      POSTGRES_DB: quire
+    ports:
+      - "5432:5432"
+    volumes:
+      - quire_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quire"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./apps/api
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: dev
+      SECRET_KEY: dev-secret-change-me
+      DATABASE_URL: postgresql+asyncpg://quire:quire@db:5432/quire
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/src:/app/src
+    command: uvicorn quire_api.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  quire_pgdata:
