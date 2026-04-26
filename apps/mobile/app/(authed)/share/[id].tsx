@@ -35,6 +35,7 @@ import type { Paper } from '@/types/paper';
 import type {
   ShareCreateInput,
   ShareItemInput,
+  ShareItemKind,
   ShareResponse,
   ShareType,
 } from '@/types/share';
@@ -42,6 +43,7 @@ import type {
 const SHARE_TYPES: ShareType[] = ['paper', 'collection', 'poster', 'grant'];
 
 const itemSchema = z.object({
+  kind: z.enum(['paper', 'repo', 'link']).optional(),
   title: z.string().trim().min(1, 'Item title required').max(500),
   scholar_url: z.string().trim().url('Invalid URL').max(2000).optional().or(z.literal('')),
   doi: z.string().trim().max(255).optional().or(z.literal('')),
@@ -50,6 +52,9 @@ const itemSchema = z.object({
     .union([z.string().regex(/^\d{4}$/, '4-digit year'), z.literal('')])
     .optional(),
   notes: z.string().trim().optional().or(z.literal('')),
+  url: z.string().nullable().optional(),
+  subtitle: z.string().nullable().optional(),
+  image_url: z.string().nullable().optional(),
 });
 
 const shareSchema = z.object({
@@ -63,12 +68,20 @@ const shareSchema = z.object({
 interface DraftItem {
   // Local-only key so reorders don't lose focus on the wrong row.
   _key: string;
+  // Mobile editor v1 only creates 'paper' rows. Non-paper rows loaded from
+  // the server are preserved verbatim so a Save round-trip doesn't drop
+  // their kind-specific fields — they render read-only in the form.
+  kind: ShareItemKind;
   title: string;
   scholar_url: string;
   doi: string;
   authors: string;
   year: string;
   notes: string;
+  // Carried for non-paper kinds; ignored for 'paper'.
+  url: string | null;
+  subtitle: string | null;
+  image_url: string | null;
 }
 
 let _itemKeySeed = 0;
@@ -76,32 +89,44 @@ const newKey = () => `item_${++_itemKeySeed}_${Date.now()}`;
 
 const emptyItem = (): DraftItem => ({
   _key: newKey(),
+  kind: 'paper',
   title: '',
   scholar_url: '',
   doi: '',
   authors: '',
   year: '',
   notes: '',
+  url: null,
+  subtitle: null,
+  image_url: null,
 });
 
 const fromResponseItem = (it: ShareResponse['items'][number]): DraftItem => ({
   _key: newKey(),
+  kind: it.kind ?? 'paper',
   title: it.title,
   scholar_url: it.scholar_url ?? '',
   doi: it.doi ?? '',
   authors: it.authors ?? '',
   year: it.year != null ? String(it.year) : '',
   notes: it.notes ?? '',
+  url: it.url ?? null,
+  subtitle: it.subtitle ?? null,
+  image_url: it.image_url ?? null,
 });
 
 const fromPaper = (p: Paper): DraftItem => ({
   _key: newKey(),
+  kind: 'paper',
   title: p.title,
   scholar_url: p.scholar_url ?? '',
   doi: p.doi ?? '',
   authors: p.authors ?? '',
   year: p.year != null ? String(p.year) : '',
   notes: '',
+  url: null,
+  subtitle: null,
+  image_url: null,
 });
 
 /**
@@ -213,14 +238,20 @@ export default function ShareEditorScreen() {
       return;
     }
 
-    // Convert empty strings → null for the API.
+    // Convert empty strings → null for the API. Non-paper kinds round-trip
+    // their server-owned fields verbatim — the mobile editor doesn't expose
+    // edit UI for them in v1.
     const apiItems: ShareItemInput[] = parsed.data.items.map((it) => ({
+      kind: it.kind ?? 'paper',
       title: it.title,
       scholar_url: it.scholar_url ? it.scholar_url : null,
       doi: it.doi ? it.doi : null,
       authors: it.authors ? it.authors : null,
       year: it.year ? Number(it.year) : null,
       notes: it.notes ? it.notes : null,
+      url: it.url ?? null,
+      subtitle: it.subtitle ?? null,
+      image_url: it.image_url ?? null,
     }));
 
     const payload: ShareCreateInput = {
@@ -445,6 +476,42 @@ export default function ShareEditorScreen() {
                 </View>
               </View>
 
+              {it.kind !== 'paper' ? (
+                // Non-paper kinds (repo / link) are read-only on mobile in v1.
+                // Reorder + remove still work above; field edits happen on web.
+                <View>
+                  <View style={styles.readOnlyKindRow}>
+                    <Ionicons
+                      name={it.kind === 'repo' ? 'logo-github' : 'link'}
+                      size={14}
+                      color={c.textMuted}
+                    />
+                    <Text style={[styles.readOnlyKindLabel, { color: c.textMuted }]}>
+                      {it.kind === 'repo' ? 'REPO' : 'LINK'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.readOnlyTitle, { color: c.text }]}>
+                    {it.title}
+                  </Text>
+                  {it.subtitle ? (
+                    <Text style={[styles.readOnlySub, { color: c.textMuted }]}>
+                      {it.subtitle}
+                    </Text>
+                  ) : null}
+                  {it.url ? (
+                    <Text
+                      style={[styles.readOnlySub, { color: c.textSubtle }]}
+                      numberOfLines={1}
+                    >
+                      {it.url}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.readOnlyHint, { color: c.textMuted }]}>
+                    Edit this item on the web app.
+                  </Text>
+                </View>
+              ) : (
+                <>
               <ItemField
                 label="Title"
                 value={it.title}
@@ -492,6 +559,8 @@ export default function ShareEditorScreen() {
                 multiline
                 c={c}
               />
+                </>
+              )}
             </View>
           ))}
 
@@ -649,4 +718,31 @@ const styles = StyleSheet.create({
   deleteText: { fontSize: 14, fontWeight: '500' },
 
   errorTitle: { fontSize: 18, fontWeight: '700', marginBottom: Spacing.md },
+
+  readOnlyKindRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: Spacing.xs,
+  },
+  readOnlyKindLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  readOnlyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 22,
+  },
+  readOnlySub: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: Spacing.xs,
+  },
+  readOnlyHint: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: Spacing.sm,
+  },
 });

@@ -6,10 +6,20 @@
 
 export type ShareType = 'paper' | 'collection' | 'poster' | 'grant';
 
+/**
+ * v1 item kinds. Server defaults to 'paper' for legacy rows so this stays
+ * backward-compatible with existing shares.
+ */
+export type ShareItemKind = 'paper' | 'repo' | 'link';
+
 export interface ShareItem {
   id: string;
   position: number;
+  kind: ShareItemKind;
   title: string;
+  url: string | null;
+  subtitle: string | null;
+  image_url: string | null;
   scholar_url: string | null;
   doi: string | null;
   authors: string | null;
@@ -42,6 +52,10 @@ export interface ShareResponse {
 
 export interface ShareItemInput {
   title: string;
+  kind?: ShareItemKind;
+  url?: string | null;
+  subtitle?: string | null;
+  image_url?: string | null;
   scholar_url?: string | null;
   doi?: string | null;
   authors?: string | null;
