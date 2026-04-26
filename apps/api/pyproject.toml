@@ -47,7 +47,10 @@ select = ["E", "F", "I", "B", "UP", "N", "S"]
 # S105/S106: hardcoded-password heuristic flags every string literal "password",
 #   "token_type", "token_url" kwargs, and our intentionally-public
 #   DEV_SECRET_PLACEHOLDER. Noise.
-ignore = ["S101", "S105", "S106", "N818", "N806"]
+# B008: function call in argument default. FastAPI's idiomatic
+#   `Query(...)`, `Depends(...)`, `Body(...)` usage in defaults is the
+#   blessed pattern; ruff treats them like mutable-default-arg footguns.
+ignore = ["S101", "S105", "S106", "N818", "N806", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S"]

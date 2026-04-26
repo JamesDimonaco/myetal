@@ -21,7 +21,7 @@ import jwt
 from ceteris_api.core.config import settings
 from ceteris_api.models import AuthProvider
 
-Platform = Literal["web", "mobile"]
+Platform = Literal["web", "mobile", "devjson"]
 STATE_TTL = timedelta(minutes=5)
 STATE_ALGORITHM = "HS256"
 

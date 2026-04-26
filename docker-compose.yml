@@ -19,6 +19,11 @@ services:
     build: ./apps/api
     ports:
       - "8000:8000"
+    # Load OAuth secrets from .env (gitignored). Compose 2.24+ "long form"
+    # so the file is optional — CI doesn't need it; dev does.
+    env_file:
+      - path: ./apps/api/.env
+        required: false
     environment:
       ENV: dev
       SECRET_KEY: dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX
