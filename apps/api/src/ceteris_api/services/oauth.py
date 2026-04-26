@@ -45,10 +45,15 @@ def _callback_url(provider: AuthProvider) -> str:
     return f"{settings.public_api_url.rstrip('/')}/auth/{provider.value}/callback"
 
 
-def start_oauth(provider: AuthProvider, return_to: str, platform: Platform) -> str:
+def start_oauth(
+    provider: AuthProvider,
+    return_to: str,
+    platform: Platform,
+    mobile_redirect: str | None = None,
+) -> str:
     config = get_provider(provider)
     client_id, _ = credentials_for(provider)
-    state = encode_state(provider, return_to, platform)
+    state = encode_state(provider, return_to, platform, mobile_redirect=mobile_redirect)
 
     params = {
         "client_id": client_id,
@@ -67,8 +72,11 @@ async def complete_oauth(
     state: str,
     *,
     http_client: httpx.AsyncClient | None = None,
-) -> tuple[User, str, str, str, Platform]:
-    """Returns (user, access_token, raw_refresh_token, return_to, platform)."""
+) -> tuple[User, str, str, str, Platform, str | None]:
+    """Returns (user, access_token, raw_refresh_token, return_to, platform,
+    mobile_redirect). The trailing `mobile_redirect` is set when the original
+    /start was called with that param (dev-only) — the callback honours it
+    by 302-bouncing to that URL with tokens in the fragment."""
 
     state_payload = decode_state(state, expected_provider=provider)
 
@@ -98,6 +106,7 @@ async def complete_oauth(
         raw_refresh,
         state_payload["return_to"],
         state_payload["platform"],
+        state_payload.get("mobile_redirect"),
     )
 
 

@@ -103,7 +103,7 @@ async def test_complete_oauth_creates_user_and_identity(db_session: AsyncSession
     state = encode_state(AuthProvider.ORCID, "/dashboard", "web")
 
     async with httpx.AsyncClient(transport=_mock_transport()) as client:
-        user, access, refresh, return_to, platform = await oauth_service.complete_oauth(
+        user, access, refresh, return_to, platform, _ = await oauth_service.complete_oauth(
             db_session,
             AuthProvider.ORCID,
             code="real-looking-code",
@@ -134,10 +134,10 @@ async def test_complete_oauth_idempotent_for_same_subject(db_session: AsyncSessi
     state2 = encode_state(AuthProvider.ORCID, "/", "web")
 
     async with httpx.AsyncClient(transport=_mock_transport()) as client:
-        user1, _, _, _, _ = await oauth_service.complete_oauth(
+        user1, _, _, _, _, _ = await oauth_service.complete_oauth(
             db_session, AuthProvider.ORCID, "c1", state1, http_client=client
         )
-        user2, _, _, _, _ = await oauth_service.complete_oauth(
+        user2, _, _, _, _, _ = await oauth_service.complete_oauth(
             db_session, AuthProvider.ORCID, "c2", state2, http_client=client
         )
 
@@ -158,7 +158,7 @@ async def test_complete_oauth_does_not_link_by_email(db_session: AsyncSession) -
 
     state = encode_state(AuthProvider.ORCID, "/", "web")
     async with httpx.AsyncClient(transport=_mock_transport()) as client:
-        new_user, _, _, _, _ = await oauth_service.complete_oauth(
+        new_user, _, _, _, _, _ = await oauth_service.complete_oauth(
             db_session, AuthProvider.ORCID, "c", state, http_client=client
         )
 
@@ -190,7 +190,7 @@ async def test_complete_oauth_orcid_with_only_sub(db_session: AsyncSession) -> N
     minimal_userinfo = {"sub": "0000-0002-1111-2222"}
 
     async with httpx.AsyncClient(transport=_mock_transport(userinfo=minimal_userinfo)) as client:
-        user, _, _, _, _ = await oauth_service.complete_oauth(
+        user, _, _, _, _, _ = await oauth_service.complete_oauth(
             db_session, AuthProvider.ORCID, "c", state, http_client=client
         )
 

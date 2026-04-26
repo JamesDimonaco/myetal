@@ -22,15 +22,31 @@ async def oauth_start(
     provider: ProviderName,
     return_to: str = Query(default="/", description="Path on the web/mobile app to land on"),
     platform: PlatformName = Query(default="web"),
+    mobile_redirect: str | None = Query(
+        default=None,
+        description=(
+            "Dev-only: a URL the callback should bounce to (with tokens in URL "
+            "fragment) instead of returning JSON. Used by mobile apps that want "
+            "to intercept the OAuth result via expo-web-browser's "
+            "openAuthSessionAsync. Refused outside ENV=dev."
+        ),
+    ),
 ) -> RedirectResponse:
     if platform == "devjson" and settings.env != "dev":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="devjson platform is only available when ENV=dev",
         )
+    if mobile_redirect and settings.env != "dev":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="mobile_redirect is only available when ENV=dev",
+        )
 
     try:
-        url = oauth_service.start_oauth(AuthProvider(provider), return_to, platform)
+        url = oauth_service.start_oauth(
+            AuthProvider(provider), return_to, platform, mobile_redirect=mobile_redirect
+        )
     except ProviderNotConfigured as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -64,9 +80,14 @@ async def oauth_callback(
         return _bounce_failure("missing code or state")
 
     try:
-        user, access, refresh, return_to, platform = await oauth_service.complete_oauth(
-            db, AuthProvider(provider), code, state
-        )
+        (
+            user,
+            access,
+            refresh,
+            return_to,
+            platform,
+            mobile_redirect,
+        ) = await oauth_service.complete_oauth(db, AuthProvider(provider), code, state)
     except StateError as exc:
         return _bounce_failure(f"invalid state: {exc}")
     except TokenExchangeFailed as exc:
@@ -78,6 +99,14 @@ async def oauth_callback(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
+
+    # Dev-only: bounce tokens to a mobile deep link the app can intercept
+    if mobile_redirect:
+        fragment = urlencode(
+            {"access_token": access, "refresh_token": refresh, "return_to": return_to}
+        )
+        sep = "&" if "#" in mobile_redirect else "#"
+        return RedirectResponse(url=f"{mobile_redirect}{sep}{fragment}", status_code=302)
 
     if platform == "devjson":
         return JSONResponse(

@@ -58,7 +58,12 @@ class StateError(Exception):
     """State token failed to decode, expired, or did not match the expected provider."""
 
 
-def encode_state(provider: AuthProvider, return_to: str, platform: Platform) -> str:
+def encode_state(
+    provider: AuthProvider,
+    return_to: str,
+    platform: Platform,
+    mobile_redirect: str | None = None,
+) -> str:
     now = datetime.now(UTC)
     payload: dict[str, str | int] = {
         "provider": provider.value,
@@ -68,6 +73,8 @@ def encode_state(provider: AuthProvider, return_to: str, platform: Platform) -> 
         "iat": int(now.timestamp()),
         "exp": int((now + STATE_TTL).timestamp()),
     }
+    if mobile_redirect:
+        payload["mobile_redirect"] = mobile_redirect
     return jwt.encode(
         payload,
         settings.secret_key.get_secret_value(),
