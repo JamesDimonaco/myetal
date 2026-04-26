@@ -127,6 +127,33 @@ async def logout(db: AsyncSession, raw_refresh: str) -> None:
     await db.commit()
 
 
+async def list_sessions(db: AsyncSession, user_id: uuid.UUID) -> list[RefreshToken]:
+    """Return all refresh-token rows for a user (one per signed-in device).
+    Routes are responsible for projecting to a hash-free schema."""
+    rows = await db.scalars(
+        select(RefreshToken)
+        .where(RefreshToken.user_id == user_id)
+        .order_by(RefreshToken.issued_at.desc())
+    )
+    return list(rows.all())
+
+
+async def revoke_session(db: AsyncSession, user_id: uuid.UUID, session_id: uuid.UUID) -> bool:
+    """Revoke a single refresh token (= sign out one device).
+
+    Returns True if the row was found and belonged to the user. False if
+    the row doesn't exist OR belongs to someone else (we deliberately
+    conflate the two so we don't leak existence of foreign session ids).
+    """
+    token = await db.get(RefreshToken, session_id)
+    if token is None or token.user_id != user_id:
+        return False
+    if not token.revoked:
+        token.revoked = True
+        await db.commit()
+    return True
+
+
 # ---------- internals ----------
 
 
