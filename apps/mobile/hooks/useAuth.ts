@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Platform } from 'react-native';
@@ -111,50 +112,54 @@ export function useAuth() {
 
   const signInWithGitHub = useCallback(async (): Promise<AuthUser> => {
     /**
-     * GitHub OAuth — pragmatic dev-build path.
-     *
-     * Real Universal Links flow waits on the EAS dev-build agent. Until then
-     * we use the backend's `platform=devjson` mode which returns the JWT pair
-     * as JSON in the browser response. We open an in-app auth session,
-     * intercept GitHub's callback URL via the host platform's session API,
-     * and read the tokens out of the trailing JSON page.
-     *
-     * On native this works because `WebBrowser.openAuthSessionAsync` keeps the
-     * browser foregrounded long enough to fetch the JSON from the callback —
-     * we then call /auth/github/callback ourselves with the same code+state to
-     * receive the JSON body. (The backend completes the flow once and only
-     * once; the second call would re-fail. So instead we fetch the JSON page
-     * directly via fetch() after the browser-side redirect resolves.)
-     *
-     * Simpler approach taken here: open the start URL in `openAuthSessionAsync`,
-     * wait for it to resolve, then surface a clear error if we couldn't capture
-     * the tokens. The user-friendly fallback (manual paste of the JSON) is
-     * implemented on the sign-in screen.
+     * GitHub OAuth — uses the backend's dev `mobile_redirect` parameter so the
+     * /auth/github/callback bounces tokens to a URL Expo can intercept,
+     * eliminating the manual-paste step. When EAS Universal Links land,
+     * swap `mobile_redirect` for the production `https://ceteris.app/...`
+     * deep link and the rest of this code stays the same.
      */
     const startUrl =
       `${API_BASE_URL}/auth/github/start?platform=devjson&return_to=/dashboard`;
 
     if (Platform.OS === 'web') {
-      // On web, just open the start URL in a new tab; user will paste tokens
-      // back into the debug input.
+      // On web the same flow doesn't apply — the production web app uses
+      // server-side cookies (see Next.js /api/auth/finish). For now in dev
+      // we fall through to the manual paste path.
       window.open(startUrl, '_blank');
       throw new Error(
         'github_devjson_manual: paste the JSON tokens into the debug input below.',
       );
     }
 
-    const result = await WebBrowser.openAuthSessionAsync(startUrl, null);
-    if (result.type !== 'success' && result.type !== 'dismiss') {
+    // expo-linking gives us the right scheme for THIS environment:
+    //   - Expo Go:    exp+ceteris://expo-development-client/...?path=auth-finish
+    //   - Dev build:  ceteris:///auth-finish
+    const returnUrl = Linking.createURL('/auth-finish');
+    const url =
+      `${startUrl}&mobile_redirect=${encodeURIComponent(returnUrl)}`;
+
+    const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      throw new Error('github_oauth_cancel');
+    }
+    if (result.type !== 'success') {
       throw new Error(`github_oauth_${result.type}`);
     }
 
-    // The browser landed on the JSON page but expo-web-browser has no way to
-    // read its body. Throw a sentinel error so the sign-in screen can prompt
-    // the user to paste the JSON they see.
-    throw new Error(
-      'github_devjson_manual: paste the JSON tokens into the debug input below.',
-    );
-  }, []);
+    const parsed = new URL(result.url);
+    const fragment = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+    const accessToken = fragment.get('access_token');
+    const refreshToken = fragment.get('refresh_token');
+    if (!accessToken || !refreshToken) {
+      throw new Error('GitHub callback returned no tokens.');
+    }
+
+    return persistTokensAndRefreshUser({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_type: 'bearer',
+    });
+  }, [persistTokensAndRefreshUser]);
 
   /**
    * Consume a manually-pasted devjson response from the GitHub OAuth flow.
