@@ -71,11 +71,17 @@ export default function LandingScreen() {
       </ScrollView>
 
       {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: c.textMuted }]}>
-          Sign in to create your own collection · coming soon
-        </Text>
-      </View>
+      <Link href="/sign-in" asChild>
+        <Pressable
+          style={({ pressed }) => [styles.footer, { opacity: pressed ? 0.6 : 1 }]}
+          accessibilityRole="link"
+          accessibilityLabel="Sign in"
+        >
+          <Text style={[styles.footerText, { color: c.textMuted }]}>
+            Sign in to create your own collection →
+          </Text>
+        </Pressable>
+      </Link>
     </SafeAreaView>
   );
 }

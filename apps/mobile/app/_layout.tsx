@@ -24,6 +24,10 @@ export default function RootLayout() {
           <Stack.Screen name="scan" options={{ title: 'Scan' }} />
           <Stack.Screen name="enter-code" options={{ title: 'Enter code' }} />
           <Stack.Screen name="c/[code]" options={{ headerBackTitle: 'Home' }} />
+          <Stack.Screen
+            name="sign-in"
+            options={{ presentation: 'modal', title: 'Sign in' }}
+          />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

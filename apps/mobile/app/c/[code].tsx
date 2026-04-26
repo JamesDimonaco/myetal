@@ -1,7 +1,15 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
-import { Pressable } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { QrModal } from '@/components/qr-modal';
 import { ShareItemCard } from '@/components/share-item-card';
@@ -41,17 +49,11 @@ export default function PublicShareScreen() {
   }
 
   if (error) {
-    const isMissing = error instanceof ApiError && error.isNotFound;
+    const { title, body } = describeError(error);
     return (
       <View style={[styles.centered, { backgroundColor: c.background }]}>
-        <Text style={[styles.errorTitle, { color: c.text }]}>
-          {isMissing ? 'Collection not found' : 'Something went wrong'}
-        </Text>
-        <Text style={[styles.errorBody, { color: c.textMuted }]}>
-          {isMissing
-            ? "We couldn't find a public collection with that code. Double-check and try again."
-            : 'Please try again in a moment.'}
-        </Text>
+        <Text style={[styles.errorTitle, { color: c.text }]}>{title}</Text>
+        <Text style={[styles.errorBody, { color: c.textMuted }]}>{body}</Text>
         <Pressable
           onPress={() => refetch()}
           style={({ pressed }) => [
@@ -100,7 +102,16 @@ export default function PublicShareScreen() {
         collectionName={data.name}
       />
 
-      <ScrollView style={{ flex: 1, backgroundColor: c.background }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: c.background }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={c.textMuted}
+          />
+        }
+      >
         <View style={styles.header}>
           <Text style={[styles.title, { color: c.text }]}>{data.name}</Text>
 
@@ -136,6 +147,29 @@ export default function PublicShareScreen() {
       </ScrollView>
     </>
   );
+}
+
+function describeError(error: unknown): { title: string; body: string } {
+  if (error instanceof ApiError) {
+    if (error.isNotFound) {
+      return {
+        title: 'Collection not found',
+        body: "We couldn't find a public collection with that code. Double-check and try again.",
+      };
+    }
+    if (error.status >= 500) {
+      return {
+        title: 'Server error',
+        body: 'The Ceteris backend ran into a problem. Try again in a moment.',
+      };
+    }
+    return { title: 'Something went wrong', body: error.detail };
+  }
+  // fetch() throws TypeError on network failure
+  return {
+    title: "Can't reach Ceteris",
+    body: 'Check your connection and try again.',
+  };
 }
 
 const styles = StyleSheet.create({
