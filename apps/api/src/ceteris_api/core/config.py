@@ -1,4 +1,4 @@
-from pydantic import SecretStr, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_SECRET_PLACEHOLDER = "dev-secret-change-me-PLEASE-do-not-use-in-prod-XXXXXXXX"
@@ -28,6 +28,23 @@ class Settings(BaseSettings):
     # GitHub
     github_client_id: str = ""
     github_client_secret: SecretStr = SecretStr("")
+
+    # Observability — Sentry. Empty DSN = disabled (default for dev / test).
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = 0.1
+
+    # CORS — list of allowed origins (exact match). Default empty = no CORS.
+    # Pydantic-settings parses comma-separated env var into list[str], e.g.
+    #   CORS_ORIGINS=https://ceteris.app,https://www.ceteris.app
+    cors_origins: list[str] = []
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_csv_origins(cls, v: object) -> object:
+        # pydantic-settings hands list/JSON straight through; only split bare strings
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
     @model_validator(mode="after")
     def reject_dev_secret_in_prod(self) -> "Settings":
