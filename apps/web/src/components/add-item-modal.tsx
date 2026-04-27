@@ -334,7 +334,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                       <span className="uppercase">{r.language}</span>
                     ) : null}
                   </div>
-                  {r.keywords.length > 0 ? (
+                  {r.keywords?.length > 0 ? (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {r.keywords.slice(0, 4).map((kw) => (
                         <span
