@@ -59,6 +59,28 @@ async def get_current_user_optional(
     return await db.get(User, user_id)
 
 
+async def require_admin(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Gate the /admin/* endpoints behind an email allowlist.
+
+    `settings.admin_emails` is a comma-separated env var. Match is
+    case-insensitive on email, so `James@Example.com` granted via env
+    matches `james@example.com` on the user row. Returns 403 (not 401)
+    when authenticated but not on the list — auth is fine, authz isn't.
+    """
+    from myetal_api.core.config import settings
+
+    allowed = {e.lower() for e in settings.admin_emails}
+    if user.email.lower() not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="admin only",
+        )
+    return user
+
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
 OptionalUser = Annotated[User | None, Depends(get_current_user_optional)]
+AdminUser = Annotated[User, Depends(require_admin)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]

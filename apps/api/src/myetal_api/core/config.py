@@ -38,7 +38,13 @@ class Settings(BaseSettings):
     #   CORS_ORIGINS=https://myetal.app,https://www.myetal.app
     cors_origins: list[str] = []
 
-    @field_validator("cors_origins", mode="before")
+    # Admin allowlist — emails (case-insensitive) that may access the
+    # /admin/* endpoints (take-down queue + share tombstoning). Empty in
+    # dev = nobody is admin; set this in prod env.
+    #   ADMIN_EMAILS=james@example.com,ops@example.com
+    admin_emails: list[str] = []
+
+    @field_validator("cors_origins", "admin_emails", mode="before")
     @classmethod
     def _split_csv_origins(cls, v: object) -> object:
         # pydantic-settings hands list/JSON straight through; only split bare strings

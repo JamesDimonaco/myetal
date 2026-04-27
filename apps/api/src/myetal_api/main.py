@@ -4,6 +4,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from myetal_api import __version__
+from myetal_api.api.routes import admin as admin_routes
 from myetal_api.api.routes import auth as auth_routes
 from myetal_api.api.routes import health as health_routes
 from myetal_api.api.routes import oauth as oauth_routes
@@ -56,3 +57,4 @@ app.include_router(papers_routes.router)
 app.include_router(public_routes.router)
 app.include_router(reports_routes.router)
 app.include_router(works_routes.router)
+app.include_router(admin_routes.router)
