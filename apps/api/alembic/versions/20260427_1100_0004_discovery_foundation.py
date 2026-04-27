@@ -30,6 +30,7 @@ discovery-ticket pre-reqs. The chain is enforced by down_revision='0003'.
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -39,34 +40,60 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def upgrade() -> None:
-    bind = op.get_bind()
+# See migration 0003 for the rationale: declare the enum once with
+# `create_type=False`, create the type idempotently via raw SQL, then use
+# the same Python instance everywhere a column references it.
+_SHARE_REPORT_REASON = postgresql.ENUM(
+    "copyright",
+    "spam",
+    "abuse",
+    "pii",
+    "other",
+    name="share_report_reason",
+    create_type=False,
+)
+_SHARE_REPORT_STATUS = postgresql.ENUM(
+    "open",
+    "actioned",
+    "dismissed",
+    name="share_report_status",
+    create_type=False,
+)
 
+
+def upgrade() -> None:
     # ----------- 1. Drop vestigial social tables (D13 + D-S-Iss4) -----------
     # share_favorites first then share_comments — neither has FK into the
     # other, but the order is consistent and makes the downgrade reversal
-    # obvious.
-    op.drop_table("share_favorites")
-    op.drop_table("share_comments")
+    # obvious. IF EXISTS guards make this safe to retry after a failed
+    # earlier attempt that already dropped one of them.
+    op.execute("DROP TABLE IF EXISTS share_favorites CASCADE")
+    op.execute("DROP TABLE IF EXISTS share_comments CASCADE")
 
     # ----------- 2. Add published_at + deleted_at to shares (D1 + D14) -----
-    op.add_column(
-        "shares",
-        sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.add_column(
-        "shares",
-        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.create_index("ix_shares_deleted_at", "shares", ["deleted_at"])
+    # IF NOT EXISTS guards make column-add idempotent across partial-retry.
+    op.execute("ALTER TABLE shares ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ NULL")
+    op.execute("ALTER TABLE shares ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_shares_deleted_at ON shares (deleted_at)")
 
     # ----------- 3. Enums for share_reports (D16) -----------
-    share_report_reason = sa.Enum(
-        "copyright", "spam", "abuse", "pii", "other", name="share_report_reason"
+    # Idempotent type creation — see migration 0003 for the rationale.
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE share_report_reason AS ENUM ('copyright', 'spam', 'abuse', 'pii', 'other');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+        """
     )
-    share_report_status = sa.Enum("open", "actioned", "dismissed", name="share_report_status")
-    share_report_reason.create(bind, checkfirst=True)
-    share_report_status.create(bind, checkfirst=True)
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE share_report_status AS ENUM ('open', 'actioned', 'dismissed');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
 
     # ----------- 4. share_views (D3 + D3.1 + D-S-Iss10 + D-S-Iss7 + D-S-Iss2) -
     op.create_table(
@@ -196,13 +223,13 @@ def upgrade() -> None:
         sa.Column("reporter_user_id", sa.Uuid(), nullable=True),
         sa.Column(
             "reason",
-            sa.Enum(name="share_report_reason", create_type=False),
+            _SHARE_REPORT_REASON,
             nullable=False,
         ),
         sa.Column("details", sa.Text(), nullable=True),
         sa.Column(
             "status",
-            sa.Enum(name="share_report_status", create_type=False),
+            _SHARE_REPORT_STATUS,
             nullable=False,
             server_default="open",
         ),
@@ -258,8 +285,6 @@ def downgrade() -> None:
     Downgrade only makes sense as a recovery from "I accidentally upgraded";
     it does not restore lost social data (which there wasn't any of).
     """
-    bind = op.get_bind()
-
     # Drop new tables in dep order.
     op.drop_index("ix_share_reports_share_id", table_name="share_reports")
     op.drop_index("ix_share_reports_status_created", table_name="share_reports")
@@ -278,8 +303,8 @@ def downgrade() -> None:
     op.drop_index("ix_share_views_share_id_viewed_at", table_name="share_views")
     op.drop_table("share_views")
 
-    sa.Enum(name="share_report_status").drop(bind, checkfirst=True)
-    sa.Enum(name="share_report_reason").drop(bind, checkfirst=True)
+    op.execute("DROP TYPE IF EXISTS share_report_status")
+    op.execute("DROP TYPE IF EXISTS share_report_reason")
 
     # Drop the share columns we added.
     op.drop_index("ix_shares_deleted_at", table_name="shares")

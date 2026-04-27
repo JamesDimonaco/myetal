@@ -37,6 +37,7 @@ Production safety:
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -46,17 +47,69 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
+# Enum types are created idempotently via DO blocks below, then referenced
+# by the table-creation calls with `create_type=False`. This avoids a known
+# foot-gun: passing `sa.Enum("a", "b", name=...)` to `op.create_table` makes
+# SQLAlchemy try to CREATE TYPE again (it sees a distinct instance from the
+# one we called `.create()` on), which on retry-after-partial-failure fails
+# with "type already exists." Using `postgresql.ENUM(..., create_type=False)`
+# tells SQLAlchemy to assume the type exists and just reference it by name.
+_PAPER_SOURCE = postgresql.ENUM(
+    "orcid",
+    "crossref",
+    "openalex",
+    "manual",
+    name="paper_source",
+    create_type=False,
+)
+_USER_PAPER_ADDED_VIA = postgresql.ENUM(
+    "orcid",
+    "manual",
+    "share",
+    name="user_paper_added_via",
+    create_type=False,
+)
+_ORCID_SYNC_STATUS = postgresql.ENUM(
+    "pending",
+    "running",
+    "completed",
+    "failed",
+    name="orcid_sync_status",
+    create_type=False,
+)
+
+
 def upgrade() -> None:
-    # ----------- 1. Enum types -----------
-    paper_source = sa.Enum("orcid", "crossref", "openalex", "manual", name="paper_source")
-    user_paper_added_via = sa.Enum("orcid", "manual", "share", name="user_paper_added_via")
-    orcid_sync_status = sa.Enum(
-        "pending", "running", "completed", "failed", name="orcid_sync_status"
-    )
     bind = op.get_bind()
-    paper_source.create(bind, checkfirst=True)
-    user_paper_added_via.create(bind, checkfirst=True)
-    orcid_sync_status.create(bind, checkfirst=True)
+
+    # ----------- 1. Enum types (idempotent) -----------
+    # `DO $$ ... EXCEPTION WHEN duplicate_object` makes these no-ops if the
+    # type already exists from a previous half-run. Cheaper recovery than
+    # forcing the operator to clean orphaned types by hand.
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE paper_source AS ENUM ('orcid', 'crossref', 'openalex', 'manual');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE user_paper_added_via AS ENUM ('orcid', 'manual', 'share');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE orcid_sync_status AS ENUM ('pending', 'running', 'completed', 'failed');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
 
     # ----------- 2. papers -----------
     op.create_table(
@@ -76,7 +129,7 @@ def upgrade() -> None:
         sa.Column("image_url", sa.String(2000), nullable=True),
         sa.Column(
             "source",
-            sa.Enum(name="paper_source", create_type=False),
+            _PAPER_SOURCE,
             nullable=False,
         ),
         sa.Column(
@@ -154,7 +207,7 @@ def upgrade() -> None:
         sa.Column("paper_id", sa.Uuid(), nullable=False),
         sa.Column(
             "added_via",
-            sa.Enum(name="user_paper_added_via", create_type=False),
+            _USER_PAPER_ADDED_VIA,
             nullable=False,
         ),
         sa.Column(
@@ -180,7 +233,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column(
             "status",
-            sa.Enum(name="orcid_sync_status", create_type=False),
+            _ORCID_SYNC_STATUS,
             nullable=False,
             server_default="pending",
         ),
@@ -494,6 +547,6 @@ def downgrade() -> None:
     op.drop_table("_migration_share_items_backup")
 
     # Drop enums last (after all tables that reference them are gone).
-    sa.Enum(name="orcid_sync_status").drop(bind, checkfirst=True)
-    sa.Enum(name="user_paper_added_via").drop(bind, checkfirst=True)
-    sa.Enum(name="paper_source").drop(bind, checkfirst=True)
+    op.execute("DROP TYPE IF EXISTS orcid_sync_status")
+    op.execute("DROP TYPE IF EXISTS user_paper_added_via")
+    op.execute("DROP TYPE IF EXISTS paper_source")
