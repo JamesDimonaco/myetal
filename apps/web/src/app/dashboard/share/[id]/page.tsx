@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 import { ShareEditor } from '@/components/share-editor';
@@ -39,6 +40,15 @@ export default async function EditSharePage({ params }: PageProps) {
         </h1>
       </header>
       <ShareEditor id={id} initial={share} />
+
+      <div className="mt-6 border-t border-rule pt-6">
+        <Link
+          href={`/dashboard/share/${id}/analytics`}
+          className="inline-flex items-center gap-2 text-sm font-medium text-ink-muted transition hover:text-ink"
+        >
+          View analytics →
+        </Link>
+      </div>
     </div>
   );
 }

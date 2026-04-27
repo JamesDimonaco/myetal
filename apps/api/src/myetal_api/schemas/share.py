@@ -85,3 +85,17 @@ class PublicShareResponse(BaseModel):
     items: list[ShareItemResponse]
     owner_name: str | None
     updated_at: datetime
+
+
+class DailyViewCount(BaseModel):
+    date: str
+    count: int
+
+
+class ShareAnalyticsResponse(BaseModel):
+    """Owner-facing analytics for a single share (D10)."""
+
+    total_views: int
+    views_last_7d: int
+    views_last_30d: int
+    daily_views: list[DailyViewCount]

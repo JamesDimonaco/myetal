@@ -24,6 +24,7 @@ import {
   useCreateShare,
   useDeleteShare,
   useShare,
+  useShareAnalytics,
   useUpdateShare,
 } from '@/hooks/useShares';
 import { ApiError } from '@/lib/api';
@@ -144,6 +145,7 @@ export default function ShareEditorScreen() {
   const isNew = id === 'new';
 
   const existing = useShare(isNew ? undefined : id);
+  const analytics = useShareAnalytics(isNew ? undefined : id);
   const createMutation = useCreateShare();
   const updateMutation = useUpdateShare(id ?? '');
   const deleteMutation = useDeleteShare();
@@ -564,6 +566,31 @@ export default function ShareEditorScreen() {
             </View>
           ))}
 
+          {/* Analytics section (edit mode only) */}
+          {!isNew && analytics.data ? (
+            <View style={[styles.analyticsSection, { borderColor: c.border }]}>
+              <Text style={[styles.sectionLabel, { color: c.textMuted }]}>ANALYTICS</Text>
+              <View style={styles.analyticsRow}>
+                <View style={[styles.analyticsStat, { backgroundColor: c.surface, borderColor: c.border }]}>
+                  <Text style={[styles.analyticsValue, { color: c.text }]}>
+                    {analytics.data.total_views.toLocaleString()}
+                  </Text>
+                  <Text style={[styles.analyticsLabel, { color: c.textMuted }]}>
+                    Total views
+                  </Text>
+                </View>
+                <View style={[styles.analyticsStat, { backgroundColor: c.surface, borderColor: c.border }]}>
+                  <Text style={[styles.analyticsValue, { color: c.text }]}>
+                    {analytics.data.views_last_7d.toLocaleString()}
+                  </Text>
+                  <Text style={[styles.analyticsLabel, { color: c.textMuted }]}>
+                    Last 7 days
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           {error ? <Text style={[styles.error, { color: '#B00020' }]}>{error}</Text> : null}
 
           <Pressable
@@ -744,5 +771,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     marginTop: Spacing.sm,
+  },
+
+  analyticsSection: {
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  analyticsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  analyticsStat: {
+    flex: 1,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.md,
+  },
+  analyticsValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  analyticsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginTop: Spacing.xs,
+    textTransform: 'uppercase',
   },
 });

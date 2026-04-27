@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query, status
 
 from myetal_api.api.deps import CurrentUser, DbSession
-from myetal_api.schemas.share import ShareCreate, ShareResponse, ShareUpdate
+from myetal_api.schemas.share import ShareAnalyticsResponse, ShareCreate, ShareResponse, ShareUpdate
 from myetal_api.services import share as share_service
 
 router = APIRouter(prefix="/shares", tags=["shares"])
@@ -36,6 +36,18 @@ async def get_share(share_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Sh
     if share is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="share not found")
     return ShareResponse.model_validate(share)
+
+
+@router.get("/{share_id}/analytics", response_model=ShareAnalyticsResponse)
+async def get_share_analytics(
+    share_id: uuid.UUID, user: CurrentUser, db: DbSession
+) -> ShareAnalyticsResponse:
+    """Owner analytics for a share: total views, 7d, 30d, and daily breakdown.
+    Per D10."""
+    share = await share_service.get_share_for_owner(db, share_id, user.id)
+    if share is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="share not found")
+    return await share_service.get_share_analytics(db, share_id)
 
 
 @router.patch("/{share_id}", response_model=ShareResponse)
