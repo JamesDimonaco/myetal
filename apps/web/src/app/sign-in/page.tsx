@@ -14,7 +14,7 @@ import { SignInForm } from './sign-in-form';
  */
 export default function SignInPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10 sm:py-16">
+    <main data-ph-no-capture className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10 sm:py-16">
       <Link href="/" className="text-sm text-ink-muted hover:text-ink">
         ← MyEtAl
       </Link>

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { PostHogIdentify } from '@/components/posthog-identify';
 import { SiteFooter } from '@/components/site-footer';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
@@ -59,6 +60,11 @@ export default async function DashboardLayout({
           </nav>
         </div>
       </header>
+      <PostHogIdentify
+        userId={user.id}
+        email={user.email}
+        name={user.name}
+      />
       <main className="flex-1">{children}</main>
       <SiteFooter />
     </div>
