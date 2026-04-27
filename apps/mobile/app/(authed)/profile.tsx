@@ -46,6 +46,17 @@ export default function ProfileScreen() {
       </View>
 
       <Pressable
+        onPress={() => router.push('/feedback')}
+        style={({ pressed }) => [
+          styles.feedbackRow,
+          { borderColor: c.border, backgroundColor: c.surface, opacity: pressed ? 0.7 : 1 },
+        ]}
+      >
+        <Text style={[styles.feedbackText, { color: c.text }]}>Send feedback</Text>
+        <Text style={{ color: c.textMuted, fontSize: 18 }}>{'\u203A'}</Text>
+      </Pressable>
+
+      <Pressable
         onPress={handleSignOut}
         disabled={signingOut}
         style={({ pressed }) => [
@@ -74,6 +85,18 @@ const styles = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: Spacing.xs },
   value: { fontSize: 17, fontWeight: '500' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.md },
+
+  feedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.md,
+  },
+  feedbackText: { fontSize: 16, fontWeight: '500' },
 
   signOut: {
     paddingVertical: 16,

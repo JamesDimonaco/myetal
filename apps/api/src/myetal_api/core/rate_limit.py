@@ -29,3 +29,7 @@ ANON_READ_LIMIT = "60/minute"
 # Take-down/abuse reports — anon allowed but heavily limited because the
 # admin queue is the dev's inbox. Per discovery ticket D16 + smaller-finding.
 REPORT_LIMIT = "3/hour"
+
+# User feedback (feature requests + bug reports) — per user-feedback-system
+# ticket. 5/hour is generous for legitimate feedback but caps spam.
+FEEDBACK_LIMIT = "5/hour"

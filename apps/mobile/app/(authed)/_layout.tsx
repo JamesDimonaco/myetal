@@ -89,6 +89,10 @@ export default function AuthedLayout() {
         name="share/add-paper"
         options={{ href: null, headerShown: false }}
       />
+      <Tabs.Screen
+        name="feedback"
+        options={{ href: null, title: 'Feedback' }}
+      />
     </Tabs>
   );
 }

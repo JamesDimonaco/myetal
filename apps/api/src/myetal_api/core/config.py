@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     #   ADMIN_EMAILS=james@example.com,ops@example.com
     admin_emails: list[str] = []
 
+    # Telegram — for instant push notifications on user feedback submissions.
+    # Both must be set for Telegram delivery; if either is empty the notification
+    # is skipped with a warning log.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+
     @field_validator("cors_origins", "admin_emails", mode="before")
     @classmethod
     def _split_csv_origins(cls, v: object) -> object:
