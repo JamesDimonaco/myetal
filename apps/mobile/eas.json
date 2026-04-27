@@ -56,8 +56,8 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "TBD-from-app-store-connect",
-        "appleTeamId": "TBD-set-via-eas-credentials"
+        "ascAppId": "6764044093",
+        "appleTeamId": "55VV8H8Q49"
       },
       "android": {
         "track": "internal",
