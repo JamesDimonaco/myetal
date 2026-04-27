@@ -274,7 +274,7 @@ export default async function PublicSharePage({ params }: PageProps) {
         )}
       </section>
 
-      {share.related_shares.length > 0 ? (
+      {share.related_shares?.length > 0 ? (
         <section className="mt-16 border-t border-rule pt-8">
           <h2 className="font-serif text-lg text-ink">Who else shares these papers</h2>
           <p className="mt-1 text-sm text-ink-muted">
@@ -300,7 +300,7 @@ export default async function PublicSharePage({ params }: PageProps) {
         </section>
       ) : null}
 
-      {share.similar_shares.length > 0 ? (
+      {share.similar_shares?.length > 0 ? (
         <section className="mt-10 border-t border-rule pt-8">
           <h2 className="font-serif text-lg text-ink">Similar collections</h2>
           <p className="mt-1 text-sm text-ink-muted">
