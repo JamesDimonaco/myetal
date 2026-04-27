@@ -36,9 +36,7 @@ OPENALEX_URL = "https://api.openalex.org/works"
 # Module-level caches. Keep small — this is a write-heavy editing flow, not a
 # public API; we only need to absorb obvious dedupes within an editing session.
 _lookup_cache: TTLCache[str, PaperMetadata] = TTLCache(maxsize=256, ttl=3600)
-_search_cache: TTLCache[tuple[str, int], list[PaperSearchResult]] = TTLCache(
-    maxsize=256, ttl=3600
-)
+_search_cache: TTLCache[tuple[str, int], list[PaperSearchResult]] = TTLCache(maxsize=256, ttl=3600)
 
 # Test-only injection point. When set to an httpx.MockTransport (or any other
 # AsyncBaseTransport), every outbound client we construct routes through it.
@@ -56,6 +54,7 @@ def _set_transport(transport: httpx.AsyncBaseTransport | None) -> None:
     """Override the outbound transport for every subsequent client. Test-only."""
     global _test_transport
     _test_transport = transport
+
 
 # Pattern for the bare-DOI shape Crossref returns. We never validate this hard
 # at the boundary — Crossref is the source of truth. We only use this to
@@ -228,9 +227,7 @@ async def lookup_doi(
     client = http_client or _new_client()
     try:
         try:
-            response = await client.get(
-                url, params=params, headers={"User-Agent": USER_AGENT}
-            )
+            response = await client.get(url, params=params, headers={"User-Agent": USER_AGENT})
         except httpx.HTTPError as exc:
             raise PaperUpstreamError(f"crossref network error: {exc}") from exc
     finally:

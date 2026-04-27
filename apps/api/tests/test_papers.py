@@ -84,8 +84,7 @@ def test_normalise_doi_bare() -> None:
 
 def test_normalise_doi_url_https() -> None:
     assert (
-        papers_service.normalise_doi("https://doi.org/10.1038/nature12373")
-        == "10.1038/nature12373"
+        papers_service.normalise_doi("https://doi.org/10.1038/nature12373") == "10.1038/nature12373"
     )
 
 
@@ -189,9 +188,7 @@ def test_lookup_crossref_404(authed_client: TestClient) -> None:
 
     _install_handler(handler)
 
-    response = authed_client.post(
-        "/papers/lookup", json={"identifier": "10.9999/does-not-exist"}
-    )
+    response = authed_client.post("/papers/lookup", json={"identifier": "10.9999/does-not-exist"})
     assert response.status_code == 404
 
 
@@ -201,16 +198,12 @@ def test_lookup_crossref_5xx_becomes_503(authed_client: TestClient) -> None:
 
     _install_handler(handler)
 
-    response = authed_client.post(
-        "/papers/lookup", json={"identifier": "10.1038/nature12373"}
-    )
+    response = authed_client.post("/papers/lookup", json={"identifier": "10.1038/nature12373"})
     assert response.status_code == 503
 
 
 def test_lookup_malformed_doi_returns_422(authed_client: TestClient) -> None:
-    response = authed_client.post(
-        "/papers/lookup", json={"identifier": "this is not a DOI"}
-    )
+    response = authed_client.post("/papers/lookup", json={"identifier": "this is not a DOI"})
     assert response.status_code == 422
 
 

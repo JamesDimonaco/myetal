@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from myetal_api.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from myetal_api.models.share_paper import SharePaper
     from myetal_api.models.user import User
 
 
@@ -51,6 +52,11 @@ class Share(Base, TimestampMixin):
         back_populates="share",
         cascade="all, delete-orphan",
         order_by="ShareItem.position",
+    )
+    papers: Mapped[list["SharePaper"]] = relationship(
+        back_populates="share",
+        cascade="all, delete-orphan",
+        order_by="SharePaper.position",
     )
 
 

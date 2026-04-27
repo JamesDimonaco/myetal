@@ -24,7 +24,7 @@ PlatformName = Literal["web", "mobile", "devjson"]
 _ALLOWED_MOBILE_REDIRECT_SCHEMES = (
     "myetal://",
     "exp+myetal://",  # Expo Go dev client
-    "exp://",         # Expo Go on the local LAN (dev only — gated below)
+    "exp://",  # Expo Go on the local LAN (dev only — gated below)
     "http://localhost",  # web fallback for local dev
 )
 
@@ -60,10 +60,7 @@ async def oauth_start(
             )
         # exp:// and http://localhost are dev-only — they'd let anyone with a
         # LAN-reachable Expo Go session steal tokens otherwise.
-        if (
-            mobile_redirect.startswith(("exp://", "http://localhost"))
-            and settings.env != "dev"
-        ):
+        if mobile_redirect.startswith(("exp://", "http://localhost")) and settings.env != "dev":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="this mobile_redirect scheme is only available when ENV=dev",
