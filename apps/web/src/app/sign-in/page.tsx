@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { GitHubIcon } from '@/components/github-icon';
+import { GoogleIcon } from '@/components/google-icon';
 
 import { SignInForm } from './sign-in-form';
 
@@ -58,7 +59,7 @@ export default function SignInPage() {
           href="/api/auth/google/start"
           className="inline-flex items-center justify-center gap-2 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
         >
-          <span aria-hidden>G</span>
+          <GoogleIcon size={18} />
           Continue with Google
         </a>
       </div>
