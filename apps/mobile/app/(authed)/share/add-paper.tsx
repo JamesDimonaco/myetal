@@ -1,11 +1,11 @@
 /**
  * Add-paper modal. Three input modes:
- *   DOI    — paste a DOI or DOI URL; debounced lookup against Crossref
- *   Search — type ≥3 chars; debounced full-text search via OpenAlex
- *   Manual — escape hatch for grey literature; user fills the row themselves
+ *   DOI    -- paste a DOI or DOI URL; debounced lookup against Crossref
+ *   Search -- type ≥3 chars; debounced full-text search via OpenAlex
+ *   Manual -- escape hatch for grey literature; user fills the row themselves
  *
  * On confirm we drop the chosen Paper into a module-level outbox
- * (`setPendingPaper`) and pop the modal — the share editor picks it up via a
+ * (`setPendingPaper`) and pop the modal -- the share editor picks it up via a
  * subscribe-on-mount listener. See `lib/pending-paper.ts`.
  *
  * Note on filename: the brief named this `_add-paper.tsx`, but expo-router
@@ -19,7 +19,9 @@ import { router, Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -196,7 +198,7 @@ function describeError(error: unknown): {
     if (error.isNotFound) {
       return {
         title: 'Not found',
-        body: 'Crossref doesn’t know that DOI. Double-check it, or fall back to Manual.',
+        body: "Crossref doesn't know that DOI. Double-check it, or fall back to Manual.",
         icon: 'help-buoy-outline',
       };
     }
@@ -280,7 +282,7 @@ function DoiPane() {
           <EmptyHint
             icon="link-outline"
             title="Waiting for a DOI"
-            body="As soon as we recognise one, we’ll fetch the metadata."
+            body="As soon as we recognise one, we'll fetch the metadata."
           />
         ) : lookup.isLoading || lookup.isFetching ? (
           <View style={styles.loadingRow}>
@@ -301,6 +303,167 @@ function DoiPane() {
 
 // ---------- Search mode ----------
 
+/** Format a publication date nicely: "15 Jun 2023" or fall back to year. */
+function formatPubDate(dateStr: string | null | undefined, year: number | null): string | null {
+  if (dateStr) {
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return year != null ? String(year) : null;
+}
+
+/** OA status colour -- green for gold/green, bronze tint for bronze, grey fallback. */
+function oaColor(status: string | null): string {
+  switch (status) {
+    case 'gold':
+      return '#D4A017';
+    case 'green':
+      return '#2F7D52';
+    case 'bronze':
+      return '#B87333';
+    case 'hybrid':
+      return '#4A90D9';
+    default:
+      return '#2F7D52';
+  }
+}
+
+function SearchResultCard({
+  result,
+  onPick,
+  c,
+}: {
+  result: PaperSearchResult;
+  onPick: () => void;
+  c: (typeof Colors)['light'];
+}) {
+  const dateLabel = formatPubDate(result.publication_date, result.year);
+
+  return (
+    <Pressable
+      onPress={onPick}
+      style={({ pressed }) => [
+        styles.resultCard,
+        {
+          backgroundColor: c.surface,
+          borderColor: result.is_retracted ? '#D32F2F' : c.border,
+          borderWidth: result.is_retracted ? 1.5 : StyleSheet.hairlineWidth,
+          opacity: pressed ? 0.85 : 1,
+        },
+        Shadows.sm,
+      ]}
+    >
+      {/* Retraction warning */}
+      {result.is_retracted ? (
+        <View style={styles.retractionBanner}>
+          <Ionicons name="warning" size={14} color="#FFFFFF" />
+          <Text style={styles.retractionText}>Retracted</Text>
+        </View>
+      ) : null}
+
+      {/* Title */}
+      <Text
+        style={[styles.resultTitle, { color: c.text }]}
+        numberOfLines={2}
+      >
+        {result.title}
+      </Text>
+
+      {/* Authors */}
+      {result.authors ? (
+        <Text
+          style={[styles.resultMeta, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {result.authors}
+        </Text>
+      ) : null}
+
+      {/* Badge row: OA, type, citations, PDF */}
+      <View style={styles.badgeRow}>
+        {result.open_access?.is_oa ? (
+          <View style={[styles.badge, { backgroundColor: oaColor(result.open_access.oa_status) + '20' }]}>
+            <Ionicons name="lock-open-outline" size={10} color={oaColor(result.open_access.oa_status)} />
+            <Text style={[styles.badgeText, { color: oaColor(result.open_access.oa_status) }]}>
+              OA{result.open_access.oa_status ? ` · ${result.open_access.oa_status}` : ''}
+            </Text>
+          </View>
+        ) : null}
+
+        {result.type ? (
+          <View style={[styles.badge, { backgroundColor: c.accentSoft }]}>
+            <Text style={[styles.badgeText, { color: c.accentText }]}>
+              {result.type.replace(/-/g, ' ')}
+            </Text>
+          </View>
+        ) : null}
+
+        {result.cited_by_count > 0 ? (
+          <View style={styles.citationChip}>
+            <Ionicons name="chatbubble-outline" size={10} color={c.textMuted} />
+            <Text style={[styles.citationText, { color: c.textMuted }]}>
+              {result.cited_by_count.toLocaleString()} citation{result.cited_by_count === 1 ? '' : 's'}
+            </Text>
+          </View>
+        ) : null}
+
+        {result.pdf_url ? (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              Linking.openURL(result.pdf_url!);
+            }}
+            hitSlop={4}
+            style={({ pressed }) => [
+              styles.badge,
+              { backgroundColor: '#D32F2F18', opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Ionicons name="document-text-outline" size={10} color="#D32F2F" />
+            <Text style={[styles.badgeText, { color: '#D32F2F' }]}>PDF</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {/* Keywords */}
+      {result.keywords && result.keywords.length > 0 ? (
+        <View style={styles.keywordRow}>
+          {result.keywords.slice(0, 4).map((kw) => (
+            <View key={kw} style={[styles.keywordChip, { backgroundColor: c.surfaceSunken }]}>
+              <Text style={[styles.keywordText, { color: c.textMuted }]} numberOfLines={1}>
+                {kw}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* Bottom meta row: container, date */}
+      <View style={styles.resultMetaRow}>
+        {result.container ? (
+          <Text
+            style={[styles.resultMetaSmall, { color: c.textMuted, flex: 1 }]}
+            numberOfLines={1}
+          >
+            {result.container}
+          </Text>
+        ) : null}
+        {dateLabel ? (
+          <Text style={[styles.resultMetaSmall, { color: c.textMuted }]}>
+            {dateLabel}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 function SearchPane() {
   const c = Colors[useColorScheme() ?? 'light'];
   const haptics = useHaptics();
@@ -311,120 +474,124 @@ function SearchPane() {
   const debounced = useDebouncedValue(input, DEBOUNCE_MS);
   const search = useSearchPapers(debounced);
 
-  // Reset picked when the user types again — they're refining the search.
+  // Reset picked when the user types again -- they're refining the search.
   useEffect(() => {
     setPicked(null);
   }, [debounced]);
 
   const trimmed = input.trim();
 
-  return (
-    <ScrollView
-      contentContainerStyle={styles.paneScroll}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text style={[styles.fieldLabel, { color: c.textMuted }]}>Search by title</Text>
-      <TextInput
-        value={input}
-        onChangeText={setInput}
-        placeholder="Attention is all you need"
-        placeholderTextColor={c.textMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="off"
-        style={[
-          styles.input,
-          {
-            color: c.text,
-            backgroundColor: c.surface,
-            borderColor: c.border,
-          },
-        ]}
-      />
-      <Text style={[styles.helperText, { color: c.textSubtle }]}>
-        Powered by OpenAlex. Best with title or first author + year.
-      </Text>
-
-      <View style={styles.paneBody}>
-        {picked ? (
-          <PaperPreview paper={picked} onAdd={() => commitPaper(picked, haptics)} />
-        ) : trimmed.length < 3 ? (
+  // Build the body content depending on state
+  const renderBody = () => {
+    if (picked) {
+      return (
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.paneBody}>
+            <PaperPreview paper={picked} onAdd={() => commitPaper(picked, haptics)} />
+          </View>
+        </ScrollView>
+      );
+    }
+    if (trimmed.length < 3) {
+      return (
+        <View style={[styles.paneBody, { paddingHorizontal: Spacing.lg }]}>
           <EmptyHint
             icon="search-outline"
             title="Type at least 3 characters"
-            body="Search runs as soon as you’ve typed enough to be meaningful."
+            body="Search runs as soon as you've typed enough to be meaningful."
           />
-        ) : search.isLoading || search.isFetching ? (
+        </View>
+      );
+    }
+    if (search.isLoading || search.isFetching) {
+      return (
+        <View style={[styles.paneBody, { paddingHorizontal: Spacing.lg }]}>
           <View style={styles.loadingRow}>
             <ActivityIndicator color={c.text} />
             <Text style={[styles.loadingText, { color: c.textMuted }]}>Searching…</Text>
           </View>
-        ) : search.isError ? (
+        </View>
+      );
+    }
+    if (search.isError) {
+      return (
+        <View style={[styles.paneBody, { paddingHorizontal: Spacing.lg }]}>
           <ErrorBanner error={search.error} />
-        ) : search.data && search.data.results.length === 0 ? (
+        </View>
+      );
+    }
+    if (search.data && search.data.results.length === 0) {
+      return (
+        <View style={[styles.paneBody, { paddingHorizontal: Spacing.lg }]}>
           <EmptyHint
             icon="help-buoy-outline"
             title="Nothing matched"
             body="Try a different phrasing or fall back to Manual."
           />
-        ) : search.data ? (
-          <View style={{ gap: Spacing.sm }}>
-            {search.data.results.map((r, idx) => (
-              <Animated.View
-                key={`${r.doi ?? r.title}-${idx}`}
-                entering={FadeInUp.duration(180).delay(idx * 25)}
-              >
-                <Pressable
-                  onPress={() => {
-                    haptics.tap();
-                    setPicked(r);
-                  }}
-                  style={({ pressed }) => [
-                    styles.resultCard,
-                    {
-                      backgroundColor: c.surface,
-                      borderColor: c.border,
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                    Shadows.sm,
-                  ]}
-                >
-                  <Text
-                    style={[styles.resultTitle, { color: c.text }]}
-                    numberOfLines={2}
-                  >
-                    {r.title}
-                  </Text>
-                  {r.authors ? (
-                    <Text
-                      style={[styles.resultMeta, { color: c.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      {r.authors}
-                    </Text>
-                  ) : null}
-                  <View style={styles.resultMetaRow}>
-                    {r.container ? (
-                      <Text
-                        style={[styles.resultMetaSmall, { color: c.textMuted }]}
-                        numberOfLines={1}
-                      >
-                        {r.container}
-                      </Text>
-                    ) : null}
-                    {r.year != null ? (
-                      <Text style={[styles.resultMetaSmall, { color: c.textMuted }]}>
-                        {r.year}
-                      </Text>
-                    ) : null}
-                  </View>
-                </Pressable>
-              </Animated.View>
-            ))}
-          </View>
-        ) : null}
+        </View>
+      );
+    }
+    if (search.data) {
+      return (
+        <FlatList
+          data={search.data.results}
+          keyExtractor={(r, idx) => `${r.doi ?? r.title}-${idx}`}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingHorizontal: Spacing.lg,
+            paddingTop: Spacing.lg,
+            paddingBottom: Spacing.xxl,
+            gap: Spacing.sm,
+          }}
+          renderItem={({ item }) => (
+            <SearchResultCard
+              result={item}
+              onPick={() => {
+                haptics.tap();
+                setPicked(item);
+              }}
+              c={c}
+            />
+          )}
+        />
+      );
+    }
+    return null;
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Pinned search input */}
+      <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm }}>
+        <Text style={[styles.fieldLabel, { color: c.textMuted }]}>Search by title</Text>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          placeholder="Attention is all you need"
+          placeholderTextColor={c.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          style={[
+            styles.input,
+            {
+              color: c.text,
+              backgroundColor: c.surface,
+              borderColor: c.border,
+            },
+          ]}
+        />
+        <Text style={[styles.helperText, { color: c.textSubtle }]}>
+          Powered by OpenAlex. Best with title or first author + year.
+        </Text>
       </View>
-    </ScrollView>
+
+      {/* Scrollable results */}
+      {renderBody()}
+    </View>
   );
 }
 
@@ -465,7 +632,7 @@ function ManualPane() {
       keyboardShouldPersistTaps="handled"
     >
       <Text style={[styles.helperText, { color: c.textSubtle, marginBottom: Spacing.md }]}>
-        For preprints, posters, grey literature — anything not in Crossref / OpenAlex.
+        For preprints, posters, grey literature -- anything not in Crossref / OpenAlex.
       </Text>
 
       <ManualField label="Title (required)" value={title} onChangeText={setTitle} c={c} />
@@ -656,9 +823,78 @@ const styles = StyleSheet.create({
   resultMetaRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
-    marginTop: 4,
+    marginTop: 6,
+    alignItems: 'center',
   },
   resultMetaSmall: { fontSize: 12 },
+
+  // Retraction banner
+  retractionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#D32F2F',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    marginBottom: Spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  retractionText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+
+  // Badges (OA, type, PDF)
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  citationChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  citationText: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+
+  // Keyword chips
+  keywordRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 6,
+  },
+  keywordChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  keywordText: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
 
   // Error banner
   errorCard: {
