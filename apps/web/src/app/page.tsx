@@ -58,9 +58,17 @@ export default async function LandingPage() {
               <SignOutButton className="rounded-md border border-rule bg-paper px-3 py-1.5 text-ink-muted transition hover:text-ink disabled:opacity-60" />
             </>
           ) : (
-            <Link href="/sign-in" className="rounded-md px-3 py-1.5 hover:text-ink">
-              Sign in
-            </Link>
+            <>
+              <Link href="/sign-in" className="rounded-md px-3 py-1.5 hover:text-ink">
+                Sign in
+              </Link>
+              <Link
+                href="/sign-in"
+                className="rounded-md bg-ink px-3 py-1.5 text-paper transition hover:opacity-90"
+              >
+                Sign up
+              </Link>
+            </>
           )}
         </nav>
       </header>

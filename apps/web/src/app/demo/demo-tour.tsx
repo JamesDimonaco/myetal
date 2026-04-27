@@ -172,7 +172,7 @@ export function DemoTour() {
           Editor
         </h2>
 
-        <div className="mt-4 grid gap-5 rounded-lg border border-rule bg-paper-soft p-5">
+        <div className="mt-4 grid gap-5 rounded-lg border border-rule bg-paper-soft p-3 sm:p-5">
           <Field label="Share name">
             <input
               type="text"
@@ -220,7 +220,7 @@ export function DemoTour() {
           {items.map((item, index) => (
             <li
               key={item.id}
-              className="rounded-lg border border-rule bg-paper-soft p-5"
+              className="rounded-lg border border-rule bg-paper-soft p-3 sm:p-5"
             >
               <div className="flex items-baseline justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
@@ -376,14 +376,14 @@ export function DemoTour() {
         </h2>
 
         <div className="mt-4 overflow-hidden rounded-lg border border-rule bg-paper shadow-sm">
-          <div className="flex items-center gap-2 border-b border-rule bg-paper-soft px-4 py-2.5 text-xs text-ink-muted">
-            <span className="inline-block h-2 w-2 rounded-full bg-ink-faint/60" />
-            <span className="inline-block h-2 w-2 rounded-full bg-ink-faint/60" />
-            <span className="inline-block h-2 w-2 rounded-full bg-ink-faint/60" />
-            <span className="ml-2 truncate font-mono">{publicUrl}</span>
+          <div className="flex items-center gap-2 border-b border-rule bg-paper-soft px-3 py-2.5 text-xs text-ink-muted sm:px-4">
+            <span className="hidden h-2 w-2 rounded-full bg-ink-faint/60 sm:inline-block" />
+            <span className="hidden h-2 w-2 rounded-full bg-ink-faint/60 sm:inline-block" />
+            <span className="hidden h-2 w-2 rounded-full bg-ink-faint/60 sm:inline-block" />
+            <span className="min-w-0 truncate font-mono sm:ml-2">{publicUrl}</span>
           </div>
 
-          <div className="px-6 py-8">
+          <div className="px-4 py-6 sm:px-6 sm:py-8">
             <div className="text-xs text-ink-muted">MyEtAl</div>
 
             <header className="mt-6">

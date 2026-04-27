@@ -66,7 +66,7 @@ export default function SignInPage({
       {/* --- Divider --- */}
       <div className="mt-8 flex items-center gap-3 text-xs uppercase tracking-widest text-ink-faint">
         <span className="h-px flex-1 bg-rule" />
-        <span>or use email</span>
+        <span>or sign in / sign up with email</span>
         <span className="h-px flex-1 bg-rule" />
       </div>
 

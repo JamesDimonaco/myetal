@@ -18,7 +18,7 @@ export const metadata = {
  */
 export default function DemoPage() {
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-6 py-10 sm:py-14">
+    <main className="mx-auto min-h-screen max-w-6xl overflow-hidden px-4 py-10 sm:px-6 sm:py-14">
       <div className="flex items-center justify-between">
         <Link href="/" className="text-sm text-ink-muted hover:text-ink">
           ← MyEtAl
