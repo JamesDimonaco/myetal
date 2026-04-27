@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { SignOutButton } from '@/components/sign-out-button';
+import { SiteFooter } from '@/components/site-footer';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
@@ -124,13 +125,8 @@ export default async function LandingPage() {
         />
       </section>
 
-      <footer className="mt-auto pt-24 text-xs text-ink-faint">
-        <div className="flex flex-wrap items-center gap-4">
-          <span>et al.</span>
-          <span aria-hidden>·</span>
-          <span>v0.1 dev</span>
-        </div>
-      </footer>
+      <div className="mt-auto pt-24" />
+      <SiteFooter />
     </main>
   );
 }
