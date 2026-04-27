@@ -163,8 +163,8 @@ export function DemoTour() {
   }
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-12">
-      <section aria-labelledby="demo-editor-heading">
+    <div className="grid gap-10 lg:grid-cols-2 lg:gap-12">
+      <section aria-labelledby="demo-editor-heading" className="order-2 lg:order-1">
         <h2
           id="demo-editor-heading"
           className="font-mono text-xs uppercase tracking-widest text-ink-faint"
@@ -366,7 +366,7 @@ export function DemoTour() {
 
       <section
         aria-labelledby="demo-preview-heading"
-        className="lg:sticky lg:top-8 lg:self-start"
+        className="order-1 lg:order-2 lg:sticky lg:top-8 lg:self-start"
       >
         <h2
           id="demo-preview-heading"
@@ -448,7 +448,7 @@ export function DemoTour() {
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            href="/sign-up"
+            href="/sign-in"
             className="inline-flex items-center justify-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
           >
             Make this real →

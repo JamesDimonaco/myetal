@@ -24,7 +24,7 @@ export default function DemoPage() {
           ← MyEtAl
         </Link>
         <Link
-          href="/sign-up"
+          href="/sign-in"
           className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90"
         >
           Sign up
@@ -42,7 +42,7 @@ export default function DemoPage() {
           This is what your visitors see when they scan one of your QR codes.
           Edit the share on the left — the public page and the QR update as
           you type. When you&apos;re ready,{' '}
-          <Link href="/sign-up" className="text-ink underline-offset-2 hover:underline">
+          <Link href="/sign-in" className="text-ink underline-offset-2 hover:underline">
             sign up
           </Link>{' '}
           to make a real one.
@@ -92,7 +92,7 @@ export default function DemoPage() {
 
         <div className="mt-12 flex flex-wrap items-center gap-4">
           <Link
-            href="/sign-up"
+            href="/sign-in"
             className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
           >
             Create your first share
@@ -107,7 +107,7 @@ export default function DemoPage() {
       </section>
 
       <footer className="mt-20 text-xs text-ink-faint">
-        et al. · v0.1 dev
+        © 2026 MyEtAl
       </footer>
     </main>
   );
