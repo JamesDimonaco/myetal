@@ -92,8 +92,7 @@
           "cameraPermission": "Allow MyEtal to access your camera so you can scan QR codes from posters and slides."
         }
       ],
-      "expo-secure-store",
-      "expo-localization"
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
