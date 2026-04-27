@@ -1,21 +1,87 @@
-# Ticket: PostHog Integration — Product Analytics, Error Tracking, Session Replay
+# Ticket: PostHog Integration — Error Tracking, Analytics, Session Replay
 
-**Status:** Draft
+**Status:** Ready to build
 **Owner:** James
 **Created:** 2026-04-27
-**Estimate:** 1–2 days
+**Estimate:** 1 day
 **PostHog project:** "weightless-md" (id: 264091) in org "Dama Health"
 
 ---
 
 ## Goal
 
-Wire PostHog into all three surfaces (web, mobile, API server) for:
-1. **Product analytics** — who's using what, funnel tracking, feature adoption
-2. **Error tracking** — client + server errors with stack traces and context
-3. **Session replay** — see what users see (web only for v1)
+Wire PostHog into web and mobile for error tracking (replaces need for Sentry), product analytics, and session replay. **Critical constraint: no tracking until the user accepts cookies.** Session replay must not slow down first load.
 
-MyEtAl already has a PostHog project ("weightless-md") in the Dama Health org. This ticket connects the app to it.
+---
+
+## Decisions (resolved)
+
+- **Host:** `https://us.i.posthog.com` (US cloud)
+- **Env var names:** `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` (web); `EXPO_PUBLIC_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_HOST` (mobile)
+- **All tokens in `.env` files only** — repo is public, never hardcode
+- **Cookie consent required** — PostHog must NOT init until user accepts
+- **Session replay** — lazy-loaded, never blocks first paint
+- **Server-side:** deferred to follow-up (web + mobile are the priority)
+
+---
+
+## Cookie Consent — the critical path
+
+PostHog must not send ANY data until the user consents. This means:
+
+### Web: consent banner + deferred init
+
+1. **Cookie consent state** stored in `localStorage` key `myetal_consent`:
+   - `null` / missing → not yet decided → show banner, PostHog NOT loaded
+   - `"accepted"` → PostHog initialised
+   - `"declined"` → PostHog never loads
+
+2. **Consent banner** — a non-blocking bottom bar on every page:
+   - "We use cookies for analytics and error tracking."
+   - Two buttons: "Accept" / "Decline"
+   - Dismissing = decline (conservative)
+   - Once accepted, call `posthog.init()` and set `localStorage`
+   - On subsequent page loads, check `localStorage` before init
+   - Banner does NOT show if already decided
+
+3. **PostHog init is DEFERRED** — do NOT init at module level. Instead:
+   ```tsx
+   // In the consent provider, ONLY after user accepts:
+   function initPostHog() {
+     if (typeof window === 'undefined') return;
+     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+       capture_pageview: false,
+       capture_pageleave: true,
+       person_profiles: 'identified_only',
+       loaded: (ph) => {
+         // Lazy-load session replay AFTER init, never block first paint
+         ph.startSessionRecording();
+       },
+       disable_session_recording: true,  // don't auto-start, we start manually after load
+       session_recording: {
+         maskAllInputs: true,
+         maskTextSelector: '[data-ph-mask]',
+       },
+     });
+   }
+   ```
+
+4. **Consent provider component** (`apps/web/src/components/consent-provider.tsx`):
+   - Wraps the app (inside Providers)
+   - Reads `localStorage` on mount
+   - If accepted: init PostHog immediately
+   - If not decided: show banner
+   - Exposes `hasConsent` via context so other components can gate on it
+
+### Mobile: consent on first launch
+
+1. Store consent in `AsyncStorage` key `myetal_consent`
+2. On first launch (no key set): show a consent modal/bottom sheet before the main app
+3. If accepted: init PostHog provider
+4. If declined: render app without PostHog provider (wrap conditionally)
+5. On subsequent launches: check storage, skip modal if already decided
+6. Add a "Reset analytics consent" option in Profile settings
 
 ---
 
@@ -23,79 +89,60 @@ MyEtAl already has a PostHog project ("weightless-md") in the Dama Health org. T
 
 ### Setup
 
-- Install `posthog-js` and `posthog-node` (for server-side)
-- Add `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST` env vars
-- PostHog host: `https://eu.i.posthog.com` (EU cloud — matches GDPR stance)
+- Install `posthog-js` (client only — no `posthog-node` for now)
+- Env vars: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`
+- **Never hardcode the key** — read from env vars only
 
-### Client-side (`posthog-js`)
+### Architecture
 
-Create a PostHog provider in `apps/web/src/app/providers.tsx` (extend the existing Providers component):
-
-```tsx
-import posthog from 'posthog-js';
-import { PostHogProvider } from 'posthog-js/react';
-
-// Init outside component so it runs once
-if (typeof window !== 'undefined') {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    capture_pageview: false,  // we handle manually for SPA nav
-    capture_pageleave: true,
-    person_profiles: 'identified_only',
-    session_recording: {
-      maskAllInputs: true,
-      maskTextSelector: '[data-ph-mask]',
-    },
-  });
-}
+```
+providers.tsx
+  └── ConsentProvider
+        ├── (no consent) → CookieBanner
+        └── (has consent) → PostHogProvider
+              ├── PostHogPageview (captures route changes)
+              └── children
 ```
 
-### Events to track
+### Error tracking (the #1 priority)
 
-**Automatic:**
-- Page views (via `usePathname` + `useSearchParams` in a `PostHogPageview` component)
-- Session replay (enabled by default, mask inputs)
+- Create `apps/web/src/app/error.tsx` — Next.js error boundary
+- On error: `posthog.captureException(error)` (only if consent given)
+- Also add `window.addEventListener('unhandledrejection', ...)` in the consent provider
 
-**Custom events (instrument in the components):**
+### Session replay
+
+- `disable_session_recording: true` on init
+- Call `posthog.startSessionRecording()` in the `loaded` callback
+- This means replay loads lazily after the page is interactive — never blocks first paint
+- Mask all inputs, mask `[data-ph-mask]` elements
+- Don't record on `/sign-in`, `/sign-up` (add `data-ph-no-capture` to those pages)
+
+### Pageviews
+
+- Manual capture via a `PostHogPageview` client component using `usePathname` + `useSearchParams`
+- Only fires if PostHog is initialised (consent given)
+
+### Identify
+
+- On sign-in success: `posthog.identify(user.id, { email, name })`
+- On sign-out: `posthog.reset()`
+- Best place: the auth finish page or a useEffect in the dashboard layout
+
+### Custom events (phase 2 — after core setup works)
 
 | Event | Where | Properties |
 |---|---|---|
-| `share_created` | share-editor.tsx (on save success, create mode) | `type`, `item_count`, `has_description` |
-| `share_updated` | share-editor.tsx (on save success, edit mode) | `type`, `item_count` |
-| `share_deleted` | share-editor.tsx (on delete) | `share_id` |
-| `share_published` | share-editor.tsx (publish toggle) | `share_id` |
-| `qr_viewed` | qr-modal.tsx (on open) | `short_code` |
-| `paper_searched` | usePapers.ts (on successful search) | `query_length`, `result_count` |
-| `paper_added_doi` | add-item-modal.tsx (DOI pane pick) | `doi` |
-| `paper_added_search` | add-item-modal.tsx (search pane pick) | `has_doi` |
-| `paper_added_manual` | add-item-modal.tsx (manual pane pick) | — |
-| `library_paper_added` | library-list.tsx (on add success) | `doi` |
-| `feedback_submitted` | feedback page (on submit) | `type`, `has_email` |
-| `public_share_viewed` | c/[code]/page.tsx (server-side) | `short_code`, `item_count`, `has_owner` |
-| `sign_in` | sign-in flow (after cookie set) | `method` (password/github/google/orcid) |
-| `sign_up` | sign-up flow | `method` |
+| `share_created` | share-editor.tsx | `type`, `item_count` |
+| `share_deleted` | share-editor.tsx | `share_id` |
+| `share_published` | share-editor.tsx | `share_id` |
+| `qr_viewed` | qr-modal.tsx | `short_code` |
+| `paper_searched` | usePapers.ts | `query_length`, `result_count` |
+| `feedback_submitted` | feedback form | `type`, `has_email` |
+| `sign_in` | auth finish | `method` |
+| `sign_up` | register | `method` |
 
-### Identify users
-
-On sign-in, call `posthog.identify(user.id, { email, name })`. On sign-out, call `posthog.reset()`.
-
-Best place: the auth finish page (`/auth/finish`) or a `useEffect` in the dashboard layout that reads the user from the server component prop.
-
-### Error tracking
-
-```tsx
-// In the root error boundary or a global error handler
-posthog.captureException(error, { extra: { route, component } });
-```
-
-Also add `apps/web/src/app/error.tsx` (Next.js error boundary) if it doesn't exist — capture to PostHog there.
-
-### Session replay config
-
-- **Mask all inputs** by default (passwords, emails)
-- **Mask** any element with `data-ph-mask` attribute
-- **Don't record** on `/sign-in`, `/sign-up` pages (sensitive)
-- **Sample rate:** 100% for now (low traffic), reduce to 10-50% at scale
+These are nice-to-have — the agent should focus on consent + error tracking + pageviews first.
 
 ---
 
@@ -103,152 +150,84 @@ Also add `apps/web/src/app/error.tsx` (Next.js error boundary) if it doesn't exi
 
 ### Setup
 
-- Install `posthog-react-native`
-- Add `EXPO_PUBLIC_POSTHOG_KEY` and `EXPO_PUBLIC_POSTHOG_HOST` env vars
-- Wrap the app in `<PostHogProvider>` in `apps/mobile/app/_layout.tsx`
+- Install: `npx expo install posthog-react-native expo-file-system expo-application expo-device expo-localization`
+- Env vars: `EXPO_PUBLIC_POSTHOG_KEY`, `EXPO_PUBLIC_POSTHOG_HOST`
+
+### Consent flow
+
+- On first launch: consent modal before anything else
+- Store in `AsyncStorage`
+- Conditionally wrap app in `<PostHogProvider>` only if accepted:
 
 ```tsx
 import { PostHogProvider } from 'posthog-react-native';
 
-<PostHogProvider
-  apiKey={process.env.EXPO_PUBLIC_POSTHOG_KEY!}
-  options={{
-    host: process.env.EXPO_PUBLIC_POSTHOG_HOST,
-    enableSessionReplay: false,  // not supported on RN yet
-  }}
->
-  {children}
-</PostHogProvider>
+// Only render PostHogProvider if user has consented
+{hasConsent ? (
+  <PostHogProvider
+    apiKey={process.env.EXPO_PUBLIC_POSTHOG_KEY!}
+    options={{
+      host: process.env.EXPO_PUBLIC_POSTHOG_HOST,
+    }}
+  >
+    <RestOfApp />
+  </PostHogProvider>
+) : (
+  <RestOfApp />
+)}
 ```
-
-### Events to track
-
-Same events as web where applicable (share_created, paper_searched, etc.). Mobile-specific:
-
-| Event | Where | Properties |
-|---|---|---|
-| `qr_scanned` | scan.tsx (on successful scan) | `short_code` |
-| `share_link_shared` | c/[code].tsx (native share sheet) | `short_code` |
-| `app_opened` | _layout.tsx | `from` (cold/warm) |
-
-### Identify users
-
-In the auth hook (`useAuth.ts`), when `isAuthed` flips to true, call `posthog.identify(user.id, { email, name })`. On sign-out, call `posthog.reset()`.
 
 ### Error tracking
 
-Wrap the root layout in an error boundary, capture with `posthog.captureException()`.
+- Wrap root layout in error boundary, capture with `posthog?.captureException()`
+- Guard all PostHog calls with null check (provider may not be mounted if declined)
+
+### Identify
+
+- In auth hook: `posthog?.identify(user.id, { email, name })` when authed
+- On sign-out: `posthog?.reset()`
 
 ---
 
-## API Server (Python / FastAPI)
+## Env vars (for .env files — never commit values)
 
-### Setup
-
-- Install `posthog` Python SDK
-- Add `POSTHOG_API_KEY` and `POSTHOG_HOST` to `config.py` (optional strings, default empty)
-- Init in `main.py` startup event:
-
-```python
-import posthog
-
-posthog.api_key = settings.posthog_api_key
-posthog.host = settings.posthog_host or 'https://eu.i.posthog.com'
-posthog.disabled = not settings.posthog_api_key  # skip if not configured
-```
-
-### Server-side events
-
-| Event | Where | Properties |
+| Var | Where | Description |
 |---|---|---|
-| `api_share_created` | routes/shares.py POST | `share_id`, `type`, `item_count` |
-| `api_report_submitted` | routes/reports.py POST | `share_short_code`, `reason` |
-| `api_report_actioned` | routes/admin.py POST | `report_id`, `decision`, `tombstoned` |
-| `api_feedback_submitted` | routes/feedback.py POST | `type`, `has_email`, `is_authed` |
-| `api_paper_lookup` | routes/papers.py POST lookup | `source` (crossref) |
-| `api_paper_search` | routes/papers.py GET search | `query_length`, `result_count` |
-| `api_auth_login` | routes/auth.py POST login | `method` |
-| `api_auth_register` | routes/auth.py POST register | — |
-| `api_oauth_complete` | routes/oauth.py callback | `provider` |
-
-### Error tracking
-
-Add a FastAPI exception handler that captures unhandled exceptions:
-
-```python
-@app.exception_handler(Exception)
-async def posthog_exception_handler(request, exc):
-    posthog.capture('server', 'api_error', {
-        'error': str(exc),
-        'path': request.url.path,
-        'method': request.method,
-    })
-    raise exc  # re-raise for normal error handling
-```
-
-### Shutdown
-
-Flush on shutdown:
-
-```python
-@app.on_event("shutdown")
-async def shutdown():
-    posthog.shutdown()
-```
+| `NEXT_PUBLIC_POSTHOG_KEY` | `apps/web/.env.local` | PostHog project API key |
+| `NEXT_PUBLIC_POSTHOG_HOST` | `apps/web/.env.local` | `https://us.i.posthog.com` |
+| `EXPO_PUBLIC_POSTHOG_KEY` | `apps/mobile/.env` | Same key |
+| `EXPO_PUBLIC_POSTHOG_HOST` | `apps/mobile/.env` | `https://us.i.posthog.com` |
 
 ---
 
-## Feature flags (future)
+## Privacy / consent
 
-PostHog feature flags can gate:
-- Trending UI (when we build it)
-- Search (when we build it)
-- ORCID sign-in (gate on `orcid_enabled` flag until sandbox is verified)
-- Any experimental feature
-
-Not in scope for this ticket but the SDK setup enables it for free.
-
----
-
-## Privacy / GDPR considerations
-
-- **EU cloud** (`eu.i.posthog.com`) — data stays in EU
-- **`person_profiles: 'identified_only'`** — anonymous users don't create person records
-- **Session replay masks inputs** — no passwords or sensitive data recorded
-- **No tracking on public pages for anonymous users** beyond pageviews (we already have our own view tracking via share_views)
-- **Update privacy policy** to mention PostHog as a data processor
-- **PostHog's DPA** covers GDPR processor obligations
-
----
-
-## Env vars summary
-
-| Var | Where | Value |
-|---|---|---|
-| `NEXT_PUBLIC_POSTHOG_KEY` | Web (.env) | from PostHog project settings |
-| `NEXT_PUBLIC_POSTHOG_HOST` | Web (.env) | `https://eu.i.posthog.com` |
-| `EXPO_PUBLIC_POSTHOG_KEY` | Mobile (.env) | same key |
-| `EXPO_PUBLIC_POSTHOG_HOST` | Mobile (.env) | `https://eu.i.posthog.com` |
-| `POSTHOG_API_KEY` | API (.env) | same key (or a separate server-side key) |
-| `POSTHOG_HOST` | API (.env) | `https://eu.i.posthog.com` |
+- **No tracking without consent** — PostHog does not init, no cookies set, no network requests
+- **Consent is per-device** — stored in localStorage (web) / AsyncStorage (mobile)
+- **Update privacy policy** to mention PostHog as a data processor (add to the "Third parties" section)
+- **Session replay masks inputs** — passwords, emails never recorded
+- PostHog's standard DPA covers processor obligations
 
 ---
 
 ## Implementation order
 
-1. Web client SDK + pageviews + identify (fastest value)
-2. Web custom events (share_created, paper_searched, etc.)
-3. Web session replay + error boundary
-4. API server SDK + server events + error handler
-5. Mobile SDK + events + identify
-6. Update privacy policy to mention PostHog
+1. **Web consent banner + deferred PostHog init** (the gating mechanism)
+2. **Web error boundary** (captures exceptions → PostHog)
+3. **Web pageview tracking** (route change capture)
+4. **Web session replay** (lazy-loaded after consent)
+5. **Mobile consent modal + conditional provider**
+6. **Mobile error boundary**
+7. **Update privacy policy** (add PostHog to third parties)
+8. Custom events (follow-up — not blocking)
 
 ---
 
 ## Out of scope
 
-- Feature flags (setup enables them, but not configuring any)
-- Dashboards / saved insights (set up in PostHog UI, not in code)
+- Server-side PostHog (Python SDK) — follow-up ticket
+- Feature flags
 - A/B testing
-- Reverse proxy for ad-blocker bypass (`/ingest` → PostHog) — follow-up if needed
-- Custom PostHog dashboards (do in the PostHog UI)
+- Custom PostHog dashboards (configure in PostHog UI)
+- Reverse proxy for ad-blocker bypass
+- Custom events beyond the basics (follow-up)
