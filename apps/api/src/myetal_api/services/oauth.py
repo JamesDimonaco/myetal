@@ -173,11 +173,15 @@ async def _find_or_create_user(
     if identity is not None:
         user = await db.get(User, identity.user_id)
         if user is not None:
+            # Update avatar on subsequent logins — it may have changed.
+            if info.avatar_url:
+                user.avatar_url = info.avatar_url
             return user
 
     user = User(
         name=info.name,
         email=info.email.lower() if info.email else None,
+        avatar_url=info.avatar_url,
     )
     db.add(user)
     await db.flush()

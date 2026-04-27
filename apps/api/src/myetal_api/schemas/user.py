@@ -11,4 +11,5 @@ class UserResponse(BaseModel):
     name: str | None
     email: str | None
     is_admin: bool
+    avatar_url: str | None
     created_at: datetime

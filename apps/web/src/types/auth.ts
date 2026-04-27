@@ -8,6 +8,7 @@ export interface UserResponse {
   id: string;
   email: string | null;
   name: string | null;
+  avatar_url: string | null;
 }
 
 export interface LoginInput {

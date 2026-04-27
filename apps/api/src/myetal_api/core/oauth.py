@@ -34,6 +34,7 @@ class ProviderUserInfo:
     name: str | None = None
     email: str | None = None
     email_verified: bool = False
+    avatar_url: str | None = None
 
 
 @dataclass(frozen=True)
