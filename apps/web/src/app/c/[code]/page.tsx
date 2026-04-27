@@ -357,6 +357,10 @@ export default async function PublicSharePage({ params }: PageProps) {
           <Link href="/privacy" className="underline-offset-2 hover:underline">
             Privacy
           </Link>
+          {' · '}
+          <Link href="/terms" className="underline-offset-2 hover:underline">
+            Terms
+          </Link>
         </p>
       </footer>
     </main>

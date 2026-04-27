@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { SiteFooter } from '@/components/site-footer';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
@@ -30,7 +31,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div className="flex min-h-screen flex-col bg-paper">
       <header className="border-b border-rule bg-paper">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <Link
@@ -58,7 +59,8 @@ export default async function DashboardLayout({
           </nav>
         </div>
       </header>
-      <main>{children}</main>
+      <main className="flex-1">{children}</main>
+      <SiteFooter />
     </div>
   );
 }
