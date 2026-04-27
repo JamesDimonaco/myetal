@@ -1,3 +1,7 @@
+// TODO: Web parity gaps:
+//   - Web profile page shows "Active sessions" list with per-session revoke
+//     (GET /auth/me/sessions, POST /auth/me/sessions/:id/revoke)
+
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';

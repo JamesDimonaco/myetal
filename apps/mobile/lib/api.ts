@@ -1,30 +1,14 @@
-import Constants from 'expo-constants';
-
 import { clearTokens, getTokens, setTokens } from './auth-storage';
 
 /**
- * Resolve the API base URL with a smart dev-vs-prod waterfall:
- *  1. Explicit override via EXPO_PUBLIC_API_URL (best for testing against staging
- *     or a tunneled backend)
- *  2. In Expo Go on a real device, point at the Metro host's IP on port 8000 —
- *     so `pnpm start` + a phone on the same Wi-Fi as your Mac just works
- *  3. Production fallback
+ * Resolve the API base URL.
+ *  1. Explicit override via EXPO_PUBLIC_API_URL (best for testing against
+ *     staging, a tunneled backend, or localhost)
+ *  2. Always use production API — local dev server is not needed
  */
 function resolveApiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, '');
-
-  const hostUri =
-    Constants.expoConfig?.hostUri ??
-    // Older Expo Go fallback
-    (Constants as unknown as { expoGoConfig?: { debuggerHost?: string } })
-      .expoGoConfig?.debuggerHost;
-
-  if (hostUri) {
-    const host = hostUri.split(':')[0];
-    return `http://${host}:8000`;
-  }
-
   return 'https://api.myetal.app';
 }
 

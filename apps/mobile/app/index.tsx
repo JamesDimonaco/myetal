@@ -113,27 +113,21 @@ export default function LandingScreen() {
         )}
       </ScrollView>
 
-      {/* Footer */}
-      <Animated.View entering={FadeInUp.duration(400).delay(380)}>
+      {/* Footer CTA */}
+      <Animated.View entering={FadeInUp.duration(400).delay(380)} style={styles.footerWrap}>
         <Link href="/sign-in" asChild>
           <Pressable
             style={({ pressed }) => [
               styles.footer,
-              { opacity: pressed ? 0.5 : 1 },
+              { borderColor: c.border, opacity: pressed ? 0.7 : 1 },
             ]}
             accessibilityRole="link"
             accessibilityLabel="Sign in to create your own collection"
             onPress={() => haptics.tap()}
           >
             <Text style={[styles.footerText, { color: c.textMuted }]}>
-              Sign in to create your own collection
+              Sign in to create your collection {'\u2192'}
             </Text>
-            <Ionicons
-              name="arrow-forward"
-              size={14}
-              color={c.textMuted}
-              style={styles.footerArrow}
-            />
           </Pressable>
         </Link>
       </Animated.View>
@@ -207,19 +201,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
   },
+  footerWrap: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+  },
   footer: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 14,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    gap: Spacing.xs + 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.md,
   },
   footerText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '500',
-  },
-  footerArrow: {
-    marginTop: 1,
   },
 });
