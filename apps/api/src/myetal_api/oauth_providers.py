@@ -27,6 +27,7 @@ def _parse_google(payload: dict[str, Any]) -> ProviderUserInfo:
         name=payload.get("name"),
         email=payload.get("email"),
         email_verified=bool(payload.get("email_verified", False)),
+        avatar_url=payload.get("picture"),
     )
 
 
@@ -39,6 +40,7 @@ def _parse_github(payload: dict[str, Any]) -> ProviderUserInfo:
         name=payload.get("name") or payload.get("login"),
         email=payload.get("email"),
         email_verified=False,
+        avatar_url=payload.get("avatar_url"),
     )
 
 

@@ -28,6 +28,13 @@ export function SiteFooter() {
             Support
           </a>
           <span aria-hidden>&middot;</span>
+          <Link
+            href="/feedback"
+            className="hover:text-ink-muted hover:underline"
+          >
+            Feedback
+          </Link>
+          <span aria-hidden>&middot;</span>
           <a
             href="https://github.com/JamesDimonaco/myetal"
             target="_blank"

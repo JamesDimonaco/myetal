@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { QrModal } from '@/components/qr-modal';
@@ -15,8 +15,6 @@ function kindSummary(items: ShareResponse['items']): string {
     const k = (it.kind ?? 'paper') as ShareItemKind;
     counts[k] += 1;
   }
-  // Mixed kinds → "3 papers, 1 repo". Single-kind → just "3 papers" (current
-  // wording, just plural-aware) so legacy paper-only shares look unchanged.
   const parts: string[] = [];
   if (counts.paper) parts.push(`${counts.paper} ${counts.paper === 1 ? 'paper' : 'papers'}`);
   if (counts.repo) parts.push(`${counts.repo} ${counts.repo === 1 ? 'repo' : 'repos'}`);
@@ -25,28 +23,78 @@ function kindSummary(items: ShareResponse['items']): string {
 }
 
 function publicUrlFor(shortCode: string): string {
-  // SSR has no `window`, so fall back to the canonical domain. On the client
-  // we prefer the live origin so a localhost/staging dashboard copies links
-  // that point to itself.
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/c/${shortCode}`;
   }
   return `https://myetal.app/c/${shortCode}`;
 }
 
+/* ---- Inline SVG icons (16px) ---- */
+
+function QrIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="1" y="1" width="5" height="5" rx="0.5" />
+      <rect x="10" y="1" width="5" height="5" rx="0.5" />
+      <rect x="1" y="10" width="5" height="5" rx="0.5" />
+      <rect x="10" y="10" width="2" height="2" rx="0.25" />
+      <path d="M15 10h-2v2" />
+      <path d="M13 15h2v-2" />
+    </svg>
+  );
+}
+
+function ClipboardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="4" y="4" width="10" height="11" rx="1" />
+      <path d="M2 11V2.5A1.5 1.5 0 0 1 3.5 1H10" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 8.5l3 3 7-7" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4" />
+      <path d="M9 2h5v5" />
+      <path d="M6 10L14 2" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M2 4h12" />
+      <path d="M5.333 4V2.667A1.333 1.333 0 0 1 6.667 1.333h2.666A1.333 1.333 0 0 1 10.667 2.667V4" />
+      <path d="M3.333 4l.667 9.333A1.333 1.333 0 0 0 5.333 14.667h5.334A1.333 1.333 0 0 0 12 13.333L12.667 4" />
+    </svg>
+  );
+}
+
+const iconBtnClass =
+  'rounded-md border border-rule bg-paper p-2 text-ink-muted transition hover:bg-paper-soft hover:text-ink';
+
 interface Props {
   initialShares: ShareResponse[];
 }
 
 /**
- * Interactive share list. Hydrated with `initialShares` from SSR so it
- * renders immediately; subsequent invalidations (after delete, or after a
- * round-trip from the editor) refetch via TanStack Query.
- *
- * Two pieces of UI state live here: which share we're showing the QR for,
- * and which share is mid-delete-confirm. Both are local-only.
+ * Interactive share list. Cards are clickable (navigate to editor); action
+ * buttons are icon-only with tooltips and use stopPropagation so they don't
+ * trigger navigation.
  */
 export function ShareList({ initialShares }: Props) {
+  const router = useRouter();
   const { data, refetch } = useShares(initialShares);
   const deleteShare = useDeleteShare();
 
@@ -55,13 +103,12 @@ export function ShareList({ initialShares }: Props) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleCopyLink = async (share: ShareResponse) => {
+  const handleCopyLink = async (share: ShareResponse, e: React.MouseEvent) => {
+    e.stopPropagation();
     const url = publicUrlFor(share.short_code);
     try {
       await navigator.clipboard.writeText(url);
     } catch {
-      // Clipboard API can fail in non-secure contexts. Fall back to a
-      // throwaway textarea so the user still gets a copy.
       const ta = document.createElement('textarea');
       ta.value = url;
       ta.style.position = 'fixed';
@@ -71,7 +118,7 @@ export function ShareList({ initialShares }: Props) {
       try {
         document.execCommand('copy');
       } catch {
-        /* ignore — the visual confirm below would be a lie */
+        /* ignore */
       }
       ta.remove();
     }
@@ -91,12 +138,12 @@ export function ShareList({ initialShares }: Props) {
           Create your first share to generate a QR for a poster, a slide, or
           your CV page.
         </p>
-        <Link
+        <a
           href="/dashboard/share/new"
           className="mt-6 inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
         >
           Create a share
-        </Link>
+        </a>
       </div>
     );
   }
@@ -119,62 +166,74 @@ export function ShareList({ initialShares }: Props) {
         {shares.map((share) => (
           <li
             key={share.id}
-            className="flex flex-col rounded-lg border border-rule bg-paper-soft p-5"
+            role="button"
+            tabIndex={0}
+            onClick={() => router.push(`/dashboard/share/${share.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                router.push(`/dashboard/share/${share.id}`);
+              }
+            }}
+            className="flex cursor-pointer flex-col rounded-lg border border-rule bg-paper-soft p-5 transition hover:border-ink/30"
           >
             <div className="flex-1">
               <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
-                /c/{share.short_code}
+                {share.short_code}
               </p>
               <h3 className="mt-2 font-serif text-lg leading-snug text-ink">
                 {share.name}
               </h3>
               <p className="mt-1 text-sm text-ink-muted">
                 {kindSummary(share.items)}
-                {share.is_public ? '' : ' · private'}
-                {' · '}
+                {' \u00b7 '}
                 <span className="capitalize">{share.type}</span>
+                {' \u00b7 '}
+                {share.is_public ? 'Published' : 'Draft'}
               </p>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setQrTarget(share)}
-                className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft"
+                title="Show QR"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setQrTarget(share);
+                }}
+                className={iconBtnClass}
               >
-                Show QR
+                <QrIcon />
               </button>
               <button
                 type="button"
-                onClick={() => handleCopyLink(share)}
-                aria-label={`Copy link to ${share.name}`}
-                className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft"
+                title={copiedId === share.id ? 'Copied!' : 'Copy link'}
+                onClick={(e) => handleCopyLink(share, e)}
+                className={iconBtnClass}
               >
-                {copiedId === share.id ? 'Copied!' : 'Copy link'}
+                {copiedId === share.id ? <CheckIcon /> : <ClipboardIcon />}
               </button>
-              <Link
-                href={`/dashboard/share/${share.id}`}
-                className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft"
-              >
-                Edit
-              </Link>
-              <Link
+              <a
                 href={`/c/${share.short_code}`}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft"
+                title="View share"
+                onClick={(e) => e.stopPropagation()}
+                className={iconBtnClass}
               >
-                View
-              </Link>
+                <ExternalLinkIcon />
+              </a>
               <button
                 type="button"
-                onClick={() => {
+                title="Delete share"
+                onClick={(e) => {
+                  e.stopPropagation();
                   setDeleteError(null);
                   setDeleteTarget(share);
                 }}
-                className="ml-auto rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-paper-soft"
+                className="ml-auto rounded-md border border-rule bg-paper p-2 text-ink-muted transition hover:bg-paper-soft hover:text-danger"
               >
-                Delete
+                <TrashIcon />
               </button>
             </div>
           </li>
@@ -229,7 +288,7 @@ export function ShareList({ initialShares }: Props) {
                 disabled={deleteShare.isPending}
                 className="rounded-md bg-danger px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
               >
-                {deleteShare.isPending ? 'Deleting…' : 'Delete'}
+                {deleteShare.isPending ? 'Deleting\u2026' : 'Delete'}
               </button>
             </div>
           </div>
