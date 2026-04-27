@@ -1,3 +1,8 @@
+// TODO: Web parity gaps:
+//   - Share cards on web have "Copy link" and "Open in new tab" actions (mobile only has QR + Edit)
+//   - Web shows a kind-aware summary (e.g. "2 papers, 1 repo") per card; mobile just shows item count
+//   - Web allows delete directly from the dashboard card; mobile requires opening the editor
+
 import { Ionicons } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
 import { useLayoutEffect, useState } from 'react';

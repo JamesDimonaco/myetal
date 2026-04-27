@@ -34,19 +34,18 @@ const signUpSchema = z.object({
 
 /**
  * Real sign-in screen. Toggles between Sign In and Register, handles email +
- * password (zod-validated), and offers GitHub OAuth — the only OAuth provider
- * with credentials currently. ORCID and Google are visible but disabled with
- * a "Coming soon" subtitle.
+ * password (zod-validated), and offers GitHub and Google OAuth. ORCID is
+ * visible but disabled with a "Coming soon" subtitle.
  *
- * GitHub flow (dev): see useAuth.signInWithGitHub for the rationale. Backend
- * lacks Universal Links wiring, so we open the browser to platform=devjson and
- * the user pastes the resulting JSON into the debug input below the GitHub
- * button. This shortcut goes away once the EAS dev-build agent ships the
- * /auth/mobile-finish deep-link handler.
+ * OAuth flow (dev): see useAuth.signInWithGitHub / signInWithGoogle for the
+ * rationale. Backend lacks Universal Links wiring, so we open the browser to
+ * platform=devjson and the user pastes the resulting JSON into the debug
+ * input below the OAuth button. This shortcut goes away once the EAS
+ * dev-build agent ships the /auth/mobile-finish deep-link handler.
  */
 export default function SignInScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
-  const { signIn, signUp, signInWithGitHub, consumeDevJsonTokens } = useAuth();
+  const { signIn, signUp, signInWithGitHub, signInWithGoogle, consumeDevJsonTokens } = useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -113,6 +112,23 @@ export default function SignInScreen() {
     }
   };
 
+  const handleGoogle = async () => {
+    setError(null);
+    try {
+      await signInWithGoogle();
+      goToDashboard();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Google sign-in failed';
+      if (msg.startsWith('google_devjson_manual')) {
+        setShowGithubPaste(true);
+      } else if (msg === 'google_oauth_cancel' || msg === 'google_oauth_dismiss') {
+        // user backed out — silent
+      } else {
+        setError(msg);
+      }
+    }
+  };
+
   const handleConsumePaste = async () => {
     setPasteError(null);
     try {
@@ -146,6 +162,23 @@ export default function SignInScreen() {
           <View style={styles.providerStack}>
             <Pressable
               accessibilityRole="button"
+              onPress={handleGoogle}
+              style={({ pressed }) => [
+                styles.providerButton,
+                {
+                  borderColor: c.border,
+                  backgroundColor: c.surface,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.providerText, { color: c.text }]}>
+                Continue with Google
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
               onPress={handleGithub}
               style={({ pressed }) => [
                 styles.providerButton,
@@ -161,26 +194,23 @@ export default function SignInScreen() {
               </Text>
             </Pressable>
 
-            {(['ORCID', 'Google'] as const).map((provider) => (
-              <View
-                key={provider}
-                style={[
-                  styles.providerButton,
-                  {
-                    borderColor: c.border,
-                    backgroundColor: c.surface,
-                    opacity: 0.55,
-                  },
-                ]}
-              >
-                <Text style={[styles.providerText, { color: c.text }]}>
-                  Continue with {provider}
-                </Text>
-                <Text style={[styles.providerSub, { color: c.textMuted }]}>
-                  Coming soon
-                </Text>
-              </View>
-            ))}
+            <View
+              style={[
+                styles.providerButton,
+                {
+                  borderColor: c.border,
+                  backgroundColor: c.surface,
+                  opacity: 0.55,
+                },
+              ]}
+            >
+              <Text style={[styles.providerText, { color: c.text }]}>
+                Continue with ORCID
+              </Text>
+              <Text style={[styles.providerSub, { color: c.textMuted }]}>
+                Coming soon
+              </Text>
+            </View>
           </View>
 
           {showGithubPaste ? (
