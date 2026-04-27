@@ -28,6 +28,20 @@ export interface ShareItem {
   image_url: string | null;
 }
 
+/** A share that has at least one paper in common with the viewed share (D8). */
+export interface RelatedShare {
+  short_code: string;
+  name: string;
+  papers_in_common: number;
+}
+
+/** A precomputed similar share from the nightly cron (D9). */
+export interface SimilarShare {
+  short_code: string;
+  name: string;
+  papers_in_common: number;
+}
+
 /** What the public viewer (`GET /public/c/{code}`) returns. No auth required. */
 export interface PublicShareResponse {
   short_code: string;
@@ -37,6 +51,8 @@ export interface PublicShareResponse {
   items: ShareItem[];
   owner_name: string | null;
   updated_at: string;
+  related_shares: RelatedShare[];
+  similar_shares: SimilarShare[];
 }
 
 /** Authed owner view (`GET /shares` and `GET /shares/{id}`). */

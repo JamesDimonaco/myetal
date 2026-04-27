@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Link, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -230,6 +230,94 @@ export default function PublicShareScreen() {
           )}
         </View>
 
+        {data.related_shares.length > 0 ? (
+          <Animated.View
+            entering={FadeInUp.duration(340).delay(180)}
+            style={styles.discoverySection}
+          >
+            <View style={[styles.discoverySep, { backgroundColor: c.border }]} />
+            <Text style={[styles.discoveryHeading, { color: c.text }]}>
+              Who else shares these papers
+            </Text>
+            <Text style={[styles.discoverySubtext, { color: c.textMuted }]}>
+              Other public collections with papers in common.
+            </Text>
+            {data.related_shares.map((rs) => (
+              <Link key={rs.short_code} href={`/c/${rs.short_code}` as any} asChild>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.discoveryRow,
+                    {
+                      backgroundColor: pressed ? c.surfaceSunken : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.discoveryName, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {rs.name}
+                  </Text>
+                  <View
+                    style={[
+                      styles.discoveryBadge,
+                      { backgroundColor: c.surfaceSunken },
+                    ]}
+                  >
+                    <Text style={[styles.discoveryBadgeText, { color: c.textMuted }]}>
+                      {rs.papers_in_common} in common
+                    </Text>
+                  </View>
+                </Pressable>
+              </Link>
+            ))}
+          </Animated.View>
+        ) : null}
+
+        {data.similar_shares.length > 0 ? (
+          <Animated.View
+            entering={FadeInUp.duration(340).delay(200)}
+            style={styles.discoverySection}
+          >
+            <View style={[styles.discoverySep, { backgroundColor: c.border }]} />
+            <Text style={[styles.discoveryHeading, { color: c.text }]}>
+              Similar collections
+            </Text>
+            <Text style={[styles.discoverySubtext, { color: c.textMuted }]}>
+              Collections with the most overlap in papers.
+            </Text>
+            {data.similar_shares.map((ss) => (
+              <Link key={ss.short_code} href={`/c/${ss.short_code}` as any} asChild>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.discoveryRow,
+                    {
+                      backgroundColor: pressed ? c.surfaceSunken : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.discoveryName, { color: c.text }]}
+                    numberOfLines={1}
+                  >
+                    {ss.name}
+                  </Text>
+                  <View
+                    style={[
+                      styles.discoveryBadge,
+                      { backgroundColor: c.surfaceSunken },
+                    ]}
+                  >
+                    <Text style={[styles.discoveryBadgeText, { color: c.textMuted }]}>
+                      {ss.papers_in_common} in common
+                    </Text>
+                  </View>
+                </Pressable>
+              </Link>
+            ))}
+          </Animated.View>
+        ) : null}
+
         {/* Show-QR CTA also lives in the body for thumb-reach on the public page */}
         {data.items.length > 0 ? (
           <Animated.View
@@ -422,6 +510,51 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',
+  },
+
+  discoverySection: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+  },
+  discoverySep: {
+    height: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.lg,
+  },
+  discoveryHeading: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  discoverySubtext: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: Spacing.md,
+  },
+  discoveryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: Spacing.sm + 4,
+    borderRadius: Radius.md,
+    marginBottom: 2,
+  },
+  discoveryName: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  discoveryBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.pill,
+  },
+  discoveryBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
   },
 
   bottomCta: {

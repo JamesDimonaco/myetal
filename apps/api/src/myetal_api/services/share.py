@@ -1,18 +1,20 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Date, cast, func, select, text
+from sqlalchemy import Date, cast, func, select, text, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from myetal_api.core.security import generate_short_code
-from myetal_api.models import Share, ShareItem, ShareView
+from myetal_api.models import Share, ShareItem, SharePaper, ShareSimilar, ShareView
 from myetal_api.schemas.share import (
     DailyViewCount,
+    RelatedShareOut,
     ShareAnalyticsResponse,
     ShareCreate,
     ShareItemCreate,
     ShareUpdate,
+    SimilarShareOut,
 )
 
 _MAX_SHORT_CODE_ATTEMPTS = 10
@@ -221,6 +223,93 @@ async def get_share_analytics(
             DailyViewCount(date=str(r.date), count=r.count) for r in daily_rows
         ],
     )
+
+
+async def get_related_shares(db: AsyncSession, share: Share) -> list[RelatedShareOut]:
+    """Other published, public shares that contain at least one paper in common.
+
+    Uses the `share_papers` join table — cheap because it's keyed on
+    (share_id, paper_id) with an index on paper_id.  Per D8.
+    """
+    sp1 = SharePaper.__table__.alias("sp1")
+    sp2 = SharePaper.__table__.alias("sp2")
+    s = Share.__table__.alias("s")
+
+    stmt = (
+        select(
+            s.c.short_code,
+            s.c.name,
+            func.count().label("papers_in_common"),
+        )
+        .select_from(
+            sp1.join(sp2, sp1.c.paper_id == sp2.c.paper_id).join(
+                s, s.c.id == sp2.c.share_id
+            )
+        )
+        .where(
+            sp1.c.share_id == share.id,
+            sp2.c.share_id != share.id,
+            s.c.is_public.is_(True),
+            s.c.published_at.is_not(None),
+            s.c.deleted_at.is_(None),
+        )
+        .group_by(s.c.short_code, s.c.name)
+        .order_by(func.count().desc())
+        .limit(20)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [
+        RelatedShareOut(
+            short_code=r.short_code,
+            name=r.name,
+            papers_in_common=r.papers_in_common,
+        )
+        for r in rows
+    ]
+
+
+async def get_similar_shares(db: AsyncSession, share: Share) -> list[SimilarShareOut]:
+    """Precomputed similar shares from the nightly `share_similar` table.
+
+    Unions both directions because the table stores canonical-ordered pairs
+    (a < b). Per D9.
+    """
+    ss = ShareSimilar.__table__
+    s = Share.__table__.alias("s")
+
+    # Direction A: current share is share_id_a
+    q_a = select(
+        ss.c.share_id_b.label("similar_share_id"),
+        ss.c.papers_in_common,
+    ).where(ss.c.share_id_a == share.id)
+
+    # Direction B: current share is share_id_b
+    q_b = select(
+        ss.c.share_id_a.label("similar_share_id"),
+        ss.c.papers_in_common,
+    ).where(ss.c.share_id_b == share.id)
+
+    combined = union_all(q_a, q_b).subquery("x")
+
+    stmt = (
+        select(s.c.short_code, s.c.name, combined.c.papers_in_common)
+        .select_from(combined.join(s, s.c.id == combined.c.similar_share_id))
+        .where(
+            s.c.deleted_at.is_(None),
+            s.c.published_at.is_not(None),
+        )
+        .order_by(combined.c.papers_in_common.desc())
+        .limit(5)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [
+        SimilarShareOut(
+            short_code=r.short_code,
+            name=r.name,
+            papers_in_common=r.papers_in_common,
+        )
+        for r in rows
+    ]
 
 
 # ---------- internals ----------
