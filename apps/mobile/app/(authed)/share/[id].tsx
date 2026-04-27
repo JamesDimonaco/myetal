@@ -43,7 +43,7 @@ import type {
   ShareType,
 } from '@/types/share';
 
-const SHARE_TYPES: ShareType[] = ['paper', 'collection', 'poster', 'grant'];
+const SHARE_TYPES: ShareType[] = ['paper', 'collection', 'poster', 'grant', 'project'];
 
 const itemSchema = z.object({
   kind: z.enum(['paper', 'repo', 'link']).optional(),
@@ -63,7 +63,7 @@ const itemSchema = z.object({
 const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
   description: z.string().trim().optional().or(z.literal('')),
-  type: z.enum(['paper', 'collection', 'poster', 'grant']),
+  type: z.enum(['paper', 'collection', 'poster', 'grant', 'project']),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
@@ -281,7 +281,10 @@ export default function ShareEditorScreen() {
 
   const handleDelete = () => {
     if (!id || isNew) return;
-    Alert.alert('Delete share?', 'This cannot be undone.', [
+    Alert.alert(
+      'Delete share?',
+      `"${name}" will be permanently removed. The QR code will stop working immediately. This cannot be undone.`,
+      [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -346,12 +349,18 @@ export default function ShareEditorScreen() {
         >
           {/* Name */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: c.textMuted }]}>Name</Text>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: c.textMuted }]}>Name</Text>
+              <Text style={[styles.charCount, { color: c.textSubtle }]}>
+                {name.length}/200
+              </Text>
+            </View>
             <TextInput
               value={name}
-              onChangeText={setName}
-              placeholder="My ASMS poster"
+              onChangeText={(v) => setName(v.slice(0, 200))}
+              placeholder="e.g. My ASMS 2026 poster"
               placeholderTextColor={c.textMuted}
+              maxLength={200}
               style={[
                 styles.input,
                 { color: c.text, borderColor: c.border, backgroundColor: c.surface },
@@ -365,7 +374,7 @@ export default function ShareEditorScreen() {
             <TextInput
               value={description}
               onChangeText={setDescription}
-              placeholder="Briefly describe what people will find"
+              placeholder="Briefly describe what people will find when they scan your QR code"
               placeholderTextColor={c.textMuted}
               multiline
               style={[
@@ -451,13 +460,25 @@ export default function ShareEditorScreen() {
 
           {/* Items */}
           <View style={styles.itemsHeader}>
-            <Text style={[styles.sectionLabel, { color: c.textMuted }]}>ITEMS</Text>
+            <View>
+              <Text style={[styles.sectionLabel, { color: c.textMuted }]}>ITEMS</Text>
+              <Text style={[styles.itemsCountHint, { color: c.textSubtle }]}>
+                {items.length} {items.length === 1 ? 'item' : 'items'}
+              </Text>
+            </View>
             <Pressable
               onPress={openAddPaper}
               hitSlop={8}
-              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', opacity: pressed ? 0.6 : 1 })}
+              style={({ pressed }) => [
+                styles.addItemBtn,
+                {
+                  borderColor: c.border,
+                  backgroundColor: c.surface,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
             >
-              <Ionicons name="add-circle-outline" size={20} color={c.text} />
+              <Ionicons name="add" size={18} color={c.text} />
               <Text style={[styles.addText, { color: c.text }]}>Add paper</Text>
             </Pressable>
           </View>
@@ -619,7 +640,12 @@ export default function ShareEditorScreen() {
             </View>
           ) : null}
 
-          {error ? <Text style={[styles.error, { color: '#B00020' }]}>{error}</Text> : null}
+          {error ? (
+            <View style={[styles.errorBanner, { backgroundColor: '#B0002010', borderColor: '#B0002040' }]}>
+              <Ionicons name="alert-circle-outline" size={18} color="#B00020" />
+              <Text style={[styles.errorText, { color: '#B00020' }]}>{error}</Text>
+            </View>
+          ) : null}
 
           <Pressable
             onPress={handleSave}
@@ -713,6 +739,13 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   field: { marginBottom: Spacing.md },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: Spacing.xs,
+  },
+  charCount: { fontSize: 11, fontVariant: ['tabular-nums'] as const },
   label: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: Spacing.xs },
   input: {
     paddingVertical: 12,
@@ -743,7 +776,17 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
   },
-  addText: { fontSize: 14, fontWeight: '500', marginLeft: 4 },
+  addText: { fontSize: 14, fontWeight: '500' },
+  addItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  itemsCountHint: { fontSize: 11, marginTop: 2 },
 
   itemCard: {
     borderRadius: Radius.md,
@@ -760,7 +803,16 @@ const styles = StyleSheet.create({
   itemIndex: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   itemHeaderActions: { flexDirection: 'row', gap: Spacing.xs, alignItems: 'center' },
 
-  error: { fontSize: 14, marginTop: Spacing.sm },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  errorText: { fontSize: 14, flex: 1, lineHeight: 20 },
 
   primary: {
     paddingVertical: 16,

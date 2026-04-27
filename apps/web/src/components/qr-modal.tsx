@@ -8,6 +8,8 @@ interface Props {
   shortCode: string;
   collectionName: string;
   onClose: () => void;
+  /** If provided, shows a secondary "Keep editing" button instead of only "Done → dashboard". */
+  onKeepEditing?: () => void;
 }
 
 const SITE_URL = (
@@ -23,7 +25,7 @@ const SITE_URL = (
  * modal in the world. Body scroll is locked while open so the underlying
  * dashboard doesn't scroll behind the dialog on mobile.
  */
-export function QrModal({ shortCode, collectionName, onClose }: Props) {
+export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: Props) {
   const qrUrl = `${API_BASE_URL}/public/c/${encodeURIComponent(shortCode)}/qr.png`;
   const shareUrl = `${SITE_URL}/c/${shortCode}`;
   const [copied, setCopied] = useState(false);
@@ -113,22 +115,42 @@ export function QrModal({ shortCode, collectionName, onClose }: Props) {
           <code className="break-all text-sm text-ink">{shareUrl}</code>
         </div>
 
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-          >
-            {copied ? 'Copied!' : 'Copy link'}
-          </button>
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-          >
-            Open
-          </a>
+        <div className="mt-4 grid gap-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+            >
+              {copied ? 'Copied!' : 'Copy link'}
+            </button>
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+            >
+              Open
+            </a>
+          </div>
+          {onKeepEditing ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onKeepEditing}
+                className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              >
+                Keep editing
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              >
+                Go to dashboard
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

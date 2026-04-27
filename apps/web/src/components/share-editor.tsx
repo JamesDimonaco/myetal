@@ -190,11 +190,13 @@ export function ShareEditor({ initial, id }: Props) {
       : [emptyItem()],
   );
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [savedShare, setSavedShare] = useState<ShareResponse | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   const updateItem = (key: string, patch: Partial<DraftItem>) => {
     setItems((prev) =>
@@ -243,6 +245,7 @@ export function ShareEditor({ initial, id }: Props) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
 
     const parsed = shareSchema.safeParse({
       name,
@@ -251,7 +254,18 @@ export function ShareEditor({ initial, id }: Props) {
       items,
     });
     if (!parsed.success) {
+      // Map zod issues to field-level errors for inline display.
+      const errs: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path.join('.');
+        if (!errs[key]) errs[key] = issue.message;
+      }
+      setFieldErrors(errs);
       setError(parsed.error.issues[0]?.message ?? 'Invalid input');
+      // Scroll error into view so the user sees what went wrong.
+      setTimeout(() => {
+        document.querySelector('[role="alert"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
       return;
     }
 
@@ -282,6 +296,9 @@ export function ShareEditor({ initial, id }: Props) {
         : await updateMutation.mutateAsync(payload);
       setSavedShare(saved);
       setShowQr(true);
+      // Flash a brief "saved" confirmation that persists after QR closes.
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 3000);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : 'Save failed');
     } finally {
@@ -302,26 +319,51 @@ export function ShareEditor({ initial, id }: Props) {
     }
   };
 
-  const closeQrAndExit = () => {
+  const closeQrAndGoToDashboard = () => {
     setShowQr(false);
     router.push('/dashboard');
     router.refresh();
   };
 
+  const closeQrAndKeepEditing = () => {
+    setShowQr(false);
+    // If this was a new share, navigate to the edit URL so refreshing
+    // the browser doesn't land on /share/new again.
+    if (isNew && savedShare) {
+      router.replace(`/dashboard/share/${savedShare.id}`);
+    }
+  };
+
   return (
     <>
+      {/* Success toast — shown briefly after save */}
+      {justSaved && !showQr ? (
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>Share saved successfully.</span>
+        </div>
+      ) : null}
+
       <form onSubmit={handleSave} className="grid gap-6">
         {/* Name */}
-        <Field label="Name">
+        <Field label="Name" hint={`${name.length}/200`}>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="My ASMS poster"
+            placeholder="e.g. My ASMS 2026 poster"
             required
             maxLength={200}
-            className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+            className={[
+              'rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
+              fieldErrors['name'] ? 'border-danger' : 'border-rule',
+            ].join(' ')}
           />
+          {fieldErrors['name'] ? (
+            <span className="text-xs text-danger">{fieldErrors['name']}</span>
+          ) : null}
         </Field>
 
         {/* Description */}
@@ -329,14 +371,14 @@ export function ShareEditor({ initial, id }: Props) {
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Briefly describe what people will find"
+            placeholder="Briefly describe what people will find when they scan your QR code"
             rows={3}
             className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
           />
         </Field>
 
         {/* Type pills */}
-        <Field label="Type">
+        <Field label="Type" hint="What kind of content is this?">
           <div className="flex flex-wrap gap-2">
             {SHARE_TYPES.map((t) => {
               const active = shareType === t;
@@ -346,7 +388,7 @@ export function ShareEditor({ initial, id }: Props) {
                   type="button"
                   onClick={() => setShareType(t)}
                   className={[
-                    'rounded-full border px-4 py-1.5 text-sm font-medium capitalize transition',
+                    'rounded-full border px-4 py-2 text-sm font-medium capitalize transition',
                     active
                       ? 'border-ink bg-ink text-paper'
                       : 'border-rule bg-paper text-ink hover:bg-paper-soft',
@@ -412,20 +454,55 @@ export function ShareEditor({ initial, id }: Props) {
           </div>
         ) : null}
 
+        {/* Quick-access QR button — edit mode only, lets you view the QR
+            without re-saving. */}
+        {!isNew && initial ? (
+          <div className="flex items-center gap-3 rounded-md border border-rule bg-paper-soft p-4">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-ink">QR Code</p>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                View or share the QR code for this share.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSavedShare(initial);
+                setShowQr(true);
+              }}
+              className="rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+            >
+              Show QR
+            </button>
+          </div>
+        ) : null}
+
         {/* Items */}
         <div>
           <div className="flex items-end justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-              Items
-            </h2>
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+                Items
+              </h2>
+              <p className="mt-1 text-xs text-ink-faint">
+                {items.length} {items.length === 1 ? 'item' : 'items'} -- use the arrows to reorder
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => setShowAddItem(true)}
-              className="text-sm font-medium text-accent hover:underline"
+              className="inline-flex items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
-              + Add item
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              Add item
             </button>
           </div>
+
+          {fieldErrors['items'] ? (
+            <p className="mt-2 text-xs text-danger">{fieldErrors['items']}</p>
+          ) : null}
 
           <div className="mt-3 grid gap-3">
             {items.map((it, idx) => (
@@ -487,17 +564,26 @@ export function ShareEditor({ initial, id }: Props) {
         </div>
 
         {error ? (
-          <p className="text-sm text-danger" role="alert">
-            {error}
-          </p>
+          <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-4 py-3" role="alert">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="mt-0.5 flex-shrink-0 text-danger">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <p className="text-sm text-danger">
+              {error}
+            </p>
+          </div>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
           <Link
             href="/dashboard"
-            className="text-sm text-ink-muted hover:text-ink"
+            className="inline-flex items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
           >
-            ← Back to dashboard
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+              <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Back to dashboard
           </Link>
           <div className="flex gap-3">
             {!isNew ? (
@@ -538,7 +624,8 @@ export function ShareEditor({ initial, id }: Props) {
         <QrModal
           shortCode={savedShare.short_code}
           collectionName={savedShare.name}
-          onClose={closeQrAndExit}
+          onClose={closeQrAndGoToDashboard}
+          onKeepEditing={closeQrAndKeepEditing}
         />
       ) : null}
 
@@ -554,7 +641,10 @@ export function ShareEditor({ initial, id }: Props) {
           <div className="w-full max-w-md rounded-lg border border-rule bg-paper p-6 shadow-xl">
             <h3 className="font-serif text-xl text-ink">Delete this share?</h3>
             <p className="mt-2 text-sm text-ink-muted">
-              The QR code will stop working immediately. This cannot be undone.
+              <span className="font-medium text-ink">&quot;{name}&quot;</span>{' '}
+              will be permanently removed. The QR code will stop working
+              immediately and anyone who scans it will see an error. This cannot
+              be undone.
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -737,15 +827,24 @@ function KindBadge({ kind }: { kind: ShareItemKind }) {
 
 function Field({
   label,
+  hint,
   children,
 }: {
   label: string;
+  hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-xs uppercase tracking-wider text-ink-muted">
-        {label}
+      <span className="flex items-baseline justify-between gap-2">
+        <span className="text-xs uppercase tracking-wider text-ink-muted">
+          {label}
+        </span>
+        {hint ? (
+          <span className="text-[11px] tabular-nums text-ink-faint">
+            {hint}
+          </span>
+        ) : null}
       </span>
       {children}
     </label>
@@ -815,7 +914,7 @@ function IconBtn({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-7 w-7 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+      className="inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
     >
       {children}
     </button>
