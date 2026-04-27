@@ -66,6 +66,21 @@ async def resolve_public_share(
     )
 
 
+@router.get("/sitemap-shares")
+@limiter.limit(ANON_READ_LIMIT)
+async def list_sitemap_shares(
+    request: Request,
+    db: DbSession,
+) -> list[dict[str, str]]:
+    """Return `[{short_code, updated_at}]` for every discoverable share.
+
+    Used by the Next.js frontend to build /sitemap.xml. No auth required;
+    the data is already public on the share pages themselves. Rate-limited
+    like any other anonymous read.
+    """
+    return await share_service.list_sitemap_shares(db)
+
+
 @router.get(
     "/c/{short_code}/qr.png",
     responses={200: {"content": {"image/png": {}}}},

@@ -149,6 +149,31 @@ async def tombstone_share(db: AsyncSession, share: Share) -> None:
     await db.commit()
 
 
+async def list_sitemap_shares(
+    db: AsyncSession,
+) -> list[dict[str, str]]:
+    """Return `[{short_code, updated_at}]` for every share that should appear
+    in the public sitemap: `is_public=True`, `published_at IS NOT NULL`,
+    `deleted_at IS NULL`.
+
+    Lightweight query — only selects two columns to keep the payload small
+    even for tens-of-thousands of published shares.
+    """
+    rows = (
+        await db.execute(
+            select(Share.short_code, Share.updated_at).where(
+                Share.is_public.is_(True),
+                Share.published_at.is_not(None),
+                Share.deleted_at.is_(None),
+            )
+        )
+    ).all()
+    return [
+        {"short_code": r.short_code, "updated_at": r.updated_at.isoformat()}
+        for r in rows
+    ]
+
+
 async def publish_share(db: AsyncSession, share: Share) -> Share:
     """Opt the share into discovery surfaces (sitemap, similar, future
     trending). Per D1 — sets `published_at = NOW()` if not already set."""
