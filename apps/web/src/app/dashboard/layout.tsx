@@ -44,6 +44,12 @@ export default async function DashboardLayout({
               Shares
             </Link>
             <Link
+              href="/dashboard/library"
+              className="text-ink-muted hover:text-ink"
+            >
+              Library
+            </Link>
+            <Link
               href="/dashboard/profile"
               className="text-ink-muted hover:text-ink"
             >

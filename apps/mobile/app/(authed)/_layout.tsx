@@ -53,6 +53,16 @@ export default function AuthedLayout() {
         }}
       />
       <Tabs.Screen
+        name="library"
+        options={{
+          title: 'Library',
+          tabBarLabel: 'Library',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="library-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="scan"
         options={{
           title: 'Scan',

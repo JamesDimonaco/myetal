@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { ReportButton } from '@/components/report-button';
 import { ShareItemCard } from '@/components/share-item-card';
 import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { formatItemCount, formatRelativeTime } from '@/lib/format';
@@ -30,22 +31,29 @@ type PageProps = { params: Promise<{ code: string }> };
 
 const FETCH_OPTIONS = { next: { revalidate: 300 } };
 
-async function fetchPublicShare(code: string): Promise<PublicShareResponse | null> {
+async function fetchPublicShare(
+  code: string,
+): Promise<{ share: PublicShareResponse | null; gone: boolean }> {
   try {
-    return await api<PublicShareResponse>(`/public/c/${encodeURIComponent(code)}`, FETCH_OPTIONS);
+    const share = await api<PublicShareResponse>(
+      `/public/c/${encodeURIComponent(code)}`,
+      FETCH_OPTIONS,
+    );
+    return { share, gone: false };
   } catch (err) {
-    if (err instanceof ApiError && err.isNotFound) return null;
+    if (err instanceof ApiError && err.isNotFound) return { share: null, gone: false };
+    if (err instanceof ApiError && err.status === 410) return { share: null, gone: true };
     throw err;
   }
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { code } = await params;
-  const share = await fetchPublicShare(code);
+  const { share, gone } = await fetchPublicShare(code);
 
   if (!share) {
     return {
-      title: 'Collection not found',
+      title: gone ? 'Collection removed' : 'Collection not found',
       robots: { index: false },
     };
   }
@@ -87,7 +95,28 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PublicSharePage({ params }: PageProps) {
   const { code } = await params;
-  const share = await fetchPublicShare(code);
+  const { share, gone } = await fetchPublicShare(code);
+
+  if (!share && gone) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-10 text-center">
+        <p className="text-xs uppercase tracking-widest text-ink-faint">410</p>
+        <h1 className="mt-4 font-serif text-4xl tracking-tight text-ink">
+          Collection removed
+        </h1>
+        <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted">
+          This collection has been taken down. If you believe this was an error,
+          please contact the collection owner.
+        </p>
+        <Link
+          href="/"
+          className="mt-8 inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink hover:border-ink/40"
+        >
+          Back to MyEtAl
+        </Link>
+      </main>
+    );
+  }
 
   if (!share) notFound();
 
@@ -177,11 +206,18 @@ export default async function PublicSharePage({ params }: PageProps) {
         </div>
       </aside>
 
-      <footer className="mt-16 text-xs text-ink-faint">
-        Built with MyEtAl ·{' '}
-        <Link href="/" className="underline-offset-2 hover:underline">
-          myetal.app
-        </Link>
+      <footer className="mt-16 space-y-4 border-t border-rule pt-8">
+        <ReportButton shortCode={share.short_code} />
+        <p className="text-xs text-ink-faint">
+          Built with MyEtAl ·{' '}
+          <Link href="/" className="underline-offset-2 hover:underline">
+            myetal.app
+          </Link>
+          {' · '}
+          <Link href="/privacy" className="underline-offset-2 hover:underline">
+            Privacy
+          </Link>
+        </p>
       </footer>
     </main>
   );

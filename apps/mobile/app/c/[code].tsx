@@ -255,6 +255,13 @@ function describeError(error: unknown): {
   icon: 'alert-circle-outline' | 'cloud-offline-outline' | 'help-buoy-outline';
 } {
   if (error instanceof ApiError) {
+    if (error.status === 410) {
+      return {
+        title: 'Collection removed',
+        body: 'This collection has been taken down. If you believe this was an error, contact the collection owner.',
+        icon: 'alert-circle-outline',
+      };
+    }
     if (error.isNotFound) {
       return {
         title: 'Collection not found',
