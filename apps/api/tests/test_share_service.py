@@ -210,10 +210,14 @@ async def test_public_share_response_includes_new_fields(
     assert item["image_url"] == "https://example.org/og.png"
 
 
-async def test_delete_share_cascades_items(db_session: AsyncSession) -> None:
+async def test_tombstone_share_marks_deleted_at_keeps_items(
+    db_session: AsyncSession,
+) -> None:
+    """Per D14: delete is now soft. Row stays, items stay, deleted_at is set.
+    The 30-day GC cron permanently drops rows via the existing CASCADE."""
     from sqlalchemy import select
 
-    from myetal_api.models import ShareItem
+    from myetal_api.models import Share, ShareItem
 
     user = await _make_user(db_session)
     share = await share_service.create_share(
@@ -222,7 +226,104 @@ async def test_delete_share_cascades_items(db_session: AsyncSession) -> None:
         ShareCreate(name="x", items=[ShareItemCreate(title="a"), ShareItemCreate(title="b")]),
     )
     share_id = share.id
-    await share_service.delete_share(db_session, share)
 
+    await share_service.tombstone_share(db_session, share)
+
+    # The share row is still present, with deleted_at populated.
+    refreshed = await db_session.scalar(select(Share).where(Share.id == share_id))
+    assert refreshed is not None
+    assert refreshed.deleted_at is not None
+
+    # Items remain (cascade only fires on real delete, which is the cron's job).
     remaining = await db_session.scalars(select(ShareItem).where(ShareItem.share_id == share_id))
-    assert remaining.all() == []
+    assert len(list(remaining.all())) == 2
+
+
+async def test_get_public_share_excludes_tombstoned(db_session: AsyncSession) -> None:
+    """Per D-BL2: get_public_share filters out tombstoned shares — returns None."""
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x", items=[ShareItemCreate(title="a")]),
+    )
+    short_code = share.short_code
+
+    # Live share resolves.
+    found = await share_service.get_public_share(db_session, short_code)
+    assert found is not None
+
+    # Tombstone it; the public lookup returns None.
+    await share_service.tombstone_share(db_session, share)
+    after = await share_service.get_public_share(db_session, short_code)
+    assert after is None
+
+
+async def test_get_public_share_with_tombstone_distinguishes_404_vs_410(
+    db_session: AsyncSession,
+) -> None:
+    """Per D-BL2: helper returns (None, True) for tombstoned vs (None, False)
+    for never-existed, so the route can return 410 vs 404 cleanly."""
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x", items=[ShareItemCreate(title="a")]),
+    )
+    short_code = share.short_code
+
+    # Tombstone it.
+    await share_service.tombstone_share(db_session, share)
+
+    found, was_tombstoned = await share_service.get_public_share_with_tombstone(
+        db_session, short_code
+    )
+    assert found is None
+    assert was_tombstoned is True
+
+    # Never-existed short_code returns (None, False).
+    found, was_tombstoned = await share_service.get_public_share_with_tombstone(
+        db_session, "nonexistent-code"
+    )
+    assert found is None
+    assert was_tombstoned is False
+
+
+async def test_publish_unpublish_share(db_session: AsyncSession) -> None:
+    """Per D1: publish_share sets published_at; unpublish clears it."""
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x"),
+    )
+    assert share.published_at is None
+
+    published = await share_service.publish_share(db_session, share)
+    assert published.published_at is not None
+
+    # Idempotent — re-publishing doesn't bump the timestamp.
+    first_at = published.published_at
+    again = await share_service.publish_share(db_session, share)
+    assert again.published_at == first_at
+
+    unpublished = await share_service.unpublish_share(db_session, share)
+    assert unpublished.published_at is None
+
+
+async def test_list_user_shares_excludes_tombstoned_by_default(
+    db_session: AsyncSession,
+) -> None:
+    """Per D-BL2: list_user_shares hides tombstoned shares unless asked."""
+    user = await _make_user(db_session)
+    a = await share_service.create_share(db_session, user.id, ShareCreate(name="a"))
+    await share_service.create_share(db_session, user.id, ShareCreate(name="b"))
+
+    # Tombstone the first one.
+    await share_service.tombstone_share(db_session, a)
+
+    visible = await share_service.list_user_shares(db_session, user.id)
+    assert {s.name for s in visible} == {"b"}
+
+    all_including = await share_service.list_user_shares(db_session, user.id, include_deleted=True)
+    assert {s.name for s in all_including} == {"a", "b"}

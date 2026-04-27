@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,13 +37,21 @@ async def create_share(
     return await _reload_with_items(db, share.id)
 
 
-async def list_user_shares(db: AsyncSession, owner_id: uuid.UUID) -> list[Share]:
-    result = await db.scalars(
-        select(Share)
-        .options(selectinload(Share.items))
-        .where(Share.owner_user_id == owner_id)
-        .order_by(Share.created_at.desc())
-    )
+async def list_user_shares(
+    db: AsyncSession,
+    owner_id: uuid.UUID,
+    *,
+    include_deleted: bool = False,
+) -> list[Share]:
+    """Owner's own shares. Tombstoned shares are excluded by default — set
+    `include_deleted=True` for the (future) trash UI.
+
+    Per discovery ticket D-BL2.
+    """
+    stmt = select(Share).options(selectinload(Share.items)).where(Share.owner_user_id == owner_id)
+    if not include_deleted:
+        stmt = stmt.where(Share.deleted_at.is_(None))
+    result = await db.scalars(stmt.order_by(Share.created_at.desc()))
     return list(result.all())
 
 
@@ -51,6 +60,11 @@ async def get_share_for_owner(
     share_id: uuid.UUID,
     owner_id: uuid.UUID,
 ) -> Share | None:
+    """Owner's own share — tombstoned shares INCLUDED.
+
+    The owner can still see their tombstoned share (with a deleted banner
+    rendered by the UI based on the `deleted_at` field). Per D-BL2.
+    """
     return await db.scalar(
         select(Share)
         .options(selectinload(Share.items))
@@ -59,11 +73,46 @@ async def get_share_for_owner(
 
 
 async def get_public_share(db: AsyncSession, short_code: str) -> Share | None:
+    """Public read of a share by short_code. Tombstoned shares are EXCLUDED.
+
+    Routes that need to distinguish 404 (never existed) from 410 (was
+    tombstoned) should use `get_public_share_with_tombstone` instead.
+    Per D-BL2 + D14.
+    """
     return await db.scalar(
+        select(Share)
+        .options(selectinload(Share.items), selectinload(Share.owner))
+        .where(
+            Share.short_code == short_code,
+            Share.is_public.is_(True),
+            Share.deleted_at.is_(None),
+        )
+    )
+
+
+async def get_public_share_with_tombstone(
+    db: AsyncSession, short_code: str
+) -> tuple[Share | None, bool]:
+    """Returns (share, was_tombstoned).
+
+    - (Share, False) → live share, render normally.
+    - (None,  True)  → a share existed under this short_code but is tombstoned;
+                       caller returns 410 Gone.
+    - (None,  False) → no share has ever had this short_code; caller returns 404.
+
+    Per D-BL2 + D14. Used by routes that want to give search engines a clean
+    "this URL is gone" signal rather than a misleading 404.
+    """
+    share = await db.scalar(
         select(Share)
         .options(selectinload(Share.items), selectinload(Share.owner))
         .where(Share.short_code == short_code, Share.is_public.is_(True))
     )
+    if share is None:
+        return None, False
+    if share.deleted_at is not None:
+        return None, True
+    return share, False
 
 
 async def update_share(db: AsyncSession, share: Share, payload: ShareUpdate) -> Share:
@@ -87,9 +136,34 @@ async def update_share(db: AsyncSession, share: Share, payload: ShareUpdate) -> 
     return await _reload_with_items(db, share.id)
 
 
-async def delete_share(db: AsyncSession, share: Share) -> None:
-    await db.delete(share)
+async def tombstone_share(db: AsyncSession, share: Share) -> None:
+    """Soft-delete: flips deleted_at = NOW().
+
+    The row stays so future references (search-engine recrawl, social-media
+    embeds, similar-shares panels on other shares) can return 410 Gone
+    rather than 404. A separate cron permanently deletes rows where
+    `deleted_at < now() - interval '30 days'` — by then crawlers have had
+    time to drop the URL. Per D14.
+    """
+    share.deleted_at = datetime.now(UTC)
     await db.commit()
+
+
+async def publish_share(db: AsyncSession, share: Share) -> Share:
+    """Opt the share into discovery surfaces (sitemap, similar, future
+    trending). Per D1 — sets `published_at = NOW()` if not already set."""
+    if share.published_at is None:
+        share.published_at = datetime.now(UTC)
+        await db.commit()
+    return share
+
+
+async def unpublish_share(db: AsyncSession, share: Share) -> Share:
+    """Reverse `publish_share` — keep the URL alive but drop from discovery."""
+    if share.published_at is not None:
+        share.published_at = None
+        await db.commit()
+    return share
 
 
 # ---------- internals ----------

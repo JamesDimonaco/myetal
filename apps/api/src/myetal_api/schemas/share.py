@@ -63,6 +63,13 @@ class ShareResponse(BaseModel):
     description: str | None
     type: ShareType
     is_public: bool
+    # Discovery opt-in (D1). NULL = link-shareable but not in discovery surfaces;
+    # non-null = the timestamp at which the owner published it.
+    published_at: datetime | None
+    # Tombstone marker (D14). Owner endpoints expose this so the UI can
+    # render a "this share is deleted" banner; public endpoints filter on
+    # deleted_at IS NULL and never return tombstoned rows.
+    deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime
     items: list[ShareItemResponse]

@@ -18,3 +18,14 @@ limiter = Limiter(key_func=get_remote_address)
 # Default rule for sensitive auth endpoints — applied via decorator on each
 # route, NOT here, so the routes' intent is visible at the call site.
 AUTH_LIMIT = "5/minute"
+
+# Anonymous read of public share endpoints. Cloudflare is DNS-only on
+# api.myetal.app (no proxy / no edge rate limiting), so this is the sole
+# defence against scraping. 60/min/IP is generous enough for legitimate
+# scroll-and-explore traffic and tight enough that a scraper can't pull the
+# whole corpus in an afternoon.
+ANON_READ_LIMIT = "60/minute"
+
+# Take-down/abuse reports — anon allowed but heavily limited because the
+# admin queue is the dev's inbox. Per discovery ticket D16 + smaller-finding.
+REPORT_LIMIT = "3/hour"

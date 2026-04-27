@@ -39,5 +39,26 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_optional(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> User | None:
+    """Like `get_current_user` but returns None for anon — never raises 401.
+
+    For endpoints that are usable both signed-in and anon, e.g. take-down
+    reports, public share view tracking, and any future "viewer if known"
+    surfaces. The presence of a valid Bearer token resolves to the user;
+    anything missing/invalid resolves to None silently.
+    """
+    if credentials is None:
+        return None
+    try:
+        user_id = decode_access_token(credentials.credentials)
+    except TokenError:
+        return None
+    return await db.get(User, user_id)
+
+
 CurrentUser = Annotated[User, Depends(get_current_user)]
+OptionalUser = Annotated[User | None, Depends(get_current_user_optional)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]

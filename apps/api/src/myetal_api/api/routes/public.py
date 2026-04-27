@@ -1,21 +1,60 @@
 import io
+from typing import Annotated
 
 import qrcode
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 
-from myetal_api.api.deps import DbSession
+from myetal_api.api.deps import DbSession, OptionalUser
 from myetal_api.core.config import settings
+from myetal_api.core.rate_limit import ANON_READ_LIMIT, limiter
 from myetal_api.schemas.share import PublicShareResponse, ShareItemResponse
 from myetal_api.services import share as share_service
+from myetal_api.services import share_view as share_view_service
 
 router = APIRouter(prefix="/public", tags=["public"])
 
 
 @router.get("/c/{short_code}", response_model=PublicShareResponse)
-async def resolve_public_share(short_code: str, db: DbSession) -> PublicShareResponse:
-    share = await share_service.get_public_share(db, short_code)
+@limiter.limit(ANON_READ_LIMIT)
+async def resolve_public_share(
+    short_code: str,
+    request: Request,
+    db: DbSession,
+    user: OptionalUser,
+    x_view_token: Annotated[str | None, Header(alias="X-View-Token")] = None,
+) -> PublicShareResponse:
+    """Resolve a public share by short_code.
+
+    Distinguishes 404 (never existed) from 410 (was tombstoned) per D-BL2 +
+    D14 — search engines drop 410'd URLs from their index cleanly.
+
+    Side-effect: records a view event (best-effort, never blocks) per D3.
+    Owner self-views, bot UAs, and within-24h dedup'd views are skipped.
+    `X-View-Token` is the mobile per-install dedup channel (D3.1).
+    """
+    share, was_tombstoned = await share_service.get_public_share_with_tombstone(db, short_code)
     if share is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="share not found")
+        if was_tombstoned:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="share has been deleted",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="share not found",
+        )
+
+    # Best-effort view tracking. record_view never raises; it logs.
+    # Logged-in users use viewer_user_id; mobile uses X-View-Token; anon-web
+    # falls through to the in-process bloom-equivalent.
+    await share_view_service.record_view(
+        db,
+        share,
+        request,
+        viewer_user_id=user.id if user else None,
+        view_token=None if user else x_view_token,
+    )
+
     return PublicShareResponse(
         short_code=share.short_code,
         name=share.name,
@@ -31,9 +70,14 @@ async def resolve_public_share(short_code: str, db: DbSession) -> PublicShareRes
     "/c/{short_code}/qr.png",
     responses={200: {"content": {"image/png": {}}}},
 )
-async def share_qr_png(short_code: str, db: DbSession) -> Response:
-    share = await share_service.get_public_share(db, short_code)
+@limiter.limit(ANON_READ_LIMIT)
+async def share_qr_png(short_code: str, request: Request, db: DbSession) -> Response:
+    """Per D-BL2: also surfaces 410 vs 404 so a tombstoned share's QR
+    endpoint stops serving before the share's URL stops resolving."""
+    share, was_tombstoned = await share_service.get_public_share_with_tombstone(db, short_code)
     if share is None:
+        if was_tombstoned:
+            raise HTTPException(status_code=status.HTTP_410_GONE, detail="share has been deleted")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="share not found")
 
     target_url = f"{settings.public_base_url.rstrip('/')}/c/{short_code}"
