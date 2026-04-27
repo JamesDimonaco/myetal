@@ -13,8 +13,13 @@
       "supportsTablet": true,
       "associatedDomains": [
         "applinks:myetal.app",
+        "applinks:myetal.app",
+        "applinks:myetal.app",
         "applinks:myetal.app"
-      ]
+      ],
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "app.myetal.mobile",
@@ -59,8 +64,6 @@
         }
       ],
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
