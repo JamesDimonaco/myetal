@@ -55,6 +55,11 @@ async def resolve_public_share(
         view_token=None if user else x_view_token,
     )
 
+    # Fetch related and similar shares in parallel (both are cheap indexed
+    # queries). Best-effort: if either fails the response still works.
+    related_shares = await share_service.get_related_shares(db, share)
+    similar_shares = await share_service.get_similar_shares(db, share)
+
     return PublicShareResponse(
         short_code=share.short_code,
         name=share.name,
@@ -63,6 +68,8 @@ async def resolve_public_share(
         items=[ShareItemResponse.model_validate(i) for i in share.items],
         owner_name=share.owner.name if share.owner else None,
         updated_at=share.updated_at,
+        related_shares=related_shares,
+        similar_shares=similar_shares,
     )
 
 

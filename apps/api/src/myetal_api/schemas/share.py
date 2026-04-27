@@ -75,6 +75,22 @@ class ShareResponse(BaseModel):
     items: list[ShareItemResponse]
 
 
+class RelatedShareOut(BaseModel):
+    """A share that has at least one paper in common with the viewed share."""
+
+    short_code: str
+    name: str
+    papers_in_common: int
+
+
+class SimilarShareOut(BaseModel):
+    """A precomputed similar share (from the nightly `share_similar` cron)."""
+
+    short_code: str
+    name: str
+    papers_in_common: int
+
+
 class PublicShareResponse(BaseModel):
     """What an anonymous QR-scan resolves to. Strips owner_id and audit fields."""
 
@@ -85,3 +101,5 @@ class PublicShareResponse(BaseModel):
     items: list[ShareItemResponse]
     owner_name: str | None
     updated_at: datetime
+    related_shares: list[RelatedShareOut] = Field(default_factory=list)
+    similar_shares: list[SimilarShareOut] = Field(default_factory=list)

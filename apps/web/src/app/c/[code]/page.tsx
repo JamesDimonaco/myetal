@@ -186,6 +186,58 @@ export default async function PublicSharePage({ params }: PageProps) {
         )}
       </section>
 
+      {share.related_shares.length > 0 ? (
+        <section className="mt-16 border-t border-rule pt-8">
+          <h2 className="font-serif text-lg text-ink">Who else shares these papers</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Other public collections with papers in common.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {share.related_shares.map((rs) => (
+              <li key={rs.short_code}>
+                <Link
+                  href={`/c/${rs.short_code}`}
+                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-surface-sunken"
+                >
+                  <span className="text-sm font-medium text-ink group-hover:underline">
+                    {rs.name}
+                  </span>
+                  <span className="ml-3 shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
+                    {rs.papers_in_common} in common
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {share.similar_shares.length > 0 ? (
+        <section className="mt-10 border-t border-rule pt-8">
+          <h2 className="font-serif text-lg text-ink">Similar collections</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Collections with the most overlap in papers.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {share.similar_shares.map((ss) => (
+              <li key={ss.short_code}>
+                <Link
+                  href={`/c/${ss.short_code}`}
+                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-surface-sunken"
+                >
+                  <span className="text-sm font-medium text-ink group-hover:underline">
+                    {ss.name}
+                  </span>
+                  <span className="ml-3 shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
+                    {ss.papers_in_common} in common
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <aside className="mt-16 border-t border-rule pt-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
