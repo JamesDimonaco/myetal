@@ -2,16 +2,21 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { PostHogProvider } from 'posthog-react-native';
 import 'react-native-reanimated';
 
+import { AnalyticsConsent } from '@/components/analytics-consent';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAnalyticsConsent } from '@/hooks/useAnalyticsConsent';
 import { queryClient } from '@/lib/queryClient';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const { consent, accept, decline, isLoading } = useAnalyticsConsent();
 
-  return (
-    <QueryClientProvider client={queryClient}>
+  const content = (
+    <ErrorBoundary>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack
           screenOptions={{
@@ -32,7 +37,29 @@ export default function RootLayout() {
           <Stack.Screen name="(authed)" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
+
+        {/* Show consent modal on first launch when not yet decided */}
+        {consent === null && !isLoading && (
+          <AnalyticsConsent onAccept={accept} onDecline={decline} />
+        )}
       </ThemeProvider>
+    </ErrorBoundary>
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {consent === 'accepted' ? (
+        <PostHogProvider
+          apiKey={process.env.EXPO_PUBLIC_POSTHOG_KEY!}
+          options={{
+            host: process.env.EXPO_PUBLIC_POSTHOG_HOST,
+          }}
+        >
+          {content}
+        </PostHogProvider>
+      ) : (
+        content
+      )}
     </QueryClientProvider>
   );
 }

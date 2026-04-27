@@ -5,12 +5,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAnalytics } from '@/hooks/useAnalytics';
+import { useAnalyticsConsent } from '@/hooks/useAnalyticsConsent';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function ProfileScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
   const { user, signOut } = useAuth();
+  const { reset: resetAnalytics } = useAnalytics();
+  const { reset: resetConsent } = useAnalyticsConsent();
   const [signingOut, setSigningOut] = useState(false);
+
+  const handleResetConsent = () => {
+    resetAnalytics();
+    resetConsent();
+    Alert.alert(
+      'Analytics consent reset',
+      'The app will ask again on next launch.',
+    );
+  };
 
   const handleSignOut = () => {
     Alert.alert('Sign out?', 'You will need to sign in again to manage your shares.', [
@@ -53,6 +66,17 @@ export default function ProfileScreen() {
         ]}
       >
         <Text style={[styles.feedbackText, { color: c.text }]}>Send feedback</Text>
+        <Text style={{ color: c.textMuted, fontSize: 18 }}>{'\u203A'}</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={handleResetConsent}
+        style={({ pressed }) => [
+          styles.feedbackRow,
+          { borderColor: c.border, backgroundColor: c.surface, opacity: pressed ? 0.7 : 1 },
+        ]}
+      >
+        <Text style={[styles.feedbackText, { color: c.text }]}>Reset analytics consent</Text>
         <Text style={{ color: c.textMuted, fontSize: 18 }}>{'\u203A'}</Text>
       </Pressable>
 

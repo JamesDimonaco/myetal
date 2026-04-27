@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
+import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
@@ -14,7 +16,16 @@ import { useAuth } from '@/hooks/useAuth';
  */
 export default function AuthedLayout() {
   const c = Colors[useColorScheme() ?? 'light'];
-  const { isAuthed, isLoading } = useAuth();
+  const { isAuthed, isLoading, user } = useAuth();
+  const analytics = useAnalytics();
+
+  // Identify the user with PostHog when authenticated
+  useEffect(() => {
+    if (user) {
+      analytics.identify(user.id, { email: user.email, name: user.name });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   if (isLoading) {
     return (
