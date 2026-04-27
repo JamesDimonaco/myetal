@@ -25,7 +25,7 @@ The current `/privacy` page is a placeholder. Upgrade to a proper policy coverin
 - **Third-party processors:** Neon (DB), Vercel (web hosting), Cloudflare (CDN/WAF), OpenAlex/Crossref (outbound metadata lookups — no user data sent)
 - **Retention:** 90-day view pruning, 30-day tombstone GC, token cleanup every 24h
 - **Data subject rights:** access (analytics surface + future `/me/export`), deletion (account delete cascade), rectification (profile edit)
-- **Contact:** privacy@myetal.app (or support@myetal.app)
+- **Contact:** dimonaco.james@gmail.com
 - **Last updated date** — auto-rendered or manual
 
 ### 2. Terms of Service
@@ -67,26 +67,27 @@ Add a persistent footer to the root layout (or at least to public pages + dashbo
 - **Centre/right links:**
   - Privacy Policy → `/privacy`
   - Terms of Service → `/terms`
-  - Support → `mailto:support@myetal.app`
-  - GitHub → `https://github.com/JamesDimonaco/myetal` (if public)
+  - Support → `mailto:dimonaco.james@gmail.com`
+  - GitHub → `https://github.com/JamesDimonaco/myetal`
 - **Bottom line:** "© 2026 MyEtAl" or "© 2026 Dama Health"
 
 Design: minimal, `text-ink-faint`, `border-t border-rule`, matches the academic aesthetic.
 
-### 6. Support Email
+### 6. Contact Email
 
-- Set up `support@myetal.app` email forwarding (→ james@damahealth.com or personal)
-- Optionally `privacy@myetal.app` as a separate alias
+- Use `dimonaco.james@gmail.com` for all support/privacy queries for now
+- Custom domain emails (`support@myetal.app`, `privacy@myetal.app`) are a future upgrade
 - Reference in privacy policy, terms, and footer
 
 ---
 
-## Decisions needed before starting
+## Decisions (resolved)
 
-1. **Legal entity** — "MyEtAl" or "Dama Health Ltd"? This goes on the privacy policy, terms, and copyright line.
-2. **Governing law** — England & Wales? (simplest if entity is UK)
-3. **GitHub repo public or private?** — affects whether we link it in the footer
-4. **Data export scope** — what goes in the ZIP? Shares + items + library + profile? Views? Reports?
+1. **Legal entity** — MyEtAl (no formal company yet)
+2. **Governing law** — England & Wales
+3. **GitHub repo** — public: https://github.com/JamesDimonaco/myetal
+4. **Contact email** — dimonaco.james@gmail.com (no custom domain emails yet)
+5. **Data export scope** — deferred to follow-up ticket
 
 ---
 
