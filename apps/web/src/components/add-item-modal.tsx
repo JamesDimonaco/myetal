@@ -12,7 +12,7 @@
  * kind without re-deriving the shape.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ApiError } from '@/lib/api';
 import type { RepoInfo } from '@/lib/github';
@@ -22,6 +22,83 @@ import {
   useSearchPapers,
 } from '@/lib/hooks/usePapers';
 import type { Paper, PaperSearchResult } from '@/types/paper';
+
+type SortOption = 'relevance' | 'newest' | 'oldest' | 'most-cited';
+
+const SORT_OPTIONS: { id: SortOption; label: string }[] = [
+  { id: 'relevance', label: 'Relevance' },
+  { id: 'newest', label: 'Newest first' },
+  { id: 'oldest', label: 'Oldest first' },
+  { id: 'most-cited', label: 'Most cited' },
+];
+
+function sortResults(
+  results: PaperSearchResult[],
+  sort: SortOption,
+): PaperSearchResult[] {
+  if (sort === 'relevance') return results;
+  const sorted = [...results];
+  switch (sort) {
+    case 'newest':
+      sorted.sort((a, b) => {
+        const da = a.publication_date ?? String(a.year ?? '0');
+        const db = b.publication_date ?? String(b.year ?? '0');
+        return db.localeCompare(da);
+      });
+      break;
+    case 'oldest':
+      sorted.sort((a, b) => {
+        const da = a.publication_date ?? String(a.year ?? '9999');
+        const db = b.publication_date ?? String(b.year ?? '9999');
+        return da.localeCompare(db);
+      });
+      break;
+    case 'most-cited':
+      sorted.sort((a, b) => b.cited_by_count - a.cited_by_count);
+      break;
+  }
+  return sorted;
+}
+
+function filterResults(
+  results: PaperSearchResult[],
+  filters: {
+    oaOnly: boolean;
+    activeTypes: Set<string>;
+    yearFrom: string;
+    yearTo: string;
+    authorFilter: string;
+  },
+): PaperSearchResult[] {
+  let filtered = results;
+  if (filters.oaOnly) {
+    filtered = filtered.filter((r) => r.open_access?.is_oa);
+  }
+  if (filters.activeTypes.size > 0) {
+    filtered = filtered.filter(
+      (r) => r.type !== null && filters.activeTypes.has(r.type),
+    );
+  }
+  if (filters.yearFrom) {
+    const from = Number(filters.yearFrom);
+    if (!isNaN(from)) {
+      filtered = filtered.filter((r) => (r.year ?? 0) >= from);
+    }
+  }
+  if (filters.yearTo) {
+    const to = Number(filters.yearTo);
+    if (!isNaN(to)) {
+      filtered = filtered.filter((r) => (r.year ?? 9999) <= to);
+    }
+  }
+  if (filters.authorFilter.trim()) {
+    const needle = filters.authorFilter.trim().toLowerCase();
+    filtered = filtered.filter(
+      (r) => r.authors && r.authors.toLowerCase().includes(needle),
+    );
+  }
+  return filtered;
+}
 
 type Kind = 'paper' | 'repo' | 'link';
 type PaperMode = 'doi' | 'search' | 'manual';
@@ -95,7 +172,7 @@ export function AddItemModal({ onClose, onPick }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex w-full max-w-xl flex-col rounded-xl border border-rule bg-paper shadow-2xl" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
+      <div className="flex w-full max-w-xl flex-col rounded-xl border border-rule bg-paper shadow-2xl sm:max-w-3xl" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
         <div className="flex items-start justify-between gap-3 border-b border-rule px-6 py-4">
           <h2 id="add-item-title" className="font-serif text-xl text-ink">
             {titleByKind[kind]}
@@ -248,6 +325,54 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
   const debounced = useDebouncedValue(input, DEBOUNCE_MS);
   const search = useSearchPapers(debounced);
 
+  // Sort & filter state
+  const [sort, setSort] = useState<SortOption>('relevance');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [oaOnly, setOaOnly] = useState(false);
+  const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
+  const [yearFrom, setYearFrom] = useState('');
+  const [yearTo, setYearTo] = useState('');
+  const [authorFilter, setAuthorFilter] = useState('');
+
+  const rawResults = search.data?.results ?? [];
+
+  // Collect unique types present in raw results for filter pills
+  const availableTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const r of rawResults) {
+      if (r.type) types.add(r.type);
+    }
+    return Array.from(types).sort();
+  }, [rawResults]);
+
+  const toggleType = useCallback((t: string) => {
+    setActiveTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  }, []);
+
+  // Apply filter + sort
+  const processed = useMemo(() => {
+    const filtered = filterResults(rawResults, {
+      oaOnly,
+      activeTypes,
+      yearFrom,
+      yearTo,
+      authorFilter,
+    });
+    return sortResults(filtered, sort);
+  }, [rawResults, oaOnly, activeTypes, yearFrom, yearTo, authorFilter, sort]);
+
+  const hasActiveFilters =
+    oaOnly ||
+    activeTypes.size > 0 ||
+    yearFrom !== '' ||
+    yearTo !== '' ||
+    authorFilter.trim() !== '';
+
   const trimmed = input.trim();
 
   return (
@@ -276,6 +401,183 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
         </span>
       </label>
 
+      {/* Sort + filter controls — visible once we have results */}
+      {rawResults.length > 0 && !picked ? (
+        <div className="grid gap-2">
+          {/* Sort dropdown + filter toggle row */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                  Sort
+                </span>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as SortOption)}
+                  className="rounded border border-rule bg-paper px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                >
+                  {SORT_OPTIONS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((p) => !p)}
+                className={[
+                  'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition',
+                  filtersOpen || hasActiveFilters
+                    ? 'bg-accent-soft text-accent'
+                    : 'text-ink-muted hover:text-ink',
+                ].join(' ')}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden
+                >
+                  <path
+                    d="M2 4h12M4 8h8M6 12h4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Filters
+                {hasActiveFilters ? (
+                  <span className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-paper">
+                    {(oaOnly ? 1 : 0) +
+                      activeTypes.size +
+                      (yearFrom ? 1 : 0) +
+                      (yearTo ? 1 : 0) +
+                      (authorFilter.trim() ? 1 : 0)}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+            {/* Result count */}
+            <span className="text-xs text-ink-faint">
+              {hasActiveFilters
+                ? `${processed.length} of ${rawResults.length} results`
+                : `${rawResults.length} results`}
+            </span>
+          </div>
+
+          {/* Collapsible filter panel */}
+          {filtersOpen ? (
+            <div className="grid gap-3 rounded-md border border-rule bg-paper-soft p-3">
+              {/* Open Access toggle */}
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={oaOnly}
+                  onChange={(e) => setOaOnly(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-rule accent-accent"
+                />
+                <span className="text-xs font-medium text-ink">
+                  Open Access only
+                </span>
+              </label>
+
+              {/* Type pills */}
+              {availableTypes.length > 0 ? (
+                <div>
+                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                    Type
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {availableTypes.map((t) => {
+                      const active = activeTypes.has(t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => toggleType(t)}
+                          className={[
+                            'rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider transition',
+                            active
+                              ? 'border-accent bg-accent-soft text-accent'
+                              : 'border-rule bg-paper text-ink-muted hover:text-ink',
+                          ].join(' ')}
+                        >
+                          {t.replace('-', ' ')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Year range */}
+              <div>
+                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                  Year range
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={yearFrom}
+                    onChange={(e) =>
+                      setYearFrom(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))
+                    }
+                    placeholder="From"
+                    inputMode="numeric"
+                    className="w-20 rounded border border-rule bg-paper px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                  />
+                  <span className="text-xs text-ink-faint">to</span>
+                  <input
+                    type="text"
+                    value={yearTo}
+                    onChange={(e) =>
+                      setYearTo(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))
+                    }
+                    placeholder="To"
+                    inputMode="numeric"
+                    className="w-20 rounded border border-rule bg-paper px-2 py-1 text-xs text-ink outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+
+              {/* Author filter */}
+              <div>
+                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                  Filter by author
+                </span>
+                <input
+                  type="text"
+                  value={authorFilter}
+                  onChange={(e) => setAuthorFilter(e.target.value)}
+                  placeholder="e.g. Vaswani"
+                  autoComplete="off"
+                  className="w-full rounded border border-rule bg-paper px-2 py-1 text-xs text-ink outline-none focus:border-accent sm:w-48"
+                />
+              </div>
+
+              {/* Clear all filters */}
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOaOnly(false);
+                    setActiveTypes(new Set());
+                    setYearFrom('');
+                    setYearTo('');
+                    setAuthorFilter('');
+                  }}
+                  className="text-left text-[11px] font-medium text-accent hover:underline"
+                >
+                  Clear all filters
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="min-h-[180px]">
         {picked ? (
           <PaperPreview paper={picked} onPick={onPick} />
@@ -288,14 +590,19 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
           <LoadingRow text="Searching…" />
         ) : search.isError ? (
           <ErrorBanner error={search.error} />
-        ) : search.data && search.data.results.length === 0 ? (
+        ) : rawResults.length === 0 ? (
           <EmptyHint
             title="Nothing matched"
             body="Try a different phrasing or fall back to Manual."
           />
-        ) : search.data ? (
+        ) : processed.length === 0 ? (
+          <EmptyHint
+            title="No results match filters"
+            body="Try loosening the filters above."
+          />
+        ) : (
           <ul className="grid gap-2">
-            {search.data.results.map((r, idx) => (
+            {processed.map((r, idx) => (
               <li key={`${r.doi ?? r.title}-${idx}`}>
                 <button
                   type="button"
@@ -350,7 +657,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
               </li>
             ))}
           </ul>
-        ) : null}
+        )}
       </div>
     </div>
   );
