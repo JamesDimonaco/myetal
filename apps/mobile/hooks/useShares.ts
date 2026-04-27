@@ -87,3 +87,20 @@ export function useUnpublishShare(id: string) {
     },
   });
 }
+
+/** Analytics data for a single share (D10). */
+export interface ShareAnalytics {
+  total_views: number;
+  views_last_7d: number;
+  views_last_30d: number;
+  daily_views: { date: string; count: number }[];
+}
+
+/** Fetch owner analytics for a share. */
+export function useShareAnalytics(id: string | undefined) {
+  return useQuery({
+    queryKey: id ? ['shares', id, 'analytics'] : ['shares', 'unknown', 'analytics'],
+    queryFn: () => api<ShareAnalytics>(`/shares/${id}/analytics`),
+    enabled: Boolean(id) && id !== 'new',
+  });
+}

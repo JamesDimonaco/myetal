@@ -1,13 +1,19 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import Date, cast, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from myetal_api.core.security import generate_short_code
-from myetal_api.models import Share, ShareItem
-from myetal_api.schemas.share import ShareCreate, ShareItemCreate, ShareUpdate
+from myetal_api.models import Share, ShareItem, ShareView
+from myetal_api.schemas.share import (
+    DailyViewCount,
+    ShareAnalyticsResponse,
+    ShareCreate,
+    ShareItemCreate,
+    ShareUpdate,
+)
 
 _MAX_SHORT_CODE_ATTEMPTS = 10
 
@@ -164,6 +170,57 @@ async def unpublish_share(db: AsyncSession, share: Share) -> Share:
         share.published_at = None
         await db.commit()
     return share
+
+
+async def get_share_analytics(
+    db: AsyncSession,
+    share_id: uuid.UUID,
+) -> ShareAnalyticsResponse:
+    """Compute view analytics for a share (D10).
+
+    Two queries: one for the aggregate counts (total, 7d, 30d) and one for the
+    daily breakdown over the last 30 days. Owner self-views are already excluded
+    at write time so no filter is needed here.
+    """
+    now_expr = func.now()
+
+    # Aggregate counts
+    agg_stmt = select(
+        func.count().label("total"),
+        func.count()
+        .filter(ShareView.viewed_at > now_expr - text("interval '7 days'"))
+        .label("last_7d"),
+        func.count()
+        .filter(ShareView.viewed_at > now_expr - text("interval '30 days'"))
+        .label("last_30d"),
+    ).where(ShareView.share_id == share_id)
+
+    agg_row = (await db.execute(agg_stmt)).one()
+
+    # Daily breakdown (last 30 days)
+    daily_stmt = (
+        select(
+            cast(ShareView.viewed_at, Date).label("date"),
+            func.count().label("count"),
+        )
+        .where(
+            ShareView.share_id == share_id,
+            ShareView.viewed_at > now_expr - text("interval '30 days'"),
+        )
+        .group_by(cast(ShareView.viewed_at, Date))
+        .order_by(cast(ShareView.viewed_at, Date))
+    )
+
+    daily_rows = (await db.execute(daily_stmt)).all()
+
+    return ShareAnalyticsResponse(
+        total_views=agg_row.total,
+        views_last_7d=agg_row.last_7d,
+        views_last_30d=agg_row.last_30d,
+        daily_views=[
+            DailyViewCount(date=str(r.date), count=r.count) for r in daily_rows
+        ],
+    )
 
 
 # ---------- internals ----------
