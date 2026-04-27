@@ -15,7 +15,9 @@ import { ApiError } from '@/lib/api';
 import {
   useCreateShare,
   useDeleteShare,
+  usePublishShare,
   useShare,
+  useUnpublishShare,
   useUpdateShare,
 } from '@/lib/hooks/useShares';
 import type { Paper } from '@/types/paper';
@@ -62,7 +64,6 @@ const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
   description: z.string().trim().optional().or(z.literal('')),
   type: z.enum(['paper', 'collection', 'poster', 'grant', 'project']),
-  is_public: z.boolean(),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
@@ -174,11 +175,15 @@ export function ShareEditor({ initial, id }: Props) {
   const createMutation = useCreateShare();
   const updateMutation = useUpdateShare(id ?? '');
   const deleteMutation = useDeleteShare();
+  const publishMutation = usePublishShare(id ?? '');
+  const unpublishMutation = useUnpublishShare(id ?? '');
 
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [shareType, setShareType] = useState<ShareType>(initial?.type ?? 'paper');
-  const [isPublic, setIsPublic] = useState(initial?.is_public ?? true);
+  const [publishedAt, setPublishedAt] = useState<string | null>(
+    initial?.published_at ?? null,
+  );
   const [items, setItems] = useState<DraftItem[]>(
     initial && initial.items.length
       ? initial.items.map(fromResponseItem)
@@ -243,7 +248,6 @@ export function ShareEditor({ initial, id }: Props) {
       name,
       description,
       type: shareType,
-      is_public: isPublic,
       items,
     });
     if (!parsed.success) {
@@ -268,7 +272,6 @@ export function ShareEditor({ initial, id }: Props) {
       name: parsed.data.name,
       description: parsed.data.description ? parsed.data.description : null,
       type: parsed.data.type,
-      is_public: parsed.data.is_public,
       items: apiItems,
     };
 
@@ -356,32 +359,58 @@ export function ShareEditor({ initial, id }: Props) {
           </div>
         </Field>
 
-        {/* Public toggle */}
-        <div className="flex items-start justify-between gap-4 rounded-md border border-rule bg-paper-soft p-4">
-          <div>
-            <p className="text-sm font-semibold text-ink">Public</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Anyone with the QR can view this collection.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={isPublic}
-            onClick={() => setIsPublic((v) => !v)}
-            className={[
-              'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition',
-              isPublic ? 'bg-accent' : 'bg-ink-faint',
-            ].join(' ')}
-          >
-            <span
+        {/* Publish to discovery toggle — only shown for existing shares */}
+        {!isNew ? (
+          <div className="flex items-start justify-between gap-4 rounded-md border border-rule bg-paper-soft p-4">
+            <div>
+              <p className="text-sm font-semibold text-ink">
+                Publish to discovery
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">
+                Make this share discoverable in search, similar shares, and
+                trending.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={publishedAt !== null}
+              disabled={
+                publishMutation.isPending || unpublishMutation.isPending
+              }
+              onClick={async () => {
+                try {
+                  if (publishedAt) {
+                    const updated =
+                      await unpublishMutation.mutateAsync();
+                    setPublishedAt(updated.published_at);
+                  } else {
+                    const updated =
+                      await publishMutation.mutateAsync();
+                    setPublishedAt(updated.published_at);
+                  }
+                } catch (err) {
+                  setError(
+                    err instanceof ApiError
+                      ? err.detail
+                      : 'Failed to update discovery status',
+                  );
+                }
+              }}
               className={[
-                'inline-block h-5 w-5 transform rounded-full bg-paper shadow transition',
-                isPublic ? 'translate-x-5' : 'translate-x-0.5',
+                'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:opacity-60',
+                publishedAt ? 'bg-accent' : 'bg-ink-faint',
               ].join(' ')}
-            />
-          </button>
-        </div>
+            >
+              <span
+                className={[
+                  'inline-block h-5 w-5 transform rounded-full bg-paper shadow transition',
+                  publishedAt ? 'translate-x-5' : 'translate-x-0.5',
+                ].join(' ')}
+              />
+            </button>
+          </div>
+        ) : null}
 
         {/* Items */}
         <div>

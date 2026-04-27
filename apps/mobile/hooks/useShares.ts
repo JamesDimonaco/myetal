@@ -61,3 +61,29 @@ export function useDeleteShare() {
     },
   });
 }
+
+/** POST /shares/{id}/publish — opt into discovery surfaces. */
+export function usePublishShare(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<ShareResponse>(`/shares/${id}/publish`, { method: 'POST' }),
+    onSuccess: (updated) => {
+      qc.setQueryData(shareKey(updated.id), updated);
+      qc.invalidateQueries({ queryKey: SHARES_KEY });
+    },
+  });
+}
+
+/** DELETE /shares/{id}/publish — remove from discovery surfaces. */
+export function useUnpublishShare(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<ShareResponse>(`/shares/${id}/publish`, { method: 'DELETE' }),
+    onSuccess: (updated) => {
+      qc.setQueryData(shareKey(updated.id), updated);
+      qc.invalidateQueries({ queryKey: SHARES_KEY });
+    },
+  });
+}

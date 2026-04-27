@@ -23,7 +23,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   useCreateShare,
   useDeleteShare,
+  usePublishShare,
   useShare,
+  useUnpublishShare,
   useUpdateShare,
 } from '@/hooks/useShares';
 import { ApiError } from '@/lib/api';
@@ -61,7 +63,6 @@ const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
   description: z.string().trim().optional().or(z.literal('')),
   type: z.enum(['paper', 'collection', 'poster', 'grant']),
-  is_public: z.boolean(),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
@@ -147,11 +148,13 @@ export default function ShareEditorScreen() {
   const createMutation = useCreateShare();
   const updateMutation = useUpdateShare(id ?? '');
   const deleteMutation = useDeleteShare();
+  const publishMutation = usePublishShare(id ?? '');
+  const unpublishMutation = useUnpublishShare(id ?? '');
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [shareType, setShareType] = useState<ShareType>('paper');
-  const [isPublic, setIsPublic] = useState(true);
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -164,7 +167,7 @@ export default function ShareEditorScreen() {
     setName(existing.data.name);
     setDescription(existing.data.description ?? '');
     setShareType(existing.data.type);
-    setIsPublic(existing.data.is_public);
+    setPublishedAt(existing.data.published_at ?? null);
     setItems(
       existing.data.items.length
         ? existing.data.items.map(fromResponseItem)
@@ -230,7 +233,6 @@ export default function ShareEditorScreen() {
       name,
       description,
       type: shareType,
-      is_public: isPublic,
       items,
     });
     if (!parsed.success) {
@@ -258,7 +260,6 @@ export default function ShareEditorScreen() {
       name: parsed.data.name,
       description: parsed.data.description ? parsed.data.description : null,
       type: parsed.data.type,
-      is_public: parsed.data.is_public,
       items: apiItems,
     };
 
@@ -408,16 +409,43 @@ export default function ShareEditorScreen() {
             </View>
           </View>
 
-          {/* Public toggle */}
-          <View style={[styles.field, styles.row]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowTitle, { color: c.text }]}>Public</Text>
-              <Text style={[styles.rowSub, { color: c.textMuted }]}>
-                Anyone with the QR can view this collection.
-              </Text>
+          {/* Publish to discovery toggle — only for existing shares */}
+          {!isNew ? (
+            <View style={[styles.field, styles.row]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowTitle, { color: c.text }]}>
+                  Publish to discovery
+                </Text>
+                <Text style={[styles.rowSub, { color: c.textMuted }]}>
+                  Make this share discoverable in search, similar shares, and
+                  trending.
+                </Text>
+              </View>
+              <Switch
+                value={publishedAt !== null}
+                disabled={
+                  publishMutation.isPending || unpublishMutation.isPending
+                }
+                onValueChange={async (value) => {
+                  try {
+                    if (value) {
+                      const updated = await publishMutation.mutateAsync();
+                      setPublishedAt(updated.published_at);
+                    } else {
+                      const updated = await unpublishMutation.mutateAsync();
+                      setPublishedAt(updated.published_at);
+                    }
+                  } catch (err) {
+                    setError(
+                      err instanceof ApiError
+                        ? err.detail
+                        : 'Failed to update discovery status',
+                    );
+                  }
+                }}
+              />
             </View>
-            <Switch value={isPublic} onValueChange={setIsPublic} />
-          </View>
+          ) : null}
 
           {/* Items */}
           <View style={styles.itemsHeader}>

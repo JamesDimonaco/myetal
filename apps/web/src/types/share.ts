@@ -47,6 +47,10 @@ export interface ShareResponse {
   description: string | null;
   type: ShareType;
   is_public: boolean;
+  /** Discovery opt-in (D1). null = not published; ISO timestamp = published. */
+  published_at: string | null;
+  /** Tombstone marker (D14). null = live; ISO timestamp = soft-deleted. */
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
   items: ShareItem[];
