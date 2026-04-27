@@ -5,7 +5,10 @@ from myetal_api.models.paper import Paper, PaperSource
 from myetal_api.models.refresh_token import RefreshToken
 from myetal_api.models.share import ItemKind, Share, ShareItem, ShareType
 from myetal_api.models.share_paper import SharePaper
-from myetal_api.models.social import ShareComment, ShareFavorite
+from myetal_api.models.share_report import ShareReport, ShareReportReason, ShareReportStatus
+from myetal_api.models.share_similar import ShareSimilar
+from myetal_api.models.share_view import ShareView
+from myetal_api.models.trending_share import TrendingShare
 from myetal_api.models.user import User
 from myetal_api.models.user_paper import UserPaper, UserPaperAddedVia
 
@@ -20,11 +23,15 @@ __all__ = [
     "PaperSource",
     "RefreshToken",
     "Share",
-    "ShareComment",
-    "ShareFavorite",
     "ShareItem",
     "SharePaper",
+    "ShareReport",
+    "ShareReportReason",
+    "ShareReportStatus",
+    "ShareSimilar",
     "ShareType",
+    "ShareView",
+    "TrendingShare",
     "User",
     "UserPaper",
     "UserPaperAddedVia",

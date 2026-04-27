@@ -1,8 +1,9 @@
 import enum
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from myetal_api.models.base import Base, TimestampMixin
@@ -46,6 +47,20 @@ class Share(Base, TimestampMixin):
         nullable=False,
     )
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Discovery opt-in: NULL = link-shareable only; non-null = appears in
+    # discovery surfaces (sitemap, similar-shares, who-else-shares-this,
+    # future trending). See discovery ticket D1.
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    # Tombstone for "soft" delete (D14). Set by DELETE /shares/{id};
+    # excluded from public read paths; permanently dropped by a 30-day cron.
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
 
     owner: Mapped["User"] = relationship(back_populates="shares")
     items: Mapped[list["ShareItem"]] = relationship(

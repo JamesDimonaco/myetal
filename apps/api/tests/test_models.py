@@ -9,11 +9,15 @@ from myetal_api.models import (
     PaperSource,
     RefreshToken,
     Share,
-    ShareComment,
-    ShareFavorite,
     ShareItem,
     SharePaper,
+    ShareReport,
+    ShareReportReason,
+    ShareReportStatus,
+    ShareSimilar,
     ShareType,
+    ShareView,
+    TrendingShare,
     User,
     UserPaper,
     UserPaperAddedVia,
@@ -27,12 +31,14 @@ def test_all_tables_registered_on_metadata() -> None:
         "refresh_tokens",
         "shares",
         "share_items",
-        "share_comments",
-        "share_favorites",
         "papers",
         "share_papers",
         "user_papers",
         "orcid_sync_runs",
+        "share_views",
+        "share_similar",
+        "trending_shares",
+        "share_reports",
     }
 
 
@@ -71,6 +77,20 @@ def test_orcid_sync_status_values() -> None:
     }
 
 
+def test_share_report_reason_values() -> None:
+    assert {r.value for r in ShareReportReason} == {
+        "copyright",
+        "spam",
+        "abuse",
+        "pii",
+        "other",
+    }
+
+
+def test_share_report_status_values() -> None:
+    assert {s.value for s in ShareReportStatus} == {"open", "actioned", "dismissed"}
+
+
 def test_models_are_classes() -> None:
     for cls in (
         User,
@@ -78,11 +98,13 @@ def test_models_are_classes() -> None:
         RefreshToken,
         Share,
         ShareItem,
-        ShareComment,
-        ShareFavorite,
         Paper,
         SharePaper,
         UserPaper,
         OrcidSyncRun,
+        ShareView,
+        ShareSimilar,
+        TrendingShare,
+        ShareReport,
     ):
         assert hasattr(cls, "__tablename__")
