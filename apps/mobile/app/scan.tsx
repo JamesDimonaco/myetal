@@ -58,7 +58,7 @@ export default function ScanScreen() {
             Camera access needed
           </Text>
           <Text style={[styles.permissionBodyText, { color: c.textMuted }]}>
-            MyEtal uses the camera only to scan QR codes from posters and slides.
+            MyEtAl uses the camera only to scan QR codes from posters and slides.
             Nothing is recorded, nothing leaves your device.
           </Text>
         </View>
@@ -117,7 +117,7 @@ export default function ScanScreen() {
           entering={FadeIn.duration(400).delay(120)}
           style={styles.hint}
         >
-          {locked ? 'Got it — opening' : 'Point at a MyEtal QR'}
+          {locked ? 'Got it — opening' : 'Point at a MyEtAl QR'}
         </Animated.Text>
 
         <View style={styles.fallbackWrap}>

@@ -27,7 +27,7 @@ from myetal_api.core.rate_limit import limiter
 configure_logging()
 init_sentry()
 
-app = FastAPI(title="MyEtal API", version=__version__)
+app = FastAPI(title="MyEtAl API", version=__version__)
 
 # slowapi binds to app.state.limiter and registers a 429 handler.
 app.state.limiter = limiter

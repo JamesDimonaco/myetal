@@ -360,7 +360,7 @@ function describeError(error: unknown): {
     if (error.status >= 500) {
       return {
         title: 'Server hiccup',
-        body: 'The MyEtal backend ran into a problem. Try again in a moment.',
+        body: 'The MyEtAl backend ran into a problem. Try again in a moment.',
         icon: 'alert-circle-outline',
       };
     }
@@ -372,7 +372,7 @@ function describeError(error: unknown): {
   }
   // fetch() throws TypeError on network failure
   return {
-    title: "Can't reach MyEtal",
+    title: "Can't reach MyEtAl",
     body: 'Check your connection and try again.',
     icon: 'cloud-offline-outline',
   };

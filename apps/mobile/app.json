@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MyEtal",
+    "name": "MyEtAl",
     "slug": "myetal",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -89,7 +89,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow MyEtal to access your camera so you can scan QR codes from posters and slides."
+          "cameraPermission": "Allow MyEtAl to access your camera so you can scan QR codes from posters and slides."
         }
       ],
       "expo-secure-store"
