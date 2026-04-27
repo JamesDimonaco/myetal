@@ -103,7 +103,7 @@ export default function PrivacyPage() {
             </li>
           </ul>
           <p className="mt-2">
-            We query <strong>OpenAlex</strong> and <strong>Crossref</strong> to
+            We query <strong>OpenAlex</strong> and <strong> Crossref</strong> to
             look up paper metadata (titles, authors, DOIs). These are outbound
             lookups &mdash; no user personal data is sent to these services.
           </p>
