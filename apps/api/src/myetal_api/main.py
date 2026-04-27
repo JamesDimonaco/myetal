@@ -11,6 +11,7 @@ from myetal_api.api.routes import papers as papers_routes
 from myetal_api.api.routes import public as public_routes
 from myetal_api.api.routes import reports as reports_routes
 from myetal_api.api.routes import shares as shares_routes
+from myetal_api.api.routes import works as works_routes
 from myetal_api.core.config import settings
 from myetal_api.core.observability import (
     RequestIDMiddleware,
@@ -54,3 +55,4 @@ app.include_router(shares_routes.router)
 app.include_router(papers_routes.router)
 app.include_router(public_routes.router)
 app.include_router(reports_routes.router)
+app.include_router(works_routes.router)
