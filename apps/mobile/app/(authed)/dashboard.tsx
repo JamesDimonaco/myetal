@@ -121,6 +121,8 @@ export default function DashboardScreen() {
               <Text style={[styles.meta, { color: c.textMuted }]}>
                 {item.items.length} {item.items.length === 1 ? 'item' : 'items'}
                 {item.is_public ? '' : ' · private'}
+                {' · '}
+                <Text style={styles.typeTag}>{item.type}</Text>
               </Text>
             </View>
             <View style={styles.actionsRow}>
@@ -186,6 +188,7 @@ const styles = StyleSheet.create({
   code: { fontSize: 12, fontVariant: ['tabular-nums'], letterSpacing: 0.5, marginBottom: Spacing.xs },
   name: { fontSize: 17, fontWeight: '600', lineHeight: 23 },
   meta: { fontSize: 13, marginTop: Spacing.xs },
+  typeTag: { textTransform: 'capitalize' },
 
   actionsRow: { flexDirection: 'row', gap: Spacing.sm },
   action: {

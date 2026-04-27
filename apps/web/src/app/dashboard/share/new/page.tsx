@@ -14,7 +14,8 @@ export default function NewSharePage() {
           Create a share
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
-          One QR code, one collection. Add as many papers as you like.
+          One QR code, one collection. Add papers, repos, links -- whatever
+          your audience needs.
         </p>
       </header>
       <ShareEditor />

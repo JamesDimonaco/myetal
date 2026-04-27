@@ -727,7 +727,7 @@ function ManualPane({ onPick }: { onPick: (p: Paper) => void }) {
         disabled={!canSave}
         className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
       >
-        Add to collection
+        Add to share
       </button>
     </div>
   );
@@ -889,7 +889,7 @@ function RepoKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
             disabled={!canSave}
             className="mt-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
           >
-            Add to project
+            Add to share
           </button>
         </div>
       ) : (
@@ -958,7 +958,7 @@ function LinkKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
         disabled={!canSave}
         className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
       >
-        Add to project
+        Add to share
       </button>
     </div>
   );
@@ -1058,7 +1058,7 @@ function PaperPreview({
         onClick={() => onPick(paper)}
         className="mt-4 w-full rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
       >
-        Add to collection
+        Add to share
       </button>
     </div>
   );

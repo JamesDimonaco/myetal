@@ -4,7 +4,7 @@
  * place, these will be generated and live in packages/types.
  */
 
-export type ShareType = 'paper' | 'collection' | 'poster' | 'grant';
+export type ShareType = 'paper' | 'collection' | 'poster' | 'grant' | 'project';
 
 /**
  * v1 item kinds. Server defaults to 'paper' for legacy rows so this stays
