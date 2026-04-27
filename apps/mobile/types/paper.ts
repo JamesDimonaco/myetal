@@ -14,9 +14,28 @@ export interface Paper {
   source: 'crossref' | 'openalex';
 }
 
-export interface PaperSearchResult extends Paper {
-  /** OpenAlex relevance score; higher is better. Unitless. */
+export interface OpenAccessInfo {
+  is_oa: boolean;
+  oa_status: string | null;
+  oa_url: string | null;
+}
+
+export interface TopicInfo {
+  name: string;
   score: number;
+}
+
+export interface PaperSearchResult extends Paper {
+  score: number;
+  cited_by_count: number;
+  type: string | null;
+  publication_date: string | null;
+  is_retracted: boolean;
+  open_access: OpenAccessInfo;
+  pdf_url: string | null;
+  topics: TopicInfo[];
+  keywords: string[];
+  language: string | null;
 }
 
 export interface PaperSearchResponse {

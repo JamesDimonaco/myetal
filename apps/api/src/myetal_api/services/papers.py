@@ -24,7 +24,7 @@ from urllib.parse import quote, quote_plus
 import httpx
 from cachetools import TTLCache
 
-from myetal_api.schemas.papers import PaperMetadata, PaperSearchResult
+from myetal_api.schemas.papers import OpenAccessInfo, PaperMetadata, PaperSearchResult, TopicInfo
 
 POLITE_EMAIL = "team@myetal.app"
 USER_AGENT = f"MyEtalAPI/0.1 (mailto:{POLITE_EMAIL})"
@@ -292,6 +292,43 @@ def _parse_openalex_work(work: dict[str, Any]) -> PaperSearchResult:
     elif title:
         scholar_url = _scholar_url_for_query(title)
 
+    # Enriched fields
+    cited_by_count = work.get("cited_by_count") or 0
+    work_type = work.get("type")
+    publication_date = work.get("publication_date")
+    is_retracted = bool(work.get("is_retracted"))
+    language = work.get("language")
+
+    # Open access
+    oa_raw = work.get("open_access") or {}
+    open_access = OpenAccessInfo(
+        is_oa=bool(oa_raw.get("is_oa")),
+        oa_status=oa_raw.get("oa_status"),
+        oa_url=oa_raw.get("oa_url"),
+    )
+
+    # PDF URL — check locations for a direct PDF link
+    pdf_url: str | None = None
+    for loc in work.get("locations") or []:
+        if isinstance(loc, dict) and loc.get("pdf_url"):
+            pdf_url = loc["pdf_url"]
+            break
+
+    # Topics — top 5 by score
+    topics: list[TopicInfo] = []
+    for t in (work.get("topics") or [])[:5]:
+        if isinstance(t, dict) and t.get("display_name"):
+            topics.append(TopicInfo(
+                name=t["display_name"],
+                score=float(t.get("score", 0)),
+            ))
+
+    # Keywords — top 8 display names
+    keywords: list[str] = []
+    for kw in (work.get("keywords") or [])[:8]:
+        if isinstance(kw, dict) and kw.get("display_name"):
+            keywords.append(kw["display_name"])
+
     return PaperSearchResult(
         doi=doi,
         title=title,
@@ -301,6 +338,15 @@ def _parse_openalex_work(work: dict[str, Any]) -> PaperSearchResult:
         scholar_url=scholar_url,
         source="openalex",
         score=score,
+        cited_by_count=cited_by_count,
+        type=work_type,
+        publication_date=publication_date,
+        is_retracted=is_retracted,
+        open_access=open_access,
+        pdf_url=pdf_url,
+        topics=topics,
+        keywords=keywords,
+        language=language,
     )
 
 

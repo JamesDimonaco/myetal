@@ -95,7 +95,7 @@ export function AddItemModal({ onClose, onPick }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-xl rounded-xl border border-rule bg-paper shadow-2xl">
+      <div className="flex w-full max-w-xl flex-col rounded-xl border border-rule bg-paper shadow-2xl" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
         <div className="flex items-start justify-between gap-3 border-b border-rule px-6 py-4">
           <h2 id="add-item-title" className="font-serif text-xl text-ink">
             {titleByKind[kind]}
@@ -117,33 +117,35 @@ export function AddItemModal({ onClose, onPick }: Props) {
           </button>
         </div>
 
-        <div className="px-6 pt-4">
-          <div className="flex gap-1 rounded-full border border-rule bg-paper-soft p-1">
-            {KINDS.map((k) => {
-              const active = kind === k.id;
-              return (
-                <button
-                  key={k.id}
-                  type="button"
-                  onClick={() => setKind(k.id)}
-                  className={[
-                    'flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition',
-                    active
-                      ? 'bg-ink text-paper'
-                      : 'text-ink-muted hover:text-ink',
-                  ].join(' ')}
-                >
-                  {k.label}
-                </button>
-              );
-            })}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="px-6 pt-4">
+            <div className="flex gap-1 rounded-full border border-rule bg-paper-soft p-1">
+              {KINDS.map((k) => {
+                const active = kind === k.id;
+                return (
+                  <button
+                    key={k.id}
+                    type="button"
+                    onClick={() => setKind(k.id)}
+                    className={[
+                      'flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition',
+                      active
+                        ? 'bg-ink text-paper'
+                        : 'text-ink-muted hover:text-ink',
+                    ].join(' ')}
+                  >
+                    {k.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        <div className="px-6 pb-6 pt-4">
-          {kind === 'paper' ? <PaperKindPane onPick={onPick} /> : null}
-          {kind === 'repo' ? <RepoKindPane onPick={onPick} /> : null}
-          {kind === 'link' ? <LinkKindPane onPick={onPick} /> : null}
+          <div className="px-6 pb-6 pt-4">
+            {kind === 'paper' ? <PaperKindPane onPick={onPick} /> : null}
+            {kind === 'repo' ? <RepoKindPane onPick={onPick} /> : null}
+            {kind === 'link' ? <LinkKindPane onPick={onPick} /> : null}
+          </div>
         </div>
       </div>
     </div>
@@ -300,15 +302,50 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                   onClick={() => setPicked(r)}
                   className="block w-full rounded-md border border-rule bg-paper-soft p-3 text-left transition hover:bg-paper"
                 >
+                  {r.is_retracted ? (
+                    <p className="mb-1.5 rounded bg-danger/10 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-danger">
+                      Retracted
+                    </p>
+                  ) : null}
                   <p className="font-serif text-sm leading-snug text-ink">
                     {r.title}
                   </p>
                   {r.authors ? (
                     <p className="mt-0.5 text-xs text-ink-muted">{r.authors}</p>
                   ) : null}
-                  <p className="mt-0.5 text-xs text-ink-faint">
-                    {[r.container, r.year].filter(Boolean).join(' · ')}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
+                    {r.container ? <span>{r.container}</span> : null}
+                    {r.container && (r.publication_date || r.year) ? <span aria-hidden>·</span> : null}
+                    <span>{r.publication_date ?? r.year}</span>
+                    {r.type ? (
+                      <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+                        {r.type.replace('-', ' ')}
+                      </span>
+                    ) : null}
+                    {r.open_access?.is_oa ? (
+                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-800">
+                        OA{r.open_access.oa_status ? ` · ${r.open_access.oa_status}` : ''}
+                      </span>
+                    ) : null}
+                    {r.cited_by_count > 0 ? (
+                      <span>{r.cited_by_count.toLocaleString()} cited</span>
+                    ) : null}
+                    {r.language && r.language !== 'en' ? (
+                      <span className="uppercase">{r.language}</span>
+                    ) : null}
+                  </div>
+                  {r.keywords.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {r.keywords.slice(0, 4).map((kw) => (
+                        <span
+                          key={kw}
+                          className="rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] text-ink-muted"
+                        >
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </button>
               </li>
             ))}
@@ -626,24 +663,88 @@ function PaperPreview({
   paper,
   onPick,
 }: {
-  paper: Paper;
+  paper: Paper | PaperSearchResult;
   onPick: (p: Paper) => void;
 }) {
+  const isSearch = 'cited_by_count' in paper;
+  const sr = isSearch ? (paper as PaperSearchResult) : null;
+
   return (
     <div className="rounded-md border border-rule bg-paper-soft p-4">
+      {sr?.is_retracted ? (
+        <p className="mb-2 rounded bg-danger/10 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-danger">
+          Retracted — verify before citing
+        </p>
+      ) : null}
       <p className="font-serif text-base leading-snug text-ink">
         {paper.title}
       </p>
       {paper.authors ? (
         <p className="mt-1 text-sm text-ink-muted">{paper.authors}</p>
       ) : null}
-      <p className="mt-1 text-xs text-ink-faint">
-        {[paper.container, paper.year].filter(Boolean).join(' · ')}
-        {' · '}
+      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
+        {paper.container ? <span>{paper.container}</span> : null}
+        {paper.container && (sr?.publication_date || paper.year) ? <span aria-hidden>·</span> : null}
+        <span>{sr?.publication_date ?? paper.year}</span>
+        <span aria-hidden>·</span>
         <span className="uppercase tracking-wider">{paper.source}</span>
-      </p>
+        {sr?.type ? (
+          <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+            {sr.type.replace('-', ' ')}
+          </span>
+        ) : null}
+      </div>
+      {sr ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {sr.open_access?.is_oa ? (
+            <span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-800">
+              Open Access{sr.open_access.oa_status ? ` · ${sr.open_access.oa_status}` : ''}
+            </span>
+          ) : null}
+          {sr.cited_by_count > 0 ? (
+            <span className="text-xs text-ink-muted">
+              {sr.cited_by_count.toLocaleString()} citations
+            </span>
+          ) : null}
+          {sr.pdf_url ? (
+            <a
+              href={sr.pdf_url}
+              target="_blank"
+              rel="noreferrer noopener"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded bg-accent-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent hover:opacity-80"
+            >
+              PDF ↗
+            </a>
+          ) : null}
+        </div>
+      ) : null}
       {paper.doi ? (
         <p className="mt-1 font-mono text-xs text-ink-faint">{paper.doi}</p>
+      ) : null}
+      {sr?.keywords && sr.keywords.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {sr.keywords.slice(0, 5).map((kw) => (
+            <span
+              key={kw}
+              className="rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] text-ink-muted"
+            >
+              {kw}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {sr?.topics && sr.topics.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {sr.topics.slice(0, 3).map((t) => (
+            <span
+              key={t.name}
+              className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent"
+            >
+              {t.name}
+            </span>
+          ))}
+        </div>
       ) : null}
       <button
         type="button"
