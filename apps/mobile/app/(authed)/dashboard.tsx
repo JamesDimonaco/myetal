@@ -145,6 +145,18 @@ export default function DashboardScreen() {
               </Pressable>
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="View share"
+                onPress={() => router.push(`/c/${item.short_code}`)}
+                style={({ pressed }) => [
+                  styles.action,
+                  { borderColor: c.border, opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Ionicons name="eye-outline" size={18} color={c.text} />
+                <Text style={[styles.actionText, { color: c.text }]}>View</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel="Edit share"
                 onPress={() => router.push(`/(authed)/share/${item.id}`)}
                 style={({ pressed }) => [

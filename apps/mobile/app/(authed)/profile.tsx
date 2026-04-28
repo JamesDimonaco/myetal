@@ -12,12 +12,20 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useAnalyticsConsent } from '@/hooks/useAnalyticsConsent';
 import { useAuth } from '@/hooks/useAuth';
+import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
+
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+];
 
 export default function ProfileScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
   const { user, signOut } = useAuth();
   const { reset: resetAnalytics } = useAnalytics();
   const { reset: resetConsent } = useAnalyticsConsent();
+  const { preference, setPreference } = useThemePreference();
   const [signingOut, setSigningOut] = useState(false);
 
   const handleResetConsent = () => {
@@ -59,6 +67,43 @@ export default function ProfileScreen() {
 
           <Text style={[styles.label, { color: c.textMuted }]}>EMAIL</Text>
           <Text style={[styles.value, { color: c.text }]}>{user?.email ?? '—'}</Text>
+        </View>
+      </View>
+
+      {/* Preferences */}
+      <View style={styles.prefsSection}>
+        <Text style={[styles.prefsLabel, { color: c.textMuted }]}>PREFERENCES</Text>
+        <View style={[styles.prefsCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <Text style={[styles.prefsTitle, { color: c.text }]}>Appearance</Text>
+          <View style={styles.themePillRow}>
+            {THEME_OPTIONS.map((opt) => {
+              const active = preference === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setPreference(opt.value)}
+                  style={({ pressed }) => [
+                    styles.themePill,
+                    {
+                      borderColor: active ? c.text : c.border,
+                      backgroundColor: active ? c.text : c.surface,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: active ? c.background : c.text,
+                      fontSize: 13,
+                      fontWeight: '500',
+                    }}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
 
@@ -113,6 +158,22 @@ const styles = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: Spacing.xs },
   value: { fontSize: 17, fontWeight: '500' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.md },
+
+  prefsSection: { marginBottom: Spacing.md },
+  prefsLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: Spacing.sm },
+  prefsCard: {
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.lg,
+  },
+  prefsTitle: { fontSize: 15, fontWeight: '600', marginBottom: Spacing.sm },
+  themePillRow: { flexDirection: 'row', gap: Spacing.xs },
+  themePill: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
 
   feedbackRow: {
     flexDirection: 'row',

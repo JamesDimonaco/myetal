@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -177,6 +177,22 @@ export default function ShareEditorScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [savedShare, setSavedShare] = useState<ShareResponse | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Reset all form state when entering create mode so stale data from a
+  // previously-viewed share doesn't leak into the new-share form.
+  useEffect(() => {
+    if (isNew) {
+      setName('');
+      setDescription('');
+      setShareType('paper');
+      setPublishedAt(null);
+      setItems([]);
+      setError(null);
+      setSavedShare(null);
+      setShowQr(false);
+    }
+  }, [isNew]);
 
   // Hydrate the form once the existing share loads.
   useEffect(() => {
@@ -196,12 +212,16 @@ export default function ShareEditorScreen() {
     setItems((prev) => prev.map((it) => (it._key === key ? { ...it, ...patch } : it)));
   };
 
-  /** Append an item from the add-item modal. */
+  /** Append an item from the add-item modal and scroll it into view. */
   const appendItem = (pending: PendingItem) => {
     const draft = pending.kind === 'paper'
       ? fromPaper(pending.paper)
       : fromPendingItem(pending);
     setItems((prev) => [...prev, draft]);
+    // Short delay so the new row has time to lay out before we scroll.
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
   // Pick up items handed off by the add-item modal. Both the immediate sync
@@ -358,6 +378,7 @@ export default function ShareEditorScreen() {
 
       <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >

@@ -10,6 +10,10 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAnalyticsConsent } from '@/hooks/useAnalyticsConsent';
 import { useSplashGate } from '@/hooks/useSplashGate';
+import {
+  ThemePreferenceContext,
+  useThemePreferenceProvider,
+} from '@/hooks/useThemePreference';
 import { queryClient } from '@/lib/queryClient';
 
 const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY ?? '';
@@ -38,9 +42,29 @@ function MaybePostHog({ enabled, children }: { enabled: boolean; children: React
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const themeCtx = useThemePreferenceProvider();
   const { consent, accept, decline, isLoading } = useAnalyticsConsent();
   useSplashGate();
+
+  return (
+    <ThemePreferenceContext.Provider value={themeCtx}>
+      <RootLayoutInner consent={consent} accept={accept} decline={decline} consentLoading={isLoading} />
+    </ThemePreferenceContext.Provider>
+  );
+}
+
+function RootLayoutInner({
+  consent,
+  accept,
+  decline,
+  consentLoading,
+}: {
+  consent: ReturnType<typeof useAnalyticsConsent>['consent'];
+  accept: ReturnType<typeof useAnalyticsConsent>['accept'];
+  decline: ReturnType<typeof useAnalyticsConsent>['decline'];
+  consentLoading: boolean;
+}) {
+  const colorScheme = useColorScheme();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -70,7 +94,7 @@ export default function RootLayout() {
             </Stack>
             <StatusBar style="auto" />
 
-            {consent === null && !isLoading && (
+            {consent === null && !consentLoading && (
               <AnalyticsConsent onAccept={accept} onDecline={decline} />
             )}
           </ThemeProvider>
