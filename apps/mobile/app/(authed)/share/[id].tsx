@@ -31,9 +31,10 @@ import {
 } from '@/hooks/useShares';
 import { ApiError } from '@/lib/api';
 import {
-  consumePendingPaper,
-  subscribePendingPaper,
-} from '@/lib/pending-paper';
+  consumePendingItem,
+  subscribePendingItem,
+  type PendingItem,
+} from '@/lib/pending-item';
 import type { Paper } from '@/types/paper';
 import type {
   ShareCreateInput,
@@ -131,6 +132,20 @@ const fromPaper = (p: Paper): DraftItem => ({
   image_url: null,
 });
 
+const fromPendingItem = (item: { kind: 'repo' | 'link'; title: string; url: string; subtitle: string | null; image_url: string | null }): DraftItem => ({
+  _key: newKey(),
+  kind: item.kind,
+  title: item.title,
+  scholar_url: '',
+  doi: '',
+  authors: '',
+  year: '',
+  notes: '',
+  url: item.url,
+  subtitle: item.subtitle,
+  image_url: item.image_url,
+});
+
 /**
  * Create / edit share. `id === 'new'` puts the screen in create mode; any
  * other value loads the existing share. After save we surface the QR via the
@@ -182,13 +197,15 @@ export default function ShareEditorScreen() {
   };
 
   /**
-   * Append a paper from the add-paper modal. If the only existing row is the
+   * Append an item from the add-item modal. If the only existing row is the
    * blank seed (no title typed), replace it — that keeps the count honest for
    * a fresh share where the user hadn't manually filled the empty row yet.
    */
-  const appendPaper = (paper: Paper) => {
+  const appendItem = (pending: PendingItem) => {
     setItems((prev) => {
-      const draft = fromPaper(paper);
+      const draft = pending.kind === 'paper'
+        ? fromPaper(pending.paper)
+        : fromPendingItem(pending);
       const onlySeedRow =
         prev.length === 1 &&
         !prev[0].title.trim() &&
@@ -199,16 +216,16 @@ export default function ShareEditorScreen() {
     });
   };
 
-  // Pick up papers handed off by the add-paper modal. Both the immediate sync
+  // Pick up items handed off by the add-item modal. Both the immediate sync
   // (subscribe fires before back-nav settles) and the focus-time consume cover
   // the case where the screen unmounts/remounts during the modal lifecycle.
   useEffect(() => {
-    const queued = consumePendingPaper();
-    if (queued) appendPaper(queued);
-    return subscribePendingPaper((p) => appendPaper(p));
+    const queued = consumePendingItem();
+    if (queued) appendItem(queued);
+    return subscribePendingItem((item) => appendItem(item));
   }, []);
 
-  const openAddPaper = () => {
+  const openAddItem = () => {
     router.push('/(authed)/share/add-paper');
   };
 
@@ -467,7 +484,7 @@ export default function ShareEditorScreen() {
               </Text>
             </View>
             <Pressable
-              onPress={openAddPaper}
+              onPress={openAddItem}
               hitSlop={8}
               style={({ pressed }) => [
                 styles.addItemBtn,
@@ -479,7 +496,7 @@ export default function ShareEditorScreen() {
               ]}
             >
               <Ionicons name="add" size={18} color={c.text} />
-              <Text style={[styles.addText, { color: c.text }]}>Add paper</Text>
+              <Text style={[styles.addText, { color: c.text }]}>Add item</Text>
             </Pressable>
           </View>
 
