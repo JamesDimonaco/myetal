@@ -43,30 +43,3 @@ export function subscribePendingItem(listener: (item: PendingItem) => void): () 
   return () => _listeners.delete(listener);
 }
 
-// ---------- Backwards-compatible aliases ----------
-// These are kept so existing callsites that haven't been migrated yet don't
-// break. They wrap a Paper into the new union automatically.
-
-/** @deprecated Use `setPendingItem` instead. */
-export function setPendingPaper(paper: Paper): void {
-  setPendingItem({ kind: 'paper', paper });
-}
-
-/** @deprecated Use `consumePendingItem` instead. */
-export function consumePendingPaper(): Paper | null {
-  const item = consumePendingItem();
-  if (!item) return null;
-  if (item.kind === 'paper') return item.paper;
-  // Non-paper items are dropped by the legacy consumer — shouldn't happen
-  // since all callers should be migrated, but fail safe.
-  return null;
-}
-
-/** @deprecated Use `subscribePendingItem` instead. */
-export function subscribePendingPaper(listener: (paper: Paper) => void): () => void {
-  const wrapped = (item: PendingItem) => {
-    if (item.kind === 'paper') listener(item.paper);
-  };
-  _listeners.add(wrapped);
-  return () => _listeners.delete(wrapped);
-}

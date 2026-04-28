@@ -12,7 +12,7 @@
  *   ghost      — text-only with optional underline; for footer/links
  */
 import { Ionicons } from '@expo/vector-icons';
-import { ComponentProps, ReactNode } from 'react';
+import { ComponentProps } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
