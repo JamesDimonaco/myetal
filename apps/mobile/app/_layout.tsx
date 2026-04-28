@@ -81,6 +81,7 @@ function RootLayoutInner({
               <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen name="scan" options={{ title: 'Scan' }} />
               <Stack.Screen name="enter-code" options={{ title: 'Enter code' }} />
+              <Stack.Screen name="search" options={{ title: 'Search' }} />
               <Stack.Screen name="c/[code]" options={{ headerBackTitle: 'Home' }} />
               <Stack.Screen
                 name="sign-in"
