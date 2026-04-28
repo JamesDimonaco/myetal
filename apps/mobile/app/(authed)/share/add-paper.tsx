@@ -1,12 +1,13 @@
 /**
- * Add-paper modal. Three input modes:
- *   DOI    -- paste a DOI or DOI URL; debounced lookup against Crossref
- *   Search -- type ≥3 chars; debounced full-text search via OpenAlex
- *   Manual -- escape hatch for grey literature; user fills the row themselves
+ * Add-item modal. Top-level kind picker: Paper / Repo / Link.
  *
- * On confirm we drop the chosen Paper into a module-level outbox
- * (`setPendingPaper`) and pop the modal -- the share editor picks it up via a
- * subscribe-on-mount listener. See `lib/pending-paper.ts`.
+ *   Paper -- three sub-modes: DOI, Search, Manual (original flow)
+ *   Repo  -- paste a GitHub URL, fetch metadata, edit, add
+ *   Link  -- manual form: URL, title, description, image
+ *
+ * On confirm we drop the chosen item into a module-level outbox
+ * (`setPendingItem`) and pop the modal -- the share editor picks it up via a
+ * subscribe-on-mount listener. See `lib/pending-item.ts`.
  *
  * Note on filename: the brief named this `_add-paper.tsx`, but expo-router
  * treats underscore-prefixed files as private (excluded from routes), so the
@@ -16,7 +17,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -39,11 +40,22 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHaptics } from '@/hooks/useHaptics';
 import { extractDoi, useLookupPaper, useSearchPapers } from '@/hooks/usePapers';
 import { ApiError } from '@/lib/api';
-import { setPendingPaper } from '@/lib/pending-paper';
+import { setPendingItem, type PendingItem } from '@/lib/pending-item';
 import type { Paper, PaperSearchResult } from '@/types/paper';
 
-type Mode = 'doi' | 'search' | 'manual';
-const MODES: { id: Mode; label: string }[] = [
+// =========================================================================
+// Top-level kind picker
+// =========================================================================
+
+type ItemKind = 'paper' | 'repo' | 'link';
+const KINDS: { id: ItemKind; label: string }[] = [
+  { id: 'paper', label: 'Paper' },
+  { id: 'repo', label: 'Repo' },
+  { id: 'link', label: 'Link' },
+];
+
+type PaperMode = 'doi' | 'search' | 'manual';
+const PAPER_MODES: { id: PaperMode; label: string }[] = [
   { id: 'doi', label: 'DOI' },
   { id: 'search', label: 'Search' },
   { id: 'manual', label: 'Manual' },
@@ -51,11 +63,11 @@ const MODES: { id: Mode; label: string }[] = [
 
 const DEBOUNCE_MS = 300;
 
-export default function AddPaperScreen() {
+export default function AddItemScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
   const haptics = useHaptics();
 
-  const [mode, setMode] = useState<Mode>('doi');
+  const [kind, setKind] = useState<ItemKind>('paper');
 
   return (
     <KeyboardAvoidingView
@@ -64,7 +76,7 @@ export default function AddPaperScreen() {
     >
       <Stack.Screen
         options={{
-          title: 'Add paper',
+          title: 'Add item',
           presentation: 'modal',
           headerShown: true,
           headerStyle: { backgroundColor: c.background },
@@ -73,19 +85,19 @@ export default function AddPaperScreen() {
       />
 
       <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
-        {/* Mode segmented control */}
-        <View style={styles.segmentRow}>
-          {MODES.map((m) => {
-            const active = mode === m.id;
+        {/* Top-level kind picker */}
+        <View style={styles.kindRow}>
+          {KINDS.map((k) => {
+            const active = kind === k.id;
             return (
               <Pressable
-                key={m.id}
+                key={k.id}
                 onPress={() => {
                   haptics.selection();
-                  setMode(m.id);
+                  setKind(k.id);
                 }}
                 style={({ pressed }) => [
-                  styles.segment,
+                  styles.kindPill,
                   {
                     backgroundColor: active ? c.text : c.surface,
                     borderColor: active ? c.text : c.border,
@@ -95,22 +107,73 @@ export default function AddPaperScreen() {
               >
                 <Text
                   style={[
-                    styles.segmentLabel,
+                    styles.kindPillLabel,
                     { color: active ? c.background : c.text },
                   ]}
                 >
-                  {m.label}
+                  {k.label}
                 </Text>
               </Pressable>
             );
           })}
         </View>
 
-        {mode === 'doi' ? <DoiPane /> : null}
-        {mode === 'search' ? <SearchPane /> : null}
-        {mode === 'manual' ? <ManualPane /> : null}
+        {kind === 'paper' ? <PaperKindPane /> : null}
+        {kind === 'repo' ? <RepoKindPane /> : null}
+        {kind === 'link' ? <LinkKindPane /> : null}
       </SafeAreaView>
     </KeyboardAvoidingView>
+  );
+}
+
+// =========================================================================
+// Paper kind (existing DOI / Search / Manual)
+// =========================================================================
+
+function PaperKindPane() {
+  const c = Colors[useColorScheme() ?? 'light'];
+  const haptics = useHaptics();
+
+  const [mode, setMode] = useState<PaperMode>('doi');
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={styles.segmentRow}>
+        {PAPER_MODES.map((m) => {
+          const active = mode === m.id;
+          return (
+            <Pressable
+              key={m.id}
+              onPress={() => {
+                haptics.selection();
+                setMode(m.id);
+              }}
+              style={({ pressed }) => [
+                styles.segment,
+                {
+                  backgroundColor: active ? c.text : c.surface,
+                  borderColor: active ? c.text : c.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.segmentLabel,
+                  { color: active ? c.background : c.text },
+                ]}
+              >
+                {m.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {mode === 'doi' ? <DoiPane /> : null}
+      {mode === 'search' ? <SearchPane /> : null}
+      {mode === 'manual' ? <ManualPane /> : null}
+    </View>
   );
 }
 
@@ -120,10 +183,12 @@ function PaperPreview({
   paper,
   onAdd,
   busy,
+  added,
 }: {
   paper: Paper;
   onAdd: () => void;
   busy?: boolean;
+  added?: boolean;
 }) {
   const c = Colors[useColorScheme() ?? 'light'];
   return (
@@ -167,7 +232,13 @@ function PaperPreview({
         </Text>
       ) : null}
       <View style={{ height: Spacing.md }} />
-      <Button label="Add to collection" icon="add" onPress={onAdd} loading={busy} />
+      <Button
+        label={added ? 'Added!' : 'Add to collection'}
+        icon={added ? 'checkmark' : 'add'}
+        onPress={onAdd}
+        loading={busy}
+        disabled={added}
+      />
     </Animated.View>
   );
 }
@@ -222,9 +293,20 @@ function describeError(error: unknown): {
   };
 }
 
-function commitPaper(paper: Paper, haptics: ReturnType<typeof useHaptics>) {
+function commitPaper(paper: Paper, haptics: ReturnType<typeof useHaptics>): void {
   haptics.success();
-  setPendingPaper(paper);
+  setPendingItem({ kind: 'paper', paper });
+}
+
+function commitPaperAndNav(paper: Paper, haptics: ReturnType<typeof useHaptics>): void {
+  haptics.success();
+  setPendingItem({ kind: 'paper', paper });
+  router.back();
+}
+
+function commitItem(item: PendingItem, haptics: ReturnType<typeof useHaptics>): void {
+  haptics.success();
+  setPendingItem(item);
   router.back();
 }
 
@@ -288,13 +370,13 @@ function DoiPane() {
           <View style={styles.loadingRow}>
             <ActivityIndicator color={c.text} />
             <Text style={[styles.loadingText, { color: c.textMuted }]}>
-              Looking up {parsedDoi}…
+              Looking up {parsedDoi}...
             </Text>
           </View>
         ) : lookup.isError ? (
           <ErrorBanner error={lookup.error} />
         ) : lookup.data ? (
-          <PaperPreview paper={lookup.data} onAdd={() => commitPaper(lookup.data!, haptics)} />
+          <PaperPreview paper={lookup.data} onAdd={() => commitPaperAndNav(lookup.data!, haptics)} />
         ) : null}
       </View>
     </ScrollView>
@@ -391,7 +473,7 @@ function SearchResultCard({
           <View style={[styles.badge, { backgroundColor: oaColor(result.open_access.oa_status) + '20' }]}>
             <Ionicons name="lock-open-outline" size={10} color={oaColor(result.open_access.oa_status)} />
             <Text style={[styles.badgeText, { color: oaColor(result.open_access.oa_status) }]}>
-              OA{result.open_access.oa_status ? ` · ${result.open_access.oa_status}` : ''}
+              OA{result.open_access.oa_status ? ` \u00b7 ${result.open_access.oa_status}` : ''}
             </Text>
           </View>
         ) : null}
@@ -470,6 +552,7 @@ function SearchPane() {
 
   const [input, setInput] = useState('');
   const [picked, setPicked] = useState<PaperSearchResult | null>(null);
+  const [added, setAdded] = useState(false);
 
   const debounced = useDebouncedValue(input, DEBOUNCE_MS);
   const search = useSearchPapers(debounced);
@@ -477,7 +560,16 @@ function SearchPane() {
   // Reset picked when the user types again -- they're refining the search.
   useEffect(() => {
     setPicked(null);
+    setAdded(false);
   }, [debounced]);
+
+  const handleAdd = useCallback(() => {
+    if (!picked || added) return;
+    commitPaper(picked, haptics);
+    setAdded(true);
+    // Brief success flash, then navigate back
+    setTimeout(() => router.back(), 500);
+  }, [picked, added, haptics]);
 
   const trimmed = input.trim();
 
@@ -490,7 +582,7 @@ function SearchPane() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.paneBody}>
-            <PaperPreview paper={picked} onAdd={() => commitPaper(picked, haptics)} />
+            <PaperPreview paper={picked} onAdd={handleAdd} added={added} />
           </View>
         </ScrollView>
       );
@@ -511,7 +603,7 @@ function SearchPane() {
         <View style={[styles.paneBody, { paddingHorizontal: Spacing.lg }]}>
           <View style={styles.loadingRow}>
             <ActivityIndicator color={c.text} />
-            <Text style={[styles.loadingText, { color: c.textMuted }]}>Searching…</Text>
+            <Text style={[styles.loadingText, { color: c.textMuted }]}>Searching...</Text>
           </View>
         </View>
       );
@@ -623,7 +715,7 @@ function ManualPane() {
       scholar_url: scholarUrl.trim() || null,
       source: 'crossref', // closest fit; manual entries don't have a real source
     };
-    commitPaper(paper, haptics);
+    commitPaperAndNav(paper, haptics);
   };
 
   return (
@@ -679,6 +771,346 @@ function ManualPane() {
     </ScrollView>
   );
 }
+
+// =========================================================================
+// Repo kind
+// =========================================================================
+
+/** Parse a GitHub URL into owner/repo. Returns null for non-GitHub URLs. */
+function parseGithubUrl(url: string): { owner: string; repo: string } | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  // git@github.com:owner/repo(.git)
+  const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/([^/]+?)(\.git)?$/i);
+  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+
+  const withScheme = /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    return null;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (host !== 'github.com' && host !== 'www.github.com') return null;
+
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  if (segments.length < 2) return null;
+
+  const owner = segments[0];
+  let repo = segments[1];
+  if (repo.toLowerCase().endsWith('.git')) repo = repo.slice(0, -4);
+  if (!owner || !repo) return null;
+
+  return { owner, repo };
+}
+
+interface RepoInfo {
+  fullName: string;
+  description: string | null;
+  htmlUrl: string;
+  stars: number;
+  language: string | null;
+  license: string | null;
+  avatarUrl: string | null;
+}
+
+function RepoKindPane() {
+  const c = Colors[useColorScheme() ?? 'light'];
+  const haptics = useHaptics();
+
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState<RepoInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Editable buffer the user can tweak before saving.
+  const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [url, setUrl] = useState('');
+
+  const handleFetch = async () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+
+    const parsed = parseGithubUrl(trimmed);
+    if (!parsed) {
+      setError("That doesn't look like a GitHub repo URL.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setInfo(null);
+
+    try {
+      const apiUrl = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`;
+      const res = await fetch(apiUrl, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'MyEtAl-Mobile/0.1',
+        },
+      });
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          setError("GitHub doesn't know that repo, or it's private.");
+        } else if (res.status === 403) {
+          setError('Rate limited by GitHub. Wait a minute and try again.');
+        } else {
+          setError('Lookup failed. Try again, or fill the fields manually.');
+        }
+        return;
+      }
+
+      const data = await res.json() as Record<string, unknown>;
+      const repoInfo: RepoInfo = {
+        fullName: (typeof data.full_name === 'string' ? data.full_name : `${parsed.owner}/${parsed.repo}`),
+        description: typeof data.description === 'string' ? data.description : null,
+        htmlUrl: typeof data.html_url === 'string' ? data.html_url : `https://github.com/${parsed.owner}/${parsed.repo}`,
+        stars: typeof data.stargazers_count === 'number' ? data.stargazers_count : 0,
+        language: typeof data.language === 'string' ? data.language : null,
+        license: (() => {
+          const lic = data.license as Record<string, unknown> | null | undefined;
+          if (!lic) return null;
+          if (typeof lic.spdx_id === 'string' && lic.spdx_id.length > 0) return lic.spdx_id;
+          if (typeof lic.name === 'string' && lic.name.length > 0) return lic.name;
+          return null;
+        })(),
+        avatarUrl: (() => {
+          const owner = data.owner as Record<string, unknown> | null | undefined;
+          if (!owner) return null;
+          return typeof owner.avatar_url === 'string' ? owner.avatar_url : null;
+        })(),
+      };
+
+      setInfo(repoInfo);
+      setTitle(repoInfo.fullName);
+      setSubtitle(repoInfo.description ?? '');
+      setImageUrl(repoInfo.avatarUrl ?? '');
+      setUrl(repoInfo.htmlUrl);
+    } catch {
+      setError('Network blip. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const canSave = title.trim().length > 0 && url.trim().length > 0;
+
+  const handleAdd = () => {
+    if (!canSave) {
+      haptics.warn();
+      return;
+    }
+    commitItem(
+      {
+        kind: 'repo',
+        url: url.trim(),
+        title: title.trim(),
+        subtitle: subtitle.trim() || null,
+        image_url: imageUrl.trim() || null,
+      },
+      haptics,
+    );
+  };
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.paneScroll}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={[styles.fieldLabel, { color: c.textMuted }]}>GitHub URL</Text>
+      <View style={styles.fetchRow}>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          placeholder="https://github.com/owner/repo"
+          placeholderTextColor={c.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="off"
+          keyboardType="url"
+          returnKeyType="go"
+          onSubmitEditing={handleFetch}
+          style={[
+            styles.input,
+            {
+              flex: 1,
+              color: c.text,
+              backgroundColor: c.surface,
+              borderColor: c.border,
+            },
+          ]}
+        />
+        <Pressable
+          onPress={handleFetch}
+          disabled={loading || !input.trim()}
+          style={({ pressed }) => [
+            styles.fetchBtn,
+            {
+              backgroundColor: c.text,
+              opacity: loading || !input.trim() ? 0.5 : pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={c.background} />
+          ) : (
+            <Text style={[styles.fetchBtnLabel, { color: c.background }]}>Fetch</Text>
+          )}
+        </Pressable>
+      </View>
+      <Text style={[styles.helperText, { color: c.textSubtle }]}>
+        We pull the description, stars, language, and license from GitHub.
+      </Text>
+
+      {error ? (
+        <Animated.View
+          entering={FadeIn.duration(180)}
+          style={[styles.errorCard, { backgroundColor: c.surfaceSunken, borderColor: c.border, marginTop: Spacing.md }]}
+        >
+          <Ionicons name="alert-circle-outline" size={22} color={c.text} style={{ marginRight: Spacing.sm }} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.errorTitle, { color: c.text }]}>Couldn't fetch</Text>
+            <Text style={[styles.errorBody, { color: c.textMuted }]}>{error}</Text>
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {info || title || url ? (
+        <Animated.View
+          entering={FadeInUp.duration(220)}
+          style={[styles.repoPreviewCard, { backgroundColor: c.surface, borderColor: c.border, marginTop: Spacing.lg }, Shadows.sm]}
+        >
+          {info ? (
+            <View style={styles.repoMetaRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.previewTitle, { color: c.text }]} numberOfLines={1}>
+                  {info.fullName}
+                </Text>
+                <Text style={[styles.previewMeta, { color: c.textMuted }]} numberOfLines={1}>
+                  {'★ ' + info.stars.toLocaleString()}
+                  {info.language ? ` \u00b7 ${info.language}` : ''}
+                  {info.license ? ` \u00b7 ${info.license}` : ''}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          <ManualField label="Title" value={title} onChangeText={setTitle} c={c} />
+          <ManualField label="Description" value={subtitle} onChangeText={setSubtitle} c={c} placeholder="Optional" />
+          <ManualField label="URL" value={url} onChangeText={setUrl} c={c} placeholder="https://github.com/owner/repo" autoCapitalize="none" keyboardType="url" />
+          <ManualField label="Image URL" value={imageUrl} onChangeText={setImageUrl} c={c} placeholder="https://avatars.githubusercontent.com/..." autoCapitalize="none" keyboardType="url" />
+
+          <View style={{ height: Spacing.sm }} />
+          <Button label="Add to share" icon="add" onPress={handleAdd} disabled={!canSave} />
+        </Animated.View>
+      ) : (
+        <View style={styles.paneBody}>
+          <EmptyHint
+            icon="logo-github"
+            title="Paste a GitHub repo URL"
+            body="We'll fetch the description and metadata."
+          />
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// =========================================================================
+// Link kind
+// =========================================================================
+
+function LinkKindPane() {
+  const c = Colors[useColorScheme() ?? 'light'];
+  const haptics = useHaptics();
+
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+
+  const canSave = url.trim().length > 0 && title.trim().length > 0;
+
+  const handleAdd = () => {
+    if (!canSave) {
+      haptics.warn();
+      return;
+    }
+    commitItem(
+      {
+        kind: 'link',
+        url: url.trim(),
+        title: title.trim(),
+        subtitle: subtitle.trim() || null,
+        image_url: imageUrl.trim() || null,
+      },
+      haptics,
+    );
+  };
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.paneScroll}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={[styles.helperText, { color: c.textSubtle, marginBottom: Spacing.md }]}>
+        For blog posts, slides, lab pages, datasets -- anything with a URL.
+      </Text>
+
+      <ManualField
+        label="URL (required)"
+        value={url}
+        onChangeText={setUrl}
+        placeholder="https://..."
+        autoCapitalize="none"
+        keyboardType="url"
+        c={c}
+      />
+      <ManualField
+        label="Title (required)"
+        value={title}
+        onChangeText={setTitle}
+        c={c}
+      />
+      <ManualField
+        label="Description"
+        value={subtitle}
+        onChangeText={setSubtitle}
+        placeholder="Optional one-liner"
+        c={c}
+      />
+      <ManualField
+        label="Image URL"
+        value={imageUrl}
+        onChangeText={setImageUrl}
+        placeholder="https://..."
+        autoCapitalize="none"
+        keyboardType="url"
+        c={c}
+      />
+
+      <View style={{ height: Spacing.lg }} />
+      <Button
+        label="Add to share"
+        icon="add"
+        onPress={handleAdd}
+        disabled={!canSave}
+      />
+    </ScrollView>
+  );
+}
+
+// =========================================================================
+// Shared components
+// =========================================================================
 
 function ManualField({
   label,
@@ -736,22 +1168,44 @@ function EmptyHint({
   );
 }
 
+// =========================================================================
+// Styles
+// =========================================================================
+
 const styles = StyleSheet.create({
-  segmentRow: {
+  // Top-level kind picker
+  kindRow: {
     flexDirection: 'row',
     gap: Spacing.xs,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
-  segment: {
+  kindPill: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
   },
-  segmentLabel: { fontSize: 13, fontWeight: '600', letterSpacing: 0.2 },
+  kindPillLabel: { fontSize: 14, fontWeight: '600', letterSpacing: 0.3 },
+
+  // Paper sub-mode segmented control
+  segmentRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+  },
+  segmentLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2 },
 
   paneScroll: {
     paddingHorizontal: Spacing.lg,
@@ -773,6 +1227,25 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
     fontSize: 15,
+  },
+
+  // Fetch row (repo)
+  fetchRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  fetchBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  fetchBtnLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 
   // Loading
@@ -811,6 +1284,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   previewDoi: { fontSize: 12, marginTop: Spacing.sm },
+
+  // Repo preview card
+  repoPreviewCard: {
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  repoMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
 
   // Result list
   resultCard: {
