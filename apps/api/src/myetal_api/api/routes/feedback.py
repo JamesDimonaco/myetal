@@ -60,13 +60,18 @@ async def submit_feedback(
     await db.refresh(feedback)
 
     # Best-effort Telegram notification — never fails the request.
+    # Only include the user's identity when they opted in to sharing
+    # their email (body.email is non-null). When body.email is null the
+    # user explicitly unchecked "Share my email", so we treat the
+    # submission as anonymous even though we know who they are.
+    opted_in = body.email is not None
     await send_feedback_notification(
         feedback_id=feedback.id,
         feedback_type=feedback.type,
         title=feedback.title,
         description=feedback.description,
-        user_name=user.name if user else None,
-        user_email=user.email if user else None,
+        user_name=user.name if user and opted_in else None,
+        user_email=user.email if user and opted_in else None,
         reply_email=feedback.email,
     )
 

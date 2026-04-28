@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -25,7 +26,7 @@ import Animated, {
 
 import { Button } from '@/components/button';
 import { Wordmark } from '@/components/wordmark';
-import { Colors, Motion, Radius, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Motion, Radius, Shadows, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHaptics } from '@/hooks/useHaptics';
 import { API_BASE_URL } from '@/lib/api';
@@ -52,6 +53,8 @@ export function QrModal({ visible, onClose, shortCode, collectionName }: Props) 
   const haptics = useHaptics();
   const qrUrl = `${API_BASE_URL}/public/c/${shortCode}/qr.png`;
   const shareUrl = `https://myetal.app/c/${shortCode}`;
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const cardScale = useSharedValue(0.92);
   const cardOpacity = useSharedValue(0);
@@ -93,6 +96,20 @@ export function QrModal({ visible, onClose, shortCode, collectionName }: Props) 
     opacity: 0.18 + halo.value * 0.32,
     transform: [{ scale: 1 + halo.value * 0.04 }],
   }));
+
+  const handleCopyCode = async () => {
+    haptics.tap();
+    await Clipboard.setStringAsync(shortCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  const handleCopyLink = async () => {
+    haptics.tap();
+    await Clipboard.setStringAsync(shareUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   const handleShare = async () => {
     haptics.tapStrong();
@@ -185,20 +202,60 @@ export function QrModal({ visible, onClose, shortCode, collectionName }: Props) 
               </View>
             </View>
 
-            {/* Code chip — visual reference for the destination URL */}
-            <View
-              style={[
-                styles.codeChip,
-                {
-                  backgroundColor: c.surfaceSunken,
-                  borderColor: c.border,
-                },
-              ]}
-            >
-              <Ionicons name="link" size={14} color={c.textMuted} />
-              <Text style={[styles.codeChipText, { color: c.text }]}>
-                myetal.app/c/{shortCode}
-              </Text>
+            {/* Short code + URL */}
+            <View style={styles.codeSection}>
+              <View style={styles.codeRow}>
+                <Text
+                  style={[
+                    styles.shortCode,
+                    { color: c.text, fontFamily: Fonts.mono },
+                  ]}
+                  selectable
+                >
+                  {shortCode}
+                </Text>
+                <Pressable
+                  onPress={handleCopyCode}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Copy code"
+                  style={({ pressed }) => [
+                    styles.copyBtn,
+                    {
+                      backgroundColor: c.surfaceSunken,
+                      borderColor: c.border,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={codeCopied ? 'checkmark' : 'copy-outline'}
+                    size={16}
+                    color={codeCopied ? c.success : c.text}
+                  />
+                  <Text
+                    style={[
+                      styles.copyBtnText,
+                      { color: codeCopied ? c.success : c.text },
+                    ]}
+                  >
+                    {codeCopied ? 'Copied' : 'Copy code'}
+                  </Text>
+                </Pressable>
+              </View>
+              <Pressable onPress={handleCopyLink} hitSlop={4}>
+                <View style={styles.urlRow}>
+                  <Ionicons name="link" size={13} color={c.textMuted} />
+                  <Text style={[styles.urlText, { color: c.textMuted }]}>
+                    myetal.app/c/{shortCode}
+                  </Text>
+                  <Ionicons
+                    name={linkCopied ? 'checkmark' : 'copy-outline'}
+                    size={13}
+                    color={linkCopied ? c.success : c.textSubtle}
+                  />
+                </View>
+              </Pressable>
             </View>
 
             {/* Action row */}
@@ -293,20 +350,43 @@ const styles = StyleSheet.create({
     height: QR_SIZE - 8,
   },
 
-  codeChip: {
-    alignSelf: 'center',
+  codeSection: {
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  shortCode: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm + 4,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  copyBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  urlRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs + 2,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-    borderRadius: Radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: Spacing.lg,
   },
-  codeChipText: {
+  urlText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     letterSpacing: 0.2,
     fontVariant: ['tabular-nums'],
   },
