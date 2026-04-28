@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
+import { UserAvatar } from '@/components/user-avatar';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
@@ -41,21 +42,27 @@ export default async function LandingPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-10 sm:py-16">
       <header className="flex items-center justify-between">
         <span className="font-serif text-xl tracking-tight text-ink">MyEtAl</span>
-        <nav className="flex items-center gap-2 text-sm text-ink-muted">
+        <nav className="flex items-center gap-6 text-sm">
           {signedIn ? (
             <>
-              {displayName ? (
-                <span className="hidden text-ink-faint sm:inline">
-                  {displayName}
-                </span>
-              ) : null}
               <Link
                 href="/dashboard"
-                className="rounded-md px-3 py-1.5 hover:text-ink"
+                className="text-ink-muted hover:text-ink"
               >
                 Dashboard
               </Link>
-              <SignOutButton className="rounded-md border border-rule bg-paper px-3 py-1.5 text-ink-muted transition hover:text-ink disabled:opacity-60" />
+              <Link
+                href="/dashboard/profile"
+                className="transition hover:opacity-80"
+                title={displayName ?? 'Profile'}
+              >
+                <UserAvatar
+                  name={user!.name}
+                  avatarUrl={user!.avatar_url}
+                  size={32}
+                />
+              </Link>
+              <SignOutButton className="text-ink-muted hover:text-ink" />
             </>
           ) : (
             <>

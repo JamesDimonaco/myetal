@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { PostHogIdentify } from '@/components/posthog-identify';
+import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
 import { UserAvatar } from '@/components/user-avatar';
 import { ApiError } from '@/lib/api';
@@ -69,6 +70,7 @@ export default async function DashboardLayout({
                 size={32}
               />
             </Link>
+            <SignOutButton className="text-ink-muted hover:text-ink" />
           </nav>
         </div>
       </header>
