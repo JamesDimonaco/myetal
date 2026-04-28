@@ -39,6 +39,7 @@ def test_all_tables_registered_on_metadata() -> None:
         "share_similar",
         "trending_shares",
         "share_reports",
+        "feedback",
     }
 
 

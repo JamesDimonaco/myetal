@@ -163,7 +163,7 @@ def test_lookup_happy_path(authed_client: TestClient) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert "api.crossref.org" in str(request.url)
         assert "mailto=team%40myetal.app" in str(request.url)
-        assert "MyEtalAPI" in request.headers.get("user-agent", "")
+        assert "MyEtAlAPI" in request.headers.get("user-agent", "")
         return httpx.Response(200, json=_crossref_work())
 
     _install_handler(handler)
