@@ -2,7 +2,6 @@ import Link from 'next/link';
 
 import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
-import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 
@@ -22,12 +21,9 @@ export const dynamic = 'force-dynamic';
 async function getCurrentUser(): Promise<UserResponse | null> {
   try {
     return await serverFetch<UserResponse>('/auth/me', { cache: 'no-store' });
-  } catch (err) {
-    if (err instanceof ApiError && (err.isUnauthorized || err.isForbidden)) {
-      return null;
-    }
-    // API down / unexpected error — render the anonymous landing rather than
-    // breaking the whole homepage.
+  } catch {
+    // 401/403 (not signed in) or API down — render the anonymous landing
+    // rather than breaking the whole homepage.
     return null;
   }
 }
