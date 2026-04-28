@@ -105,6 +105,25 @@ class PublicShareResponse(BaseModel):
     similar_shares: list[SimilarShareOut] = Field(default_factory=list)
 
 
+class ShareSearchResult(BaseModel):
+    """A single hit from public share search."""
+
+    short_code: str
+    name: str
+    description: str | None
+    type: ShareType
+    owner_name: str | None
+    item_count: int
+    published_at: datetime
+    updated_at: datetime
+    preview_items: list[str]  # first 3 item titles
+
+
+class ShareSearchResponse(BaseModel):
+    results: list[ShareSearchResult]
+    has_more: bool
+
+
 class DailyViewCount(BaseModel):
     date: str
     count: int

@@ -13,6 +13,7 @@ from myetal_api.schemas.share import (
     ShareAnalyticsResponse,
     ShareCreate,
     ShareItemCreate,
+    ShareSearchResult,
     ShareUpdate,
     SimilarShareOut,
 )
@@ -335,6 +336,105 @@ async def get_similar_shares(db: AsyncSession, share: Share) -> list[SimilarShar
         )
         for r in rows
     ]
+
+
+async def search_published_shares(
+    db: AsyncSession,
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[ShareSearchResult], bool]:
+    """Full-text trigram search over published public shares.
+
+    Uses pg_trgm's ``%`` (similarity) operator so partial matches and
+    typos are handled.  Returns ``(results, has_more)`` where
+    ``has_more`` is True when there are additional rows beyond `offset +
+    limit`.
+
+    The query runs under a 3-second statement timeout (``SET LOCAL``) as
+    defence-in-depth against pathological inputs.
+    """
+    # Safety: per-statement timeout inside this transaction
+    await db.execute(text("SET LOCAL statement_timeout = '3000'"))
+
+    # Fetch limit+1 to derive has_more without a COUNT(*)
+    fetch_limit = limit + 1
+
+    search_sql = text("""
+        SELECT
+            s.id          AS share_id,
+            s.short_code,
+            s.name,
+            s.description,
+            s.type,
+            s.published_at,
+            s.updated_at,
+            u.name        AS owner_name,
+            COUNT(si.id)  AS item_count,
+            GREATEST(
+                similarity(s.name, :query),
+                similarity(COALESCE(s.description, ''), :query)
+            ) AS relevance
+        FROM shares s
+        LEFT JOIN users u       ON u.id  = s.owner_user_id
+        LEFT JOIN share_items si ON si.share_id = s.id
+        WHERE s.is_public = true
+          AND s.published_at IS NOT NULL
+          AND s.deleted_at IS NULL
+          AND (
+              s.name        % :query
+           OR s.description % :query
+           OR u.name        % :query
+          )
+        GROUP BY s.id, u.name
+        ORDER BY relevance DESC, s.published_at DESC
+        LIMIT :fetch_limit OFFSET :offset
+    """).bindparams(query=query, fetch_limit=fetch_limit, offset=offset)
+
+    rows = (await db.execute(search_sql)).all()
+
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+
+    if not rows:
+        return [], False
+
+    # Batch-fetch the first 3 item titles for each share in the result set
+    share_ids = [r.share_id for r in rows]
+    preview_sql = text("""
+        SELECT share_id, title
+        FROM (
+            SELECT
+                si.share_id,
+                si.title,
+                ROW_NUMBER() OVER (PARTITION BY si.share_id ORDER BY si.position) AS rn
+            FROM share_items si
+            WHERE si.share_id = ANY(:share_ids)
+        ) sub
+        WHERE rn <= 3
+    """).bindparams(share_ids=share_ids)
+
+    preview_rows = (await db.execute(preview_sql)).all()
+
+    previews: dict[uuid.UUID, list[str]] = {}
+    for pr in preview_rows:
+        previews.setdefault(pr.share_id, []).append(pr.title)
+
+    results = [
+        ShareSearchResult(
+            short_code=r.short_code,
+            name=r.name,
+            description=r.description,
+            type=r.type,
+            owner_name=r.owner_name,
+            item_count=r.item_count,
+            published_at=r.published_at,
+            updated_at=r.updated_at,
+            preview_items=previews.get(r.share_id, []),
+        )
+        for r in rows
+    ]
+    return results, has_more
 
 
 # ---------- internals ----------

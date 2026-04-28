@@ -12,6 +12,7 @@ from myetal_api.api.routes import oauth as oauth_routes
 from myetal_api.api.routes import papers as papers_routes
 from myetal_api.api.routes import public as public_routes
 from myetal_api.api.routes import reports as reports_routes
+from myetal_api.api.routes import search as search_routes
 from myetal_api.api.routes import shares as shares_routes
 from myetal_api.api.routes import works as works_routes
 from myetal_api.core.config import settings
@@ -56,6 +57,7 @@ app.include_router(oauth_routes.router)
 app.include_router(shares_routes.router)
 app.include_router(papers_routes.router)
 app.include_router(public_routes.router)
+app.include_router(search_routes.router)
 app.include_router(reports_routes.router)
 app.include_router(works_routes.router)
 app.include_router(feedback_routes.router)

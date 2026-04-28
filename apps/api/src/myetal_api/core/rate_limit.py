@@ -33,3 +33,9 @@ REPORT_LIMIT = "3/hour"
 # User feedback (feature requests + bug reports) — per user-feedback-system
 # ticket. 5/hour is generous for legitimate feedback but caps spam.
 FEEDBACK_LIMIT = "5/hour"
+
+# Public share search — tighter than ANON_READ_LIMIT because search hits
+# GiST indexes across the whole published corpus, making it more expensive
+# than a single-share lookup.  20/min/IP caps scraping while allowing
+# generous browse-and-refine sessions.  Per public-share-search ticket.
+SEARCH_LIMIT = "20/minute"
