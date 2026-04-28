@@ -230,7 +230,7 @@ export default function PublicShareScreen() {
           )}
         </View>
 
-        {data.related_shares.length > 0 ? (
+        {data.related_shares?.length > 0 ? (
           <Animated.View
             entering={FadeInUp.duration(340).delay(180)}
             style={styles.discoverySection}
@@ -274,7 +274,7 @@ export default function PublicShareScreen() {
           </Animated.View>
         ) : null}
 
-        {data.similar_shares.length > 0 ? (
+        {data.similar_shares?.length > 0 ? (
           <Animated.View
             entering={FadeInUp.duration(340).delay(200)}
             style={styles.discoverySection}
