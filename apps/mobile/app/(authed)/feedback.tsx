@@ -35,6 +35,7 @@ export default function FeedbackScreen() {
   const [description, setDescription] = useState('');
   const [email, setEmail] = useState(user?.email ?? '');
   const [useCustomEmail, setUseCustomEmail] = useState(false);
+  const [shareEmail, setShareEmail] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
@@ -45,8 +46,11 @@ export default function FeedbackScreen() {
     setSubmitting(true);
 
     try {
-      const resolvedEmail =
-        user?.email && !useCustomEmail ? user.email : email.trim() || null;
+      const resolvedEmail = !shareEmail
+        ? null
+        : user?.email && !useCustomEmail
+          ? user.email
+          : email.trim() || null;
 
       await api<FeedbackResponse>('/feedback', {
         method: 'POST',
@@ -78,6 +82,7 @@ export default function FeedbackScreen() {
     setDescription('');
     setEmail(user?.email ?? '');
     setUseCustomEmail(false);
+    setShareEmail(true);
     setSuccess(false);
     setSubmittedEmail(null);
   };
@@ -307,51 +312,64 @@ export default function FeedbackScreen() {
             </Text>
           </View>
 
-          {/* Email */}
+          {/* Email opt-in */}
           <View style={styles.field}>
-            {user?.email && !useCustomEmail ? (
-              <View
-                style={[
-                  styles.emailPreview,
-                  { backgroundColor: c.accentSoft },
-                ]}
-              >
-                <Text style={[styles.emailPreviewText, { color: c.text }]}>
-                  {'\u2713'} We&apos;ll reply to{' '}
-                  <Text style={{ fontWeight: '600' }}>{user.email}</Text>
-                </Text>
-                <Pressable onPress={() => setUseCustomEmail(true)}>
-                  <Text
-                    style={[styles.emailChangeLink, { color: c.textMuted }]}
-                  >
-                    Change
-                  </Text>
-                </Pressable>
+            <Pressable
+              onPress={() => setShareEmail(!shareEmail)}
+              style={[styles.emailToggleRow, { borderColor: c.border, backgroundColor: c.surface }]}
+            >
+              <View style={[styles.checkbox, { borderColor: c.border, backgroundColor: shareEmail ? c.accent : 'transparent' }]}>
+                {shareEmail ? <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{'\u2713'}</Text> : null}
               </View>
-            ) : (
-              <>
-                <View style={styles.emailLabelRow}>
-                  <Text style={[styles.label, { color: c.text }]}>
-                    Email for follow-up
+              <Text style={[styles.emailToggleText, { color: c.text }]}>
+                Share my email for follow-up
+              </Text>
+            </Pressable>
+
+            {shareEmail ? (
+              user?.email && !useCustomEmail ? (
+                <View
+                  style={[
+                    styles.emailPreview,
+                    { backgroundColor: c.accentSoft },
+                  ]}
+                >
+                  <Text style={[styles.emailPreviewText, { color: c.text }]}>
+                    We&apos;ll reply to{' '}
+                    <Text style={{ fontWeight: '600' }}>{user.email}</Text>
                   </Text>
-                  {user?.email && (
-                    <Pressable
-                      onPress={() => {
-                        setUseCustomEmail(false);
-                        setEmail(user.email ?? '');
-                      }}
+                  <Pressable onPress={() => setUseCustomEmail(true)}>
+                    <Text
+                      style={[styles.emailChangeLink, { color: c.textMuted }]}
                     >
-                      <Text
-                        style={[
-                          styles.emailChangeLink,
-                          { color: c.textMuted },
-                        ]}
-                      >
-                        Use {user.email}
-                      </Text>
-                    </Pressable>
-                  )}
+                      Change
+                    </Text>
+                  </Pressable>
                 </View>
+              ) : (
+                <>
+                  <View style={styles.emailLabelRow}>
+                    <Text style={[styles.label, { color: c.text }]}>
+                      Email for follow-up
+                    </Text>
+                    {user?.email && (
+                      <Pressable
+                        onPress={() => {
+                          setUseCustomEmail(false);
+                          setEmail(user.email ?? '');
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.emailChangeLink,
+                            { color: c.textMuted },
+                          ]}
+                        >
+                          Use {user.email}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
@@ -371,8 +389,16 @@ export default function FeedbackScreen() {
                   ]}
                 />
               </>
+              )
+            ) : (
+              <Text style={[styles.emailOptOutHint, { color: c.textSubtle }]}>
+                Anonymous — we won&apos;t be able to follow up.
+              </Text>
             )}
           </View>
+
+          {/* Extra padding so submit button is above keyboard */}
+          <View style={{ height: 40 }} />
 
           {/* Submit */}
           <Pressable
@@ -401,7 +427,7 @@ export default function FeedbackScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, paddingHorizontal: Spacing.lg },
-  scrollContent: { paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
+  scrollContent: { paddingTop: Spacing.lg, paddingBottom: Spacing.xxl * 2 },
 
   heading: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
   subheading: { fontSize: 15, marginTop: Spacing.xs },
@@ -465,6 +491,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   emailChangeLink: { fontSize: 12, textDecorationLine: 'underline' },
+  emailToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.sm,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emailToggleText: { fontSize: 15, fontWeight: '500' },
+  emailOptOutHint: { fontSize: 13, marginTop: 4 },
 
   submitButton: {
     paddingVertical: 14,
