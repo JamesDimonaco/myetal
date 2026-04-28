@@ -28,7 +28,7 @@ export default function DemoPage() {
           href="/sign-in"
           className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90"
         >
-          Sign up
+          Get started
         </Link>
       </div>
 
@@ -44,7 +44,7 @@ export default function DemoPage() {
           Edit the share on the left — the public page and the QR update as
           you type. When you&apos;re ready,{' '}
           <Link href="/sign-in" className="text-ink underline-offset-2 hover:underline">
-            sign up
+            sign in
           </Link>{' '}
           to make a real one.
         </p>
@@ -56,7 +56,7 @@ export default function DemoPage() {
 
       <section className="mt-20 border-t border-rule pt-12">
         <h2 className="font-serif text-2xl tracking-tight text-ink">
-          What happens when you sign up?
+          What happens when you sign in?
         </h2>
         <ol className="mt-6 grid gap-6 text-sm leading-relaxed text-ink-muted sm:grid-cols-3">
           <li>

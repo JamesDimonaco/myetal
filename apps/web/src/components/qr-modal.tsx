@@ -28,7 +28,8 @@ const SITE_URL = (
 export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: Props) {
   const qrUrl = `${API_BASE_URL}/public/c/${encodeURIComponent(shortCode)}/qr.png`;
   const shareUrl = `${SITE_URL}/c/${shortCode}`;
-  const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -43,14 +44,24 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
     };
   }, [onClose]);
 
-  const handleCopy = async () => {
+  const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
     } catch {
       // Clipboard can be blocked in iframes / insecure contexts; the URL is
       // still visible on screen for manual copy.
+    }
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(shortCode);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch {
+      // Same fallback — the code is visible on screen.
     }
   };
 
@@ -111,18 +122,29 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
           </div>
         </div>
 
-        <div className="mt-6 rounded-md border border-rule bg-paper-soft px-3 py-2 text-center">
-          <code className="break-all text-sm text-ink">{shareUrl}</code>
+        {/* Short code + URL */}
+        <div className="mt-6 rounded-md border border-rule bg-paper-soft px-3 py-3 text-center">
+          <p className="font-mono text-2xl font-semibold tracking-wider text-ink">
+            {shortCode}
+          </p>
+          <p className="mt-1 break-all text-sm text-ink-muted">{shareUrl}</p>
         </div>
 
         <div className="mt-4 grid gap-2">
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={handleCopy}
+              onClick={handleCopyCode}
               className="flex-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
             >
-              {copied ? 'Copied!' : 'Copy link'}
+              {copiedCode ? 'Copied!' : 'Copy code'}
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+            >
+              {copiedLink ? 'Copied!' : 'Copy link'}
             </button>
             <a
               href={shareUrl}

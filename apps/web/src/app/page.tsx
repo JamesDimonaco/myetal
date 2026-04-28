@@ -66,7 +66,7 @@ export default async function LandingPage() {
                 href="/sign-in"
                 className="rounded-md bg-ink px-3 py-1.5 text-paper transition hover:opacity-90"
               >
-                Sign up
+                Get started
               </Link>
             </>
           )}
