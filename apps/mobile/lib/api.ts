@@ -80,8 +80,11 @@ async function refreshAccessToken(): Promise<string | null> {
       });
 
       if (!response.ok) {
-        // Backend revoked the family — can't recover without re-auth
-        await clearTokens();
+        // Refresh rejected — token was rotated or revoked. Don't clear
+        // tokens here; the auth hook will detect the 401 on /auth/me
+        // and redirect to sign-in. Clearing eagerly was causing forced
+        // logouts on every dev-mode restart (hot-reload loses the
+        // in-memory rotated token, SecureStore still has the old one).
         onForcedSignOut?.();
         return null;
       }
