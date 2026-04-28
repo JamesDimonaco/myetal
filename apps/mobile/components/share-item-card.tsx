@@ -48,6 +48,16 @@ function PaperCard({ item }: Props) {
     });
   };
 
+  const pdfUrl = item.doi ? `https://doi.org/${item.doi}` : null;
+  const handleOpenPdf = async () => {
+    if (!pdfUrl) return;
+    haptics.tap();
+    await WebBrowser.openBrowserAsync(pdfUrl, {
+      toolbarColor: c.background,
+      controlsColor: c.accent,
+    });
+  };
+
   const interactive = Boolean(item.scholar_url);
 
   return (
@@ -72,18 +82,37 @@ function PaperCard({ item }: Props) {
             {meta ? (
               <Text style={[styles.meta, { color: c.textMuted }]}>{meta}</Text>
             ) : null}
+            {item.doi ? (
+              <Text style={[styles.doi, { color: c.textSubtle }]}>DOI {item.doi}</Text>
+            ) : null}
             {item.notes ? (
               <Text style={[styles.notes, { color: c.text }]}>{item.notes}</Text>
             ) : null}
           </View>
         </View>
 
-        {interactive ? (
+        {interactive || pdfUrl ? (
           <View style={[styles.actionRow, { borderTopColor: c.border }]}>
-            <Ionicons name="open-outline" size={14} color={c.accent} />
-            <Text style={[styles.action, { color: c.accent }]}>
-              Open in Google Scholar
-            </Text>
+            {interactive ? (
+              <Pressable
+                onPress={handleOpen}
+                hitSlop={8}
+                style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.6 : 1 }]}
+              >
+                <Ionicons name="open-outline" size={14} color={c.accent} />
+                <Text style={[styles.action, { color: c.accent }]}>Scholar</Text>
+              </Pressable>
+            ) : null}
+            {pdfUrl ? (
+              <Pressable
+                onPress={handleOpenPdf}
+                hitSlop={8}
+                style={({ pressed }) => [styles.actionBtn, { opacity: pressed ? 0.6 : 1 }]}
+              >
+                <Ionicons name="document-text-outline" size={14} color={c.accent} />
+                <Text style={[styles.action, { color: c.accent }]}>PDF</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
       </Animated.View>
@@ -266,6 +295,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: Spacing.xs + 2,
     fontWeight: '500',
+  },
+  doi: {
+    fontSize: 11,
+    marginTop: Spacing.xs,
+    fontVariant: ['tabular-nums'] as const,
+  },
+  actionBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: Spacing.xs + 2,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
   },
   subtitle: {
     fontSize: 14,

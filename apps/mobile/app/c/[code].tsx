@@ -54,10 +54,7 @@ export default function PublicShareScreen() {
   }
 
   if (error) {
-    // Log the full error for debugging — visible in Expo's terminal output
-    console.error('[PublicShare] Error loading share:', error);
     const { title, body, icon } = describeError(error);
-    const debugInfo = error instanceof Error ? error.message : String(error);
     return (
       <View style={[styles.centered, { backgroundColor: c.background }]}>
         <View
@@ -70,9 +67,6 @@ export default function PublicShareScreen() {
         </View>
         <Text style={[styles.errorTitle, { color: c.text }]}>{title}</Text>
         <Text style={[styles.errorBody, { color: c.textMuted }]}>{body}</Text>
-        <Text style={[{ color: c.textSubtle, fontSize: 10, marginTop: 8, textAlign: 'center', maxWidth: 300 }]}>
-          Debug: {debugInfo}
-        </Text>
         <View style={styles.errorAction}>
           <Button
             label={isRefetching ? 'Retrying' : 'Try again'}
@@ -106,6 +100,8 @@ export default function PublicShareScreen() {
     <>
       <Stack.Screen
         options={{
+          headerStyle: { backgroundColor: c.background },
+          headerTintColor: c.text,
           headerRight: () => (
             <View style={styles.headerActions}>
               <Pressable
