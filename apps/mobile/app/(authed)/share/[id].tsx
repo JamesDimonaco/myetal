@@ -194,9 +194,14 @@ export default function ShareEditorScreen() {
     }
   }, [isNew]);
 
-  // Hydrate the form once the existing share loads.
+  // Hydrate the form ONCE when existing share first loads. We track
+  // whether we've hydrated so that TanStack Query refetches (e.g. after
+  // publish/unpublish invalidation) don't clobber the user's in-progress
+  // edits or reset optimistic toggle state.
+  const hydratedRef = useRef(false);
   useEffect(() => {
-    if (!existing.data) return;
+    if (!existing.data || hydratedRef.current) return;
+    hydratedRef.current = true;
     setName(existing.data.name);
     setDescription(existing.data.description ?? '');
     setShareType(existing.data.type);
@@ -487,7 +492,10 @@ export default function ShareEditorScreen() {
 
                   const mutation = value ? publishMutation : unpublishMutation;
                   mutation.mutateAsync().then(
-                    (updated) => setPublishedAt(updated.published_at),
+                    () => {
+                      // Optimistic value is already correct — don't overwrite.
+                      // TanStack cache is updated by the mutation's onSuccess.
+                    },
                     (err) => {
                       // Revert on failure
                       setPublishedAt(previousValue);

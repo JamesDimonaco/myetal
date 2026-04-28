@@ -421,7 +421,9 @@ export function ShareEditor({ initial, id }: Props) {
                   ? publishMutation
                   : unpublishMutation;
                 mutation.mutateAsync().then(
-                  (updated) => setPublishedAt(updated.published_at),
+                  () => {
+                    // Optimistic value is already correct
+                  },
                   (err) => {
                     setPublishedAt(previousValue);
                     setError(
