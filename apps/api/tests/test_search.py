@@ -6,21 +6,9 @@ mock the service layer and test the route's validation + response shaping.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from myetal_api.schemas.share import ShareSearchResult
-from myetal_api.services import auth as auth_service
-from myetal_api.services import share as share_service
-from myetal_api.schemas.share import ShareCreate
-
-
-async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
-    user, _, _ = await auth_service.register_with_password(db, email, "hunter22", "Researcher")
-    return user
 
 
 # ---------- validation ----------
@@ -65,7 +53,6 @@ async def test_search_returns_empty_for_no_matches(
 @patch("myetal_api.api.routes.search.share_service.search_published_shares", new_callable=AsyncMock)
 async def test_search_does_not_return_unpublished_shares(
     mock_search: AsyncMock,
-    db_session: AsyncSession,
     api_client: TestClient,
 ) -> None:
     """Shares with published_at=NULL should not appear in search results.

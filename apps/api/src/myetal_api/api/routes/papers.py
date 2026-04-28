@@ -26,7 +26,7 @@ async def lookup_paper(body: PaperLookupRequest, _user: CurrentUser) -> PaperMet
         return await papers_service.lookup_doi(body.identifier)
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
     except papers_service.PaperNotFound as exc:
         raise HTTPException(
@@ -49,7 +49,7 @@ async def search_papers(
         results = await papers_service.search_papers(q, limit)
     except ValueError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
     except papers_service.PaperUpstreamError as exc:
         raise HTTPException(

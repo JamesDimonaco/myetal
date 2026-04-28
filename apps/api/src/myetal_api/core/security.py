@@ -2,7 +2,6 @@ import hashlib
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Literal
 
 import jwt
 from argon2 import PasswordHasher
@@ -102,8 +101,3 @@ _SHORT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789
 def generate_short_code(length: int = 6) -> str:
     """URL-safe short code with no easily-confused glyphs (no 0/O/1/l/I)."""
     return "".join(secrets.choice(_SHORT_CODE_ALPHABET) for _ in range(length))
-
-
-# ---------- placeholder type alias for callers ----------
-
-TokenType = Literal["access", "refresh"]
