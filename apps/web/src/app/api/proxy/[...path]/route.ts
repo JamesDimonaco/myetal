@@ -8,23 +8,77 @@
  * goes along for free), the route reads the cookie server-side, and forwards
  * the request to the API with `Authorization: Bearer ...` on the wire.
  *
- * Usage from the client: `/api/proxy/shares` → backend `/shares`. Method,
- * body, query string, and most headers are forwarded verbatim. Anything
- * sensitive (cookie, host) is stripped — only Authorization, Content-Type,
- * and Accept end up on the outgoing request.
+ * Token refresh: if the upstream returns 401, we try to refresh the access
+ * token using the refresh cookie and retry the request once. On success the
+ * new tokens are written back to the cookies so subsequent requests use them.
  *
  * Server components MUST NOT use this — they should call `serverFetch`
  * directly, which is one network hop instead of two.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 
 import { API_BASE_URL } from '@/lib/api';
-import { getAccessToken } from '@/lib/server-api';
+import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  accessCookieOptions,
+  refreshCookieOptions,
+} from '@/lib/auth-cookies';
+import { getAccessToken, getRefreshToken } from '@/lib/server-api';
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 const FORWARDED_HEADERS = new Set(['content-type', 'accept']);
+
+async function sendUpstream(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body: ArrayBuffer | undefined,
+) {
+  const upstream = await fetch(url, {
+    method,
+    headers,
+    body,
+    cache: 'no-store',
+  });
+  return upstream;
+}
+
+async function tryRefreshTokens(): Promise<string | null> {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      cache: 'no-store',
+    });
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as {
+      access_token: string;
+      refresh_token: string;
+    };
+
+    // Write new tokens to cookies
+    const store = await cookies();
+    store.set(ACCESS_COOKIE, data.access_token, accessCookieOptions);
+    store.set(REFRESH_COOKIE, data.refresh_token, refreshCookieOptions);
+
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
 
 async function handle(request: NextRequest, ctx: RouteContext) {
   const { path } = await ctx.params;
@@ -42,25 +96,24 @@ async function handle(request: NextRequest, ctx: RouteContext) {
   const token = await getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  // Body: anything that has a body, forward it. fetch() requires duplex:'half'
-  // for streaming bodies on Node 18+; here we just buffer to ArrayBuffer to
-  // keep things simple — paper search bodies are tiny.
-  let body: BodyInit | undefined;
+  // Buffer body for non-GET requests (needed for retry)
+  let body: ArrayBuffer | undefined;
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     const buf = await request.arrayBuffer();
     body = buf.byteLength ? buf : undefined;
   }
 
-  const upstream = await fetch(url, {
-    method: request.method,
-    headers,
-    body,
-    // Don't let Next cache an authed response; the same path may legitimately
-    // return different bodies for different users.
-    cache: 'no-store',
-  });
+  let upstream = await sendUpstream(url, request.method, headers, body);
 
-  // 204 has no body — short-circuit.
+  // On 401, try refreshing the access token and retry once
+  if (upstream.status === 401 && token) {
+    const newToken = await tryRefreshTokens();
+    if (newToken) {
+      headers.Authorization = `Bearer ${newToken}`;
+      upstream = await sendUpstream(url, request.method, headers, body);
+    }
+  }
+
   if (upstream.status === 204) {
     return new NextResponse(null, { status: 204 });
   }
