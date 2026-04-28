@@ -104,3 +104,24 @@ export interface ShareUpdateInput {
   /** null/undefined = leave items alone, [] = clear them. */
   items?: ShareItemInput[];
 }
+
+// ---------------------------------------------------------------------------
+// Public search
+// ---------------------------------------------------------------------------
+
+export interface ShareSearchResult {
+  short_code: string;
+  name: string;
+  description: string | null;
+  type: ShareType;
+  owner_name: string | null;
+  item_count: number;
+  published_at: string;
+  updated_at: string;
+  preview_items: string[];
+}
+
+export interface ShareSearchResponse {
+  results: ShareSearchResult[];
+  has_more: boolean;
+}

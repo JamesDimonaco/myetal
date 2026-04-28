@@ -113,6 +113,12 @@ export default async function LandingPage() {
               >
                 Try the demo
               </Link>
+              <Link
+                href="/search"
+                className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+              >
+                Search collections
+              </Link>
             </>
           )}
         </div>

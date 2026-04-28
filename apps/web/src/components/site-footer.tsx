@@ -29,6 +29,13 @@ export function SiteFooter() {
           </a>
           <span aria-hidden>&middot;</span>
           <Link
+            href="/search"
+            className="hover:text-ink-muted hover:underline"
+          >
+            Search
+          </Link>
+          <span aria-hidden>&middot;</span>
+          <Link
             href="/feedback"
             className="hover:text-ink-muted hover:underline"
           >
