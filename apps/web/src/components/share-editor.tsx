@@ -490,12 +490,25 @@ export function ShareEditor({ initial, id }: Props) {
 
           <div className="mt-3 grid gap-3">
             {items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-rule py-10 text-ink-muted">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-rule py-12 text-ink-muted">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <p className="text-sm">No items yet. Click &apos;Add item&apos; to start.</p>
+                <p className="text-sm font-medium text-ink">No items yet</p>
+                <p className="text-xs text-ink-faint">
+                  Add papers, repos, or links to include in this share.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddItem(true)}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                    <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  Add item
+                </button>
               </div>
             ) : null}
 

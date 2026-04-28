@@ -22,6 +22,7 @@ export function FeedbackForm({ userEmail }: Props) {
   const [description, setDescription] = useState('');
   const [email, setEmail] = useState(userEmail ?? '');
   const [useCustomEmail, setUseCustomEmail] = useState(false);
+  const [shareEmail, setShareEmail] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -37,8 +38,11 @@ export function FeedbackForm({ userEmail }: Props) {
     setError(null);
 
     try {
-      const resolvedEmail =
-        isSignedIn && !useCustomEmail ? userEmail : email || null;
+      const resolvedEmail = !shareEmail
+        ? null
+        : isSignedIn && !useCustomEmail
+          ? userEmail
+          : email || null;
 
       await clientApi<FeedbackResponse>('/feedback', {
         method: 'POST',
@@ -50,9 +54,7 @@ export function FeedbackForm({ userEmail }: Props) {
         },
       });
 
-      setSubmittedEmail(
-        isSignedIn && !useCustomEmail ? userEmail : email || null,
-      );
+      setSubmittedEmail(resolvedEmail?.trim() || null);
       setSuccess(true);
     } catch (err) {
       setError(
@@ -69,6 +71,7 @@ export function FeedbackForm({ userEmail }: Props) {
     setDescription('');
     setEmail(userEmail ?? '');
     setUseCustomEmail(false);
+    setShareEmail(true);
     setError(null);
     setSuccess(false);
     setSubmittedEmail(null);
@@ -105,7 +108,7 @@ export function FeedbackForm({ userEmail }: Props) {
           </p>
         ) : (
           <p className="mt-3 text-base text-ink-muted">
-            We read every submission, even anonymous ones.
+            We read every submission.
           </p>
         )}
 
@@ -239,64 +242,84 @@ export function FeedbackForm({ userEmail }: Props) {
       {/* Email */}
       <div>
         {isSignedIn ? (
-          <div>
-            {!useCustomEmail ? (
-              <div className="flex items-center gap-2 rounded-md bg-accent-soft px-3 py-2.5">
-                <svg
-                  className="h-4 w-4 text-accent"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4.5 12.75l6 6 9-13.5"
-                  />
-                </svg>
-                <span className="text-sm text-ink">
-                  We&apos;ll reply to{' '}
-                  <span className="font-medium">{userEmail}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setUseCustomEmail(true)}
-                  className="ml-auto text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
-                >
-                  Use a different email
-                </button>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="feedback-email"
-                    className="block text-sm font-medium text-ink"
+          <div className="space-y-3">
+            {/* Opt-in / opt-out toggle */}
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={shareEmail}
+                onChange={(e) => setShareEmail(e.target.checked)}
+                className="h-4 w-4 rounded border-rule text-accent accent-accent focus:ring-accent"
+              />
+              <span className="text-sm text-ink">
+                Share my email for follow-up
+              </span>
+            </label>
+
+            {shareEmail ? (
+              !useCustomEmail ? (
+                <div className="flex items-center gap-2 rounded-md bg-accent-soft px-3 py-2.5">
+                  <svg
+                    className="h-4 w-4 text-accent"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                    stroke="currentColor"
                   >
-                    Email for follow-up
-                  </label>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.5 12.75l6 6 9-13.5"
+                    />
+                  </svg>
+                  <span className="text-sm text-ink">
+                    We&apos;ll reply to{' '}
+                    <span className="font-medium">{userEmail}</span>
+                  </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setUseCustomEmail(false);
-                      setEmail(userEmail ?? '');
-                    }}
-                    className="text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
+                    onClick={() => setUseCustomEmail(true)}
+                    className="ml-auto text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
                   >
-                    Use {userEmail}
+                    Use a different email
                   </button>
                 </div>
-                <input
-                  id="feedback-email"
-                  type="email"
-                  maxLength={320}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-              </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="feedback-email"
+                      className="block text-sm font-medium text-ink"
+                    >
+                      Email for follow-up
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUseCustomEmail(false);
+                        setEmail(userEmail ?? '');
+                      }}
+                      className="text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
+                    >
+                      Use {userEmail}
+                    </button>
+                  </div>
+                  <input
+                    id="feedback-email"
+                    type="email"
+                    maxLength={320}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                </div>
+              )
+            ) : (
+              <p className="text-xs text-ink-faint">
+                Your feedback will be anonymous — we won&apos;t be able to
+                follow up.
+              </p>
             )}
           </div>
         ) : (

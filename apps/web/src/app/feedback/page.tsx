@@ -26,12 +26,20 @@ export default async function FeedbackPage() {
     }
   }
 
+  const isSignedIn = userEmail !== null;
+
   return (
     <main className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
       <div className="text-sm text-ink-muted">
-        <Link href="/" className="hover:text-ink">
-          MyEtAl
-        </Link>
+        {isSignedIn ? (
+          <Link href="/dashboard" className="hover:text-ink">
+            &larr; Back to dashboard
+          </Link>
+        ) : (
+          <Link href="/" className="hover:text-ink">
+            &larr; MyEtAl
+          </Link>
+        )}
       </div>
 
       <h1 className="mt-8 font-serif text-4xl tracking-tight text-ink">
