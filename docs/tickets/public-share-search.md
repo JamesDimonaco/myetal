@@ -175,14 +175,26 @@ Each result is a pressable card that navigates to `/c/{short_code}` (the public 
 
 ---
 
-## Publish toggle context
+## Publish toggle context — shares are NOT public by default
 
-Shares are searchable only when `published_at IS NOT NULL`. The "Publish to discovery" toggle on the share editor controls this. Shares that are `is_public = true` but NOT published are still accessible via their QR/URL — they're just not in search results.
+**This is critical and must be clear throughout the UI.**
 
-This means:
-- User creates a share → it's reachable by QR but NOT searchable
-- User toggles "Publish to discovery" → now it appears in search
-- User unpublishes → disappears from search, QR still works
+When a user creates a share, it is:
+- `is_public = true` — the URL/QR works (anyone with the link can view it)
+- `published_at = NULL` — it is **NOT discoverable** in search, sitemap, trending, or any public listing
+
+The share is **link-accessible but not searchable**. This is the default for every new share. The user must explicitly opt in to discovery by toggling "Publish to discovery" on the share editor, which sets `published_at = NOW()`.
+
+**The flow:**
+1. User creates a share → reachable by QR/link, **NOT in search**
+2. User toggles "Publish to discovery" → now it appears in search, sitemap, similar-shares panels
+3. User unpublishes → disappears from search, QR/link still works
+4. User deletes → tombstoned, QR returns 410 Gone, removed from everything
+
+**UI implications for the search feature:**
+- The search page should explain that only published collections appear: "Showing published collections. To make your collection searchable, toggle 'Publish to discovery' in the share editor."
+- If a signed-in user searches and gets no results, consider showing: "Your shares won't appear here until you publish them to discovery."
+- The share editor's "Publish to discovery" toggle description should mention search: "Make this share discoverable in search and similar collections."
 
 ---
 
