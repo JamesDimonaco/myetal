@@ -36,6 +36,8 @@ interface Props {
   onClose: () => void;
   shortCode: string;
   collectionName: string;
+  /** Optional content rendered below the QR code (e.g. publish prompt) */
+  extraContent?: React.ReactNode;
 }
 
 /**
@@ -48,7 +50,7 @@ interface Props {
  * inside a rounded "paper" tile with a subtle teal halo that pulses,
  * and a Share / Done action row lives at the bottom.
  */
-export function QrModal({ visible, onClose, shortCode, collectionName }: Props) {
+export function QrModal({ visible, onClose, shortCode, collectionName, extraContent }: Props) {
   const c = Colors[useColorScheme() ?? 'light'];
   const haptics = useHaptics();
   const qrUrl = `${API_BASE_URL}/public/c/${shortCode}/qr.png`;
@@ -271,6 +273,7 @@ export function QrModal({ visible, onClose, shortCode, collectionName }: Props) 
                 variant="secondary"
                 onPress={handleClose}
               />
+              {extraContent ?? null}
             </View>
           </Animated.View>
         </Animated.View>

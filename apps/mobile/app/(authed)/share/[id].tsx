@@ -29,7 +29,7 @@ import {
   useUnpublishShare,
   useUpdateShare,
 } from '@/hooks/useShares';
-import { ApiError } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import {
   consumePendingItem,
   subscribePendingItem,
@@ -171,7 +171,15 @@ export default function ShareEditorScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [shareType, setShareType] = useState<ShareType>('paper');
-  const [publishedAt, setPublishedAt] = useState<string | null>(null);
+  // publishedAt is derived from the query cache, not local state.
+  // This avoids the snap-back bug where local state fights TanStack refetches.
+  // For optimistic UI, we use a local override that clears after the mutation.
+  const [publishedAtOverride, setPublishedAtOverride] = useState<
+    { value: string | null } | null
+  >(null);
+  const publishedAt = publishedAtOverride
+    ? publishedAtOverride.value
+    : (existing.data?.published_at ?? null);
   const [items, setItems] = useState<DraftItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -186,7 +194,7 @@ export default function ShareEditorScreen() {
       setName('');
       setDescription('');
       setShareType('paper');
-      setPublishedAt(null);
+      setPublishedAtOverride(null);
       setItems([]);
       setError(null);
       setSavedShare(null);
@@ -205,7 +213,7 @@ export default function ShareEditorScreen() {
     setName(existing.data.name);
     setDescription(existing.data.description ?? '');
     setShareType(existing.data.type);
-    setPublishedAt(existing.data.published_at ?? null);
+    // publishedAt is derived from existing.data, not set here
     setItems(
       existing.data.items.length
         ? existing.data.items.map(fromResponseItem)
@@ -486,19 +494,20 @@ export default function ShareEditorScreen() {
                 trackColor={{ false: c.border, true: c.accent }}
                 thumbColor="#fff"
                 onValueChange={(value) => {
-                  // Optimistic update — toggle immediately, fix on error
-                  const previousValue = publishedAt;
-                  setPublishedAt(value ? new Date().toISOString() : null);
+                  // Optimistic: override immediately
+                  const newVal = value ? new Date().toISOString() : null;
+                  setPublishedAtOverride({ value: newVal });
 
                   const mutation = value ? publishMutation : unpublishMutation;
                   mutation.mutateAsync().then(
                     () => {
-                      // Optimistic value is already correct — don't overwrite.
-                      // TanStack cache is updated by the mutation's onSuccess.
+                      // Cache is updated by mutation's onSuccess.
+                      // Clear override so we read from cache going forward.
+                      setPublishedAtOverride(null);
                     },
                     (err) => {
-                      // Revert on failure
-                      setPublishedAt(previousValue);
+                      // Revert override
+                      setPublishedAtOverride(null);
                       setError(
                         err instanceof ApiError
                           ? err.detail
@@ -746,6 +755,42 @@ export default function ShareEditorScreen() {
           shortCode={savedShare.short_code}
           collectionName={savedShare.name}
           onClose={closeQrAndExit}
+          extraContent={
+            savedShare.published_at === null ? (
+              <Pressable
+                onPress={async () => {
+                  try {
+                    await api(`/shares/${savedShare.id}/publish`, { method: 'POST' });
+                    setSavedShare({ ...savedShare, published_at: new Date().toISOString() });
+                  } catch {}
+                }}
+                style={({ pressed }) => [
+                  styles.publishPrompt,
+                  {
+                    backgroundColor: c.accentSoft,
+                    borderColor: c.accent,
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.publishPromptTitle, { color: c.accent }]}>
+                  Make it discoverable?
+                </Text>
+                <Text style={[styles.publishPromptSub, { color: c.textMuted }]}>
+                  Publish to search and Google so others can find it.
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={[styles.publishPrompt, { backgroundColor: c.accentSoft, borderColor: c.accent }]}>
+                <Text style={[styles.publishPromptTitle, { color: c.accent }]}>
+                  Published
+                </Text>
+                <Text style={[styles.publishPromptSub, { color: c.textMuted }]}>
+                  Visible in search and on Google.
+                </Text>
+              </View>
+            )
+          }
         />
       ) : null}
     </KeyboardAvoidingView>
@@ -837,6 +882,14 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontSize: 15, fontWeight: '600' },
   rowSub: { fontSize: 13, marginTop: 2, lineHeight: 18 },
+  publishPrompt: {
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginTop: Spacing.md,
+  },
+  publishPromptTitle: { fontSize: 15, fontWeight: '600' },
+  publishPromptSub: { fontSize: 13, marginTop: 2, lineHeight: 18 },
 
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
   itemsHeader: {
