@@ -1,6 +1,5 @@
 import Link from 'next/link';
 
-import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 
@@ -17,13 +16,9 @@ export default async function FeedbackPage() {
       cache: 'no-store',
     });
     userEmail = user.email;
-  } catch (err) {
-    if (err instanceof ApiError && err.isUnauthorized) {
-      userEmail = null;
-    } else {
-      // Unexpected error — still render the page, just without pre-filled email
-      userEmail = null;
-    }
+  } catch {
+    // Any error (401, network, etc.) — render without pre-filled email
+    userEmail = null;
   }
 
   const isSignedIn = userEmail !== null;

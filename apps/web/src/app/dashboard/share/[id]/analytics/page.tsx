@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
+import type { ShareResponse } from '@/types/share';
 
 export const metadata = { title: 'Share analytics' };
 export const dynamic = 'force-dynamic';
@@ -17,12 +18,6 @@ interface ShareAnalytics {
   views_last_7d: number;
   views_last_30d: number;
   daily_views: DailyView[];
-}
-
-interface ShareResponse {
-  id: string;
-  short_code: string;
-  name: string;
 }
 
 type PageProps = { params: Promise<{ id: string }> };

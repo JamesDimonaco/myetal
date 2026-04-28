@@ -18,8 +18,6 @@ import {
   REFRESH_COOKIE,
 } from './auth-cookies';
 
-export { ACCESS_COOKIE, REFRESH_COOKIE };
-
 export async function getAccessToken(): Promise<string | undefined> {
   const store = await cookies();
   return store.get(ACCESS_COOKIE)?.value;

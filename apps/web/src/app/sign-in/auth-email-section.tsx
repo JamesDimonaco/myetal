@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 const ALLOWED_RETURN_PREFIXES = ['/dashboard', '/'];
