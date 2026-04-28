@@ -387,44 +387,53 @@ export function ShareEditor({ initial, id }: Props) {
 
         {/* Publish to discovery toggle — only shown for existing shares */}
         {!isNew ? (
-          <div className="flex items-start justify-between gap-4 rounded-md border border-rule bg-paper-soft p-4">
+          <div
+            className={[
+              'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors',
+              publishedAt
+                ? 'border-accent bg-accent-soft'
+                : 'border-rule bg-paper-soft',
+            ].join(' ')}
+          >
             <div>
               <p className="text-sm font-semibold text-ink">
-                Publish to discovery
+                {publishedAt ? 'Published' : 'Publish to discovery'}
               </p>
               <p className="mt-1 text-sm text-ink-muted">
-                Make this share discoverable in search, similar shares, and
-                trending.
+                {publishedAt
+                  ? 'Visible in search, similar shares, and Google.'
+                  : 'Make this share searchable and visible on Google.'}
               </p>
             </div>
             <button
               type="button"
               role="switch"
               aria-checked={publishedAt !== null}
-              disabled={
-                publishMutation.isPending || unpublishMutation.isPending
-              }
-              onClick={async () => {
-                try {
-                  if (publishedAt) {
-                    const updated =
-                      await unpublishMutation.mutateAsync();
-                    setPublishedAt(updated.published_at);
-                  } else {
-                    const updated =
-                      await publishMutation.mutateAsync();
-                    setPublishedAt(updated.published_at);
-                  }
-                } catch (err) {
-                  setError(
-                    err instanceof ApiError
-                      ? err.detail
-                      : 'Failed to update discovery status',
-                  );
-                }
+              onClick={() => {
+                // Optimistic update — toggle immediately, revert on error
+                const previousValue = publishedAt;
+                const newValue = publishedAt
+                  ? null
+                  : new Date().toISOString();
+                setPublishedAt(newValue);
+
+                const mutation = newValue
+                  ? publishMutation
+                  : unpublishMutation;
+                mutation.mutateAsync().then(
+                  (updated) => setPublishedAt(updated.published_at),
+                  (err) => {
+                    setPublishedAt(previousValue);
+                    setError(
+                      err instanceof ApiError
+                        ? err.detail
+                        : 'Failed to update discovery status',
+                    );
+                  },
+                );
               }}
               className={[
-                'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:opacity-60',
+                'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition',
                 publishedAt ? 'bg-accent' : 'bg-ink-faint',
               ].join(' ')}
             >

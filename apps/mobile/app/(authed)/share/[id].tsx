@@ -457,37 +457,47 @@ export default function ShareEditorScreen() {
 
           {/* Publish to discovery toggle — only for existing shares */}
           {!isNew ? (
-            <View style={[styles.field, styles.row]}>
+            <View
+              style={[
+                styles.publishCard,
+                {
+                  backgroundColor: publishedAt ? c.accentSoft : c.surface,
+                  borderColor: publishedAt ? c.accent : c.border,
+                },
+              ]}
+            >
               <View style={{ flex: 1 }}>
                 <Text style={[styles.rowTitle, { color: c.text }]}>
-                  Publish to discovery
+                  {publishedAt ? 'Published' : 'Publish to discovery'}
                 </Text>
                 <Text style={[styles.rowSub, { color: c.textMuted }]}>
-                  Make this share discoverable in search, similar shares, and
-                  trending.
+                  {publishedAt
+                    ? 'Visible in search, similar shares, and Google.'
+                    : 'Make this share searchable and visible on Google.'}
                 </Text>
               </View>
               <Switch
                 value={publishedAt !== null}
-                disabled={
-                  publishMutation.isPending || unpublishMutation.isPending
-                }
-                onValueChange={async (value) => {
-                  try {
-                    if (value) {
-                      const updated = await publishMutation.mutateAsync();
-                      setPublishedAt(updated.published_at);
-                    } else {
-                      const updated = await unpublishMutation.mutateAsync();
-                      setPublishedAt(updated.published_at);
-                    }
-                  } catch (err) {
-                    setError(
-                      err instanceof ApiError
-                        ? err.detail
-                        : 'Failed to update discovery status',
-                    );
-                  }
+                trackColor={{ false: c.border, true: c.accent }}
+                thumbColor="#fff"
+                onValueChange={(value) => {
+                  // Optimistic update — toggle immediately, fix on error
+                  const previousValue = publishedAt;
+                  setPublishedAt(value ? new Date().toISOString() : null);
+
+                  const mutation = value ? publishMutation : unpublishMutation;
+                  mutation.mutateAsync().then(
+                    (updated) => setPublishedAt(updated.published_at),
+                    (err) => {
+                      // Revert on failure
+                      setPublishedAt(previousValue);
+                      setError(
+                        err instanceof ApiError
+                          ? err.detail
+                          : 'Failed to update discovery status',
+                      );
+                    },
+                  );
                 }}
               />
             </View>
@@ -808,6 +818,15 @@ const styles = StyleSheet.create({
   },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  publishCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
   rowTitle: { fontSize: 15, fontWeight: '600' },
   rowSub: { fontSize: 13, marginTop: 2, lineHeight: 18 },
 
