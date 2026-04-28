@@ -125,3 +125,26 @@ export interface ShareSearchResponse {
   results: ShareSearchResult[];
   has_more: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Public browse (discovery page)
+// ---------------------------------------------------------------------------
+
+export interface BrowseShareResult {
+  short_code: string;
+  name: string;
+  description: string | null;
+  type: ShareType;
+  owner_name: string | null;
+  item_count: number;
+  published_at: string;
+  updated_at: string;
+  preview_items: string[];
+  view_count: number | null;
+}
+
+export interface BrowseResponse {
+  trending: BrowseShareResult[];
+  recent: BrowseShareResult[];
+  total_published: number;
+}

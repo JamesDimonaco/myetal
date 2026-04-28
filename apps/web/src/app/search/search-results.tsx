@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clientApi } from '@/lib/client-api';
 import { formatRelativeTime } from '@/lib/format';
 import type {
+  BrowseResponse,
+  BrowseShareResult,
   ShareSearchResponse,
   ShareSearchResult,
   ShareType,
@@ -65,6 +67,14 @@ export function SearchResults() {
 
   const debouncedQuery = useDebouncedValue(query.trim(), DEBOUNCE_MS);
   const enabled = debouncedQuery.length >= MIN_QUERY_LENGTH;
+
+  // Fetch browse data (trending + recent) when the search query is empty
+  const { data: browseData } = useQuery({
+    queryKey: ['browse'],
+    queryFn: () => clientApi<BrowseResponse>('/public/browse'),
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   // Reset pagination when query changes
   const prevQueryRef = useRef(debouncedQuery);
@@ -170,6 +180,11 @@ export function SearchResults() {
         />
       </div>
 
+      {/* Browse sections — shown when query is empty */}
+      {!enabled && browseData ? (
+        <BrowseSections data={browseData} />
+      ) : null}
+
       {/* Loading spinner */}
       {(isLoading || isFetching) && enabled ? (
         <div className="mt-6 flex justify-center" aria-live="polite">
@@ -257,7 +272,119 @@ export function SearchResults() {
 }
 
 // ---------------------------------------------------------------------------
-// Result card
+// Browse sections (shown before user types)
+// ---------------------------------------------------------------------------
+
+function BrowseSections({ data }: { data: BrowseResponse }) {
+  const { trending, recent, total_published } = data;
+
+  // Edge case: nothing published at all
+  if (trending.length === 0 && recent.length === 0) {
+    return (
+      <div className="mt-10 text-center">
+        <p className="text-sm text-ink-muted">
+          Be the first to publish a collection on MyEtAl.
+        </p>
+      </div>
+    );
+  }
+
+  const showTrending = trending.length >= 3;
+
+  return (
+    <div className="mt-6">
+      {showTrending ? (
+        <>
+          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+            Trending this week
+          </h2>
+          <div role="list" className="mt-2">
+            {trending.map((item) => (
+              <BrowseCard key={item.short_code} result={item} showViews />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      <h2
+        className={`text-xs font-medium uppercase tracking-widest text-ink-faint ${showTrending ? 'mt-8' : ''}`}
+      >
+        Recently published
+      </h2>
+      <div role="list" className="mt-2">
+        {recent.map((item) => (
+          <BrowseCard key={item.short_code} result={item} />
+        ))}
+      </div>
+
+      {total_published >= 5 ? (
+        <p className="mt-8 text-center text-sm text-ink-faint">
+          Browse {total_published} collections
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function BrowseCard({
+  result,
+  showViews,
+}: {
+  result: BrowseShareResult;
+  showViews?: boolean;
+}) {
+  const previewText = useMemo(() => {
+    if (!result.preview_items || result.preview_items.length === 0) return null;
+    const shown = result.preview_items.slice(0, 3);
+    const remaining = result.item_count - shown.length;
+    const titles = shown.join(', ');
+    if (remaining > 0) {
+      return `Contains: ${titles}, and ${remaining} more`;
+    }
+    return `Contains: ${titles}`;
+  }, [result.preview_items, result.item_count]);
+
+  return (
+    <article role="listitem" className="border-b border-rule py-4">
+      <Link
+        href={`/c/${result.short_code}`}
+        className="font-serif text-base text-ink underline decoration-transparent decoration-1 underline-offset-4 transition hover:decoration-ink"
+      >
+        {result.name}
+      </Link>
+
+      {result.description ? (
+        <p className="mt-1 line-clamp-2 text-sm text-ink-muted">
+          {result.description}
+        </p>
+      ) : null}
+
+      {/* Metadata row */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
+        {result.owner_name ? <span>{result.owner_name}</span> : null}
+        <span className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-muted">
+          {result.type}
+        </span>
+        <span>
+          {result.item_count} {result.item_count === 1 ? 'paper' : 'papers'}
+        </span>
+        {showViews && result.view_count != null ? (
+          <span>{result.view_count} {result.view_count === 1 ? 'view' : 'views'}</span>
+        ) : (
+          <span>{formatRelativeTime(result.published_at)}</span>
+        )}
+      </div>
+
+      {/* Preview items */}
+      {previewText ? (
+        <p className="mt-1.5 text-xs italic text-ink-faint">{previewText}</p>
+      ) : null}
+    </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Search result card
 // ---------------------------------------------------------------------------
 
 function ResultCard({ result }: { result: ShareSearchResult }) {
