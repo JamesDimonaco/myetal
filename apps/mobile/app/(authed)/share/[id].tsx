@@ -172,7 +172,7 @@ export default function ShareEditorScreen() {
   const [description, setDescription] = useState('');
   const [shareType, setShareType] = useState<ShareType>('paper');
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
-  const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
+  const [items, setItems] = useState<DraftItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [savedShare, setSavedShare] = useState<ShareResponse | null>(null);
@@ -188,7 +188,7 @@ export default function ShareEditorScreen() {
     setItems(
       existing.data.items.length
         ? existing.data.items.map(fromResponseItem)
-        : [emptyItem()],
+        : [],
     );
   }, [existing.data]);
 
@@ -196,24 +196,12 @@ export default function ShareEditorScreen() {
     setItems((prev) => prev.map((it) => (it._key === key ? { ...it, ...patch } : it)));
   };
 
-  /**
-   * Append an item from the add-item modal. If the only existing row is the
-   * blank seed (no title typed), replace it — that keeps the count honest for
-   * a fresh share where the user hadn't manually filled the empty row yet.
-   */
+  /** Append an item from the add-item modal. */
   const appendItem = (pending: PendingItem) => {
-    setItems((prev) => {
-      const draft = pending.kind === 'paper'
-        ? fromPaper(pending.paper)
-        : fromPendingItem(pending);
-      const onlySeedRow =
-        prev.length === 1 &&
-        !prev[0].title.trim() &&
-        !prev[0].doi.trim() &&
-        !prev[0].scholar_url.trim() &&
-        !prev[0].authors.trim();
-      return onlySeedRow ? [draft] : [...prev, draft];
-    });
+    const draft = pending.kind === 'paper'
+      ? fromPaper(pending.paper)
+      : fromPendingItem(pending);
+    setItems((prev) => [...prev, draft]);
   };
 
   // Pick up items handed off by the add-item modal. Both the immediate sync
@@ -230,7 +218,7 @@ export default function ShareEditorScreen() {
   };
 
   const removeItem = (key: string) => {
-    setItems((prev) => (prev.length === 1 ? prev : prev.filter((it) => it._key !== key)));
+    setItems((prev) => prev.filter((it) => it._key !== key));
   };
 
   const moveItem = (key: string, direction: -1 | 1) => {
@@ -500,6 +488,15 @@ export default function ShareEditorScreen() {
             </Pressable>
           </View>
 
+          {items.length === 0 ? (
+            <View style={[styles.emptyItems, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <Ionicons name="document-outline" size={28} color={c.textMuted} />
+              <Text style={[styles.emptyItemsText, { color: c.textMuted }]}>
+                No items yet. Tap &apos;Add item&apos; to start.
+              </Text>
+            </View>
+          ) : null}
+
           {items.map((it, idx) => (
             <View
               key={it._key}
@@ -532,10 +529,9 @@ export default function ShareEditorScreen() {
                   <Pressable
                     accessibilityLabel="Remove item"
                     hitSlop={8}
-                    disabled={items.length === 1}
                     onPress={() => removeItem(it._key)}
                     style={({ pressed }) => ({
-                      opacity: items.length === 1 ? 0.3 : pressed ? 0.6 : 1,
+                      opacity: pressed ? 0.6 : 1,
                       padding: 4,
                     })}
                   >
@@ -666,12 +662,12 @@ export default function ShareEditorScreen() {
 
           <Pressable
             onPress={handleSave}
-            disabled={submitting}
+            disabled={submitting || !name.trim()}
             style={({ pressed }) => [
               styles.primary,
               {
                 backgroundColor: c.text,
-                opacity: submitting ? 0.6 : pressed ? 0.85 : 1,
+                opacity: submitting || !name.trim() ? 0.6 : pressed ? 0.85 : 1,
                 marginTop: Spacing.lg,
               },
             ]}
@@ -804,6 +800,21 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   itemsCountHint: { fontSize: 11, marginTop: 2 },
+
+  emptyItems: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xl,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: 'dashed',
+    marginBottom: Spacing.sm,
+  },
+  emptyItemsText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
 
   itemCard: {
     borderRadius: Radius.md,

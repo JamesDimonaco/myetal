@@ -233,7 +233,7 @@ function PaperPreview({
       ) : null}
       <View style={{ height: Spacing.md }} />
       <Button
-        label={added ? 'Added!' : 'Add to collection'}
+        label={added ? 'Added!' : 'Add to share'}
         icon={added ? 'checkmark' : 'add'}
         onPress={onAdd}
         loading={busy}
@@ -763,7 +763,7 @@ function ManualPane() {
 
       <View style={{ height: Spacing.lg }} />
       <Button
-        label="Add to collection"
+        label="Add to share"
         icon="add"
         onPress={handleAdd}
         disabled={!canSave}

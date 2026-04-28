@@ -187,7 +187,7 @@ export function ShareEditor({ initial, id }: Props) {
   const [items, setItems] = useState<DraftItem[]>(
     initial && initial.items.length
       ? initial.items.map(fromResponseItem)
-      : [emptyItem()],
+      : [],
   );
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -204,30 +204,14 @@ export function ShareEditor({ initial, id }: Props) {
     );
   };
 
-  /**
-   * Append an item from the add-item modal. If the only existing row is the
-   * blank seed (no fields filled), replace it — keeps the count honest for a
-   * fresh share where the user hadn't manually touched the empty row yet.
-   */
+  /** Append an item from the add-item modal. */
   const appendItem = (payload: AddItemPayload) => {
-    setItems((prev) => {
-      const draft = fromAddPayload(payload);
-      const onlySeedRow =
-        prev.length === 1 &&
-        !prev[0].title.trim() &&
-        !prev[0].doi.trim() &&
-        !prev[0].scholar_url.trim() &&
-        !prev[0].authors.trim() &&
-        !prev[0].url.trim() &&
-        !prev[0].subtitle.trim();
-      return onlySeedRow ? [draft] : [...prev, draft];
-    });
+    const draft = fromAddPayload(payload);
+    setItems((prev) => [...prev, draft]);
   };
 
   const removeItem = (key: string) => {
-    setItems((prev) =>
-      prev.length === 1 ? prev : prev.filter((it) => it._key !== key),
-    );
+    setItems((prev) => prev.filter((it) => it._key !== key));
   };
 
   const moveItem = (key: string, direction: -1 | 1) => {
@@ -505,6 +489,16 @@ export function ShareEditor({ initial, id }: Props) {
           ) : null}
 
           <div className="mt-3 grid gap-3">
+            {items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-rule py-10 text-ink-muted">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <p className="text-sm">No items yet. Click &apos;Add item&apos; to start.</p>
+              </div>
+            ) : null}
+
             {items.map((it, idx) => (
               <div
                 key={it._key}
@@ -534,7 +528,6 @@ export function ShareEditor({ initial, id }: Props) {
                     </IconBtn>
                     <IconBtn
                       label="Remove item"
-                      disabled={items.length === 1}
                       onClick={() => removeItem(it._key)}
                     >
                       <TrashIcon />
@@ -597,7 +590,7 @@ export function ShareEditor({ initial, id }: Props) {
             ) : null}
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !name.trim()}
               className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
             >
               {submitting
