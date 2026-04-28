@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -13,14 +13,12 @@ import { RecentShareCard } from '@/components/recent-share-card';
 import { Wordmark } from '@/components/wordmark';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useHaptics } from '@/hooks/useHaptics';
 import { useRecentShares } from '@/hooks/useRecentShares';
 import { useSplashGate } from '@/hooks/useSplashGate';
 
 export default function LandingScreen() {
   const scheme = useColorScheme() ?? 'light';
   const c = Colors[scheme];
-  const haptics = useHaptics();
   const recents = useRecentShares();
   const hasRecents = (recents?.length ?? 0) > 0;
   useSplashGate();
@@ -137,23 +135,22 @@ export default function LandingScreen() {
         )}
       </ScrollView>
 
-      {/* Footer CTA */}
+      {/* Divider + Sign-in CTA */}
       <Animated.View entering={FadeInUp.duration(400).delay(380)} style={styles.footerWrap}>
-        <Link href="/sign-in" asChild>
-          <Pressable
-            style={({ pressed }) => [
-              styles.footer,
-              { borderColor: c.border, opacity: pressed ? 0.7 : 1 },
-            ]}
-            accessibilityRole="link"
-            accessibilityLabel="Sign in to create your own collection"
-            onPress={() => haptics.tap()}
-          >
-            <Text style={[styles.footerText, { color: c.textMuted }]}>
-              Sign in to create your collection {'\u2192'}
-            </Text>
-          </Pressable>
-        </Link>
+        <View style={styles.dividerRow}>
+          <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+          <Text style={[styles.dividerText, { color: c.textSubtle }]}>or</Text>
+          <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+        </View>
+
+        <Button
+          label="Sign in to create your collection"
+          icon="arrow-forward"
+          iconPosition="trailing"
+          variant="secondary"
+          onPress={() => router.push('/sign-in')}
+          accessibilityLabel="Sign in to create your own collection"
+        />
       </Animated.View>
     </SafeAreaView>
   );
@@ -241,18 +238,22 @@ const styles = StyleSheet.create({
   },
   footerWrap: {
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.lg,
   },
-  footer: {
+  dividerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: Spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.md,
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  footerText: {
-    fontSize: 15,
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  dividerText: {
+    fontSize: 13,
     fontWeight: '500',
+    letterSpacing: 0.3,
   },
 });
