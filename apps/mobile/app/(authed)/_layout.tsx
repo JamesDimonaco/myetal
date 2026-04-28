@@ -98,10 +98,7 @@ export default function AuthedLayout() {
           headerShown must NOT be false here — the screens set their own
           header via Stack.Screen options inside the component. */}
       <Tabs.Screen name="share/[id]" options={{ href: null }} />
-      <Tabs.Screen
-        name="share/add-paper"
-        options={{ href: null }}
-      />
+      {/* share/add-paper moved to root /add-item as a modal */}
       <Tabs.Screen
         name="feedback"
         options={{ href: null, title: 'Feedback' }}

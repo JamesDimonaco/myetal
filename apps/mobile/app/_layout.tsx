@@ -63,6 +63,10 @@ export default function RootLayout() {
                 options={{ presentation: 'modal', title: 'Sign in' }}
               />
               <Stack.Screen name="(authed)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="add-item"
+                options={{ presentation: 'modal', headerShown: false }}
+              />
             </Stack>
             <StatusBar style="auto" />
 

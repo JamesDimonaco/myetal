@@ -214,7 +214,7 @@ export default function ShareEditorScreen() {
   }, []);
 
   const openAddItem = () => {
-    router.push('/(authed)/share/add-paper');
+    router.push('/add-item' as any);
   };
 
   const removeItem = (key: string) => {
