@@ -870,7 +870,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
 
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   publishCard: {
     flexDirection: 'row',
     alignItems: 'center',
