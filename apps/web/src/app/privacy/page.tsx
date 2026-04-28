@@ -161,7 +161,7 @@ export default function PrivacyPage() {
             <li>
               <strong>Deletion</strong> &mdash; delete your account and all
               associated data at any time from your profile page. This cascades
-              to shares, views, reports, library entries, and auth tokens.
+              to shares, views, reports, saved papers, and auth tokens.
             </li>
             <li>
               <strong>Rectification</strong> &mdash; update your name, email,

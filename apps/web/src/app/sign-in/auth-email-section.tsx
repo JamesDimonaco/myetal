@@ -282,7 +282,7 @@ export function AuthEmailSection({
             >
               Sign in
             </button>
-            . Email/password is minimal — no password reset until v1.1.
+            . Email/password is minimal — password reset coming soon.
           </p>
         </form>
       )}

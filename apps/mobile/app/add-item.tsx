@@ -9,10 +9,8 @@
  * (`setPendingItem`) and pop the modal -- the share editor picks it up via a
  * subscribe-on-mount listener. See `lib/pending-item.ts`.
  *
- * Note on filename: the brief named this `_add-paper.tsx`, but expo-router
- * treats underscore-prefixed files as private (excluded from routes), so the
- * file lives at `add-paper.tsx`. The route is hidden from the tab bar via
- * `href: null` in `(authed)/_layout.tsx`.
+ * Lives at the root Stack level as a modal (`app/add-item.tsx`) so the
+ * share editor stays mounted underneath and retains form state.
  */
 
 import { Ionicons } from '@expo/vector-icons';

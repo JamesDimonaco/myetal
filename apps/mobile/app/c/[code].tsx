@@ -194,7 +194,7 @@ export default function PublicShareScreen() {
             style={styles.countRow}
           >
             <Text style={[styles.countLabel, { color: c.textSubtle }]}>
-              {data.items.length} {data.items.length === 1 ? 'PAPER' : 'PAPERS'}
+              {data.items.length} {data.items.length === 1 ? 'ITEM' : 'ITEMS'}
             </Text>
             <View style={[styles.countRule, { backgroundColor: c.border }]} />
           </Animated.View>

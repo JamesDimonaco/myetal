@@ -1,5 +1,5 @@
 /**
- * MyEtal design tokens. Paper-and-ink palette: warm off-white surface,
+ * MyEtAl design tokens. Paper-and-ink palette: warm off-white surface,
  * dark ink text, single deep teal accent. Iterate freely; everything is
  * consumed via the `Colors` object so changes here propagate.
  */
@@ -89,7 +89,7 @@ export const Fonts = Platform.select({
  * and any "display" voice on hero copy.
  */
 export const Type = {
-  // Display serif — used for the MyEtal wordmark and large hero text
+  // Display serif — used for the MyEtAl wordmark and large hero text
   display: {
     fontFamily: Fonts.serif,
     fontSize: 64,

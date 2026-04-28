@@ -27,7 +27,7 @@ from cachetools import TTLCache
 from myetal_api.schemas.papers import OpenAccessInfo, PaperMetadata, PaperSearchResult, TopicInfo
 
 POLITE_EMAIL = "team@myetal.app"
-USER_AGENT = f"MyEtalAPI/0.1 (mailto:{POLITE_EMAIL})"
+USER_AGENT = f"MyEtAlAPI/0.1 (mailto:{POLITE_EMAIL})"
 TIMEOUT_SECONDS = 5.0
 
 CROSSREF_URL = "https://api.crossref.org/works/{doi}"

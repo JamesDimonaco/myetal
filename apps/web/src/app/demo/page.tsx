@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { SiteFooter } from '@/components/site-footer';
 import { DemoTour } from './demo-tour';
 
 export const metadata = {
@@ -106,9 +107,9 @@ export default function DemoPage() {
         </div>
       </section>
 
-      <footer className="mt-20 text-xs text-ink-faint">
-        © 2026 MyEtAl
-      </footer>
+      <div className="mt-20">
+        <SiteFooter />
+      </div>
     </main>
   );
 }
