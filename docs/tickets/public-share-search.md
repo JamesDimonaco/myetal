@@ -106,7 +106,8 @@ class ShareSearchResponse(BaseModel):
 One-time migration (can be in a new Alembic revision):
 
 ```sql
--- Enable the extension (Neon supports it; the Pi Postgres should too)
+-- Enable the extension (standard in Postgres 16; works on the dev Pi
+-- and on Railway/Neon production)
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- GiST index for trigram search on share name + description
@@ -370,11 +371,11 @@ The ticket recommends "Load more" over infinite scroll — agreed. Specifics:
 
 ---
 
-## Out of scope
+## Out of scope (revisit later)
 
+- **Paper-level search (v2)** — v1 only searches share name, description, and owner name. Searching within a share's paper titles/authors (e.g. "find shares containing 'Attention is all you need'") is deferred. When we build this, it's an additional `EXISTS` subquery joining `share_items` with trigram matching on `title` and `authors`. The pg_trgm index would need extending to cover `share_items.title`.
 - Full-text search with `tsvector` (decided against in discovery ticket D5)
 - Author profile pages
 - Category/topic browsing
-- Search within paper content (v2)
 - Search analytics (what people search for) — could be a PostHog event
 - Autocomplete/suggestions
