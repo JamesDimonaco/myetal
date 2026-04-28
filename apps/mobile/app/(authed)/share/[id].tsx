@@ -344,6 +344,15 @@ export default function ShareEditorScreen() {
           headerShown: true,
           headerStyle: { backgroundColor: c.background },
           headerTintColor: c.text,
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingRight: Spacing.sm })}
+            >
+              <Ionicons name="arrow-back" size={24} color={c.text} />
+            </Pressable>
+          ),
         }}
       />
 

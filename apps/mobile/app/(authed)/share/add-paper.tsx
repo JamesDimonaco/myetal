@@ -81,6 +81,15 @@ export default function AddItemScreen() {
           headerShown: true,
           headerStyle: { backgroundColor: c.background },
           headerTintColor: c.text,
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingRight: Spacing.sm })}
+            >
+              <Ionicons name="close" size={24} color={c.text} />
+            </Pressable>
+          ),
         }}
       />
 

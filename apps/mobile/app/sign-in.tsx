@@ -59,7 +59,16 @@ export default function SignInScreen() {
   const [pasteValue, setPasteValue] = useState('');
   const [pasteError, setPasteError] = useState<string | null>(null);
 
-  const goToDashboard = () => router.replace('/(authed)/dashboard');
+  const goToDashboard = () => {
+    // Dismiss the sign-in modal. The (authed) layout detects isAuthed
+    // and renders the tab shell automatically — we don't need to navigate
+    // to it explicitly. dismissAll() clears the modal stack so the user
+    // can't swipe back to the sign-in page.
+    if (router.canDismiss()) {
+      router.dismissAll();
+    }
+    router.replace('/(authed)/dashboard');
+  };
 
   const handleSubmit = async () => {
     setError(null);

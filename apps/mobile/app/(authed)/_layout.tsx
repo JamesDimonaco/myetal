@@ -94,11 +94,13 @@ export default function AuthedLayout() {
           ),
         }}
       />
-      {/* Hidden routes — reachable by navigation but not in the tab bar */}
-      <Tabs.Screen name="share/[id]" options={{ href: null, headerShown: false }} />
+      {/* Hidden routes — reachable by navigation but not in the tab bar.
+          headerShown must NOT be false here — the screens set their own
+          header via Stack.Screen options inside the component. */}
+      <Tabs.Screen name="share/[id]" options={{ href: null }} />
       <Tabs.Screen
         name="share/add-paper"
-        options={{ href: null, headerShown: false }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="feedback"
