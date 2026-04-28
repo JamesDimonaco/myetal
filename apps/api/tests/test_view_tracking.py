@@ -32,12 +32,6 @@ async def _count_views(db: AsyncSession, share_id) -> int:
     return len(list(rows.all()))
 
 
-def _setup_module() -> None:
-    # Reset the in-memory anon dedup between modules so prior tests can't
-    # bleed into this one's bloom-equivalent.
-    share_view_dedup._reset_for_tests()
-
-
 async def test_anon_view_records_a_share_view_row(db_session: AsyncSession, api_client) -> None:
     """Plain GET /public/c/{short_code} from anon writes a share_views row."""
     share_view_dedup._reset_for_tests()

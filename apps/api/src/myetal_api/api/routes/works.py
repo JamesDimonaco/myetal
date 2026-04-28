@@ -39,7 +39,7 @@ async def add_work(
     except ValueError as exc:
         # Malformed DOI / unparseable identifier
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
     except papers_service.PaperNotFound as exc:
         raise HTTPException(

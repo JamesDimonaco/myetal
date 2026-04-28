@@ -10,17 +10,8 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.schemas.share import BrowseShareResult
-from myetal_api.services import auth as auth_service
-from myetal_api.services import share as share_service
-from myetal_api.schemas.share import ShareCreate
-
-
-async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
-    user, _, _ = await auth_service.register_with_password(db, email, "hunter22", "Researcher")
-    return user
 
 
 # ---------- response structure ----------
