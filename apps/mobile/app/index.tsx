@@ -45,9 +45,33 @@ export default function LandingScreen() {
           </Text>
         </Animated.View>
 
+        {/* Search entry */}
+        <Animated.View
+          entering={FadeInUp.duration(400).delay(80).springify().damping(20)}
+        >
+          <Pressable
+            onPress={() => router.push('/search')}
+            accessibilityRole="search"
+            accessibilityLabel="Search collections"
+            style={({ pressed }) => [
+              styles.searchEntry,
+              {
+                borderColor: c.border,
+                backgroundColor: c.surface,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Ionicons name="search-outline" size={18} color={c.textSubtle} />
+            <Text style={[styles.searchPlaceholder, { color: c.textSubtle }]}>
+              Search collections...
+            </Text>
+          </Pressable>
+        </Animated.View>
+
         {/* Primary actions */}
         <Animated.View
-          entering={FadeInUp.duration(400).delay(120).springify().damping(20)}
+          entering={FadeInUp.duration(400).delay(160).springify().damping(20)}
           style={styles.actions}
         >
           <Button
@@ -152,6 +176,20 @@ const styles = StyleSheet.create({
     marginTop: Spacing.lg,
     lineHeight: 25,
     maxWidth: 320,
+  },
+  searchEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    minHeight: 48,
+    marginBottom: Spacing.sm + 2,
+  },
+  searchPlaceholder: {
+    fontSize: 15,
+    fontWeight: '400',
   },
   actions: {
     gap: Spacing.sm + 2,

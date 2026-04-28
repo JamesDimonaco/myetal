@@ -98,3 +98,22 @@ export interface ShareUpdateInput {
   is_public?: boolean;
   items?: ShareItemInput[];
 }
+
+/** A single result from the public share search endpoint. */
+export interface ShareSearchResult {
+  short_code: string;
+  name: string;
+  description: string | null;
+  type: ShareType;
+  owner_name: string | null;
+  item_count: number;
+  published_at: string;
+  updated_at: string;
+  preview_items: string[];
+}
+
+/** Paginated response from `GET /public/search`. */
+export interface ShareSearchResponse {
+  results: ShareSearchResult[];
+  has_more: boolean;
+}
