@@ -124,6 +124,27 @@ class ShareSearchResponse(BaseModel):
     has_more: bool
 
 
+class BrowseShareResult(BaseModel):
+    """A single collection card on the browse page."""
+
+    short_code: str
+    name: str
+    description: str | None
+    type: ShareType
+    owner_name: str | None
+    item_count: int
+    published_at: datetime
+    updated_at: datetime
+    preview_items: list[str]  # first 3 item titles
+    view_count: int | None = None  # only populated for trending results
+
+
+class BrowseResponse(BaseModel):
+    trending: list[BrowseShareResult]
+    recent: list[BrowseShareResult]
+    total_published: int
+
+
 class DailyViewCount(BaseModel):
     date: str
     count: int

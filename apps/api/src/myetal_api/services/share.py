@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from myetal_api.core.security import generate_short_code
 from myetal_api.models import Share, ShareItem, SharePaper, ShareSimilar, ShareView
 from myetal_api.schemas.share import (
+    BrowseShareResult,
     DailyViewCount,
     RelatedShareOut,
     ShareAnalyticsResponse,
@@ -435,6 +436,138 @@ async def search_published_shares(
         for r in rows
     ]
     return results, has_more
+
+
+async def browse_published_shares(
+    db: AsyncSession,
+) -> tuple[list[BrowseShareResult], list[BrowseShareResult], int]:
+    """Returns (trending, recent, total_count) for the browse page.
+
+    Trending: top 5 from ``trending_shares`` (7-day view-weighted score).
+    Recent:   last 5 (or 10 if trending < 3) by ``published_at DESC``.
+    Total:    COUNT of all published, public, non-deleted shares.
+    """
+    # ── Trending ────────────────────────────────────────────────────────
+    trending_sql = text("""
+        SELECT
+            ts.share_id,
+            ts.score,
+            ts.view_count_7d,
+            s.short_code,
+            s.name,
+            s.description,
+            s.type,
+            s.published_at,
+            s.updated_at,
+            u.name AS owner_name,
+            COUNT(si.id) AS item_count
+        FROM trending_shares ts
+        JOIN shares s ON s.id = ts.share_id
+        LEFT JOIN users u ON u.id = s.owner_user_id
+        LEFT JOIN share_items si ON si.share_id = s.id
+        WHERE s.is_public = true
+          AND s.published_at IS NOT NULL
+          AND s.deleted_at IS NULL
+        GROUP BY ts.share_id, ts.score, ts.view_count_7d,
+                 s.short_code, s.name, s.description, s.type,
+                 s.published_at, s.updated_at, u.name
+        ORDER BY ts.score DESC
+        LIMIT 5
+    """)
+    trending_rows = (await db.execute(trending_sql)).all()
+
+    # ── Recent ──────────────────────────────────────────────────────────
+    recent_limit = 10 if len(trending_rows) < 3 else 5
+    recent_sql = text("""
+        SELECT
+            s.id AS share_id,
+            s.short_code,
+            s.name,
+            s.description,
+            s.type,
+            s.published_at,
+            s.updated_at,
+            u.name AS owner_name,
+            COUNT(si.id) AS item_count
+        FROM shares s
+        LEFT JOIN users u ON u.id = s.owner_user_id
+        LEFT JOIN share_items si ON si.share_id = s.id
+        WHERE s.is_public = true
+          AND s.published_at IS NOT NULL
+          AND s.deleted_at IS NULL
+        GROUP BY s.id, s.short_code, s.name, s.description, s.type,
+                 s.published_at, s.updated_at, u.name
+        ORDER BY s.published_at DESC
+        LIMIT :recent_limit
+    """).bindparams(recent_limit=recent_limit)
+    recent_rows = (await db.execute(recent_sql)).all()
+
+    # ── Total count ─────────────────────────────────────────────────────
+    count_sql = text("""
+        SELECT COUNT(*) AS cnt FROM shares
+        WHERE is_public = true
+          AND published_at IS NOT NULL
+          AND deleted_at IS NULL
+    """)
+    total_published = (await db.execute(count_sql)).scalar_one()
+
+    # ── Preview items (batch for both sets) ─────────────────────────────
+    all_share_ids = [r.share_id for r in trending_rows] + [
+        r.share_id for r in recent_rows
+    ]
+    previews: dict[uuid.UUID, list[str]] = {}
+    if all_share_ids:
+        # Deduplicate to avoid redundant rows
+        unique_ids = list(set(all_share_ids))
+        preview_sql = text("""
+            SELECT share_id, title
+            FROM (
+                SELECT
+                    si.share_id,
+                    si.title,
+                    ROW_NUMBER() OVER (PARTITION BY si.share_id ORDER BY si.position) AS rn
+                FROM share_items si
+                WHERE si.share_id = ANY(:share_ids)
+            ) sub
+            WHERE rn <= 3
+        """).bindparams(share_ids=unique_ids)
+        preview_rows = (await db.execute(preview_sql)).all()
+        for pr in preview_rows:
+            previews.setdefault(pr.share_id, []).append(pr.title)
+
+    # ── Assemble results ────────────────────────────────────────────────
+    trending = [
+        BrowseShareResult(
+            short_code=r.short_code,
+            name=r.name,
+            description=r.description,
+            type=r.type,
+            owner_name=r.owner_name,
+            item_count=r.item_count,
+            published_at=r.published_at,
+            updated_at=r.updated_at,
+            preview_items=previews.get(r.share_id, []),
+            view_count=r.view_count_7d,
+        )
+        for r in trending_rows
+    ]
+
+    recent = [
+        BrowseShareResult(
+            short_code=r.short_code,
+            name=r.name,
+            description=r.description,
+            type=r.type,
+            owner_name=r.owner_name,
+            item_count=r.item_count,
+            published_at=r.published_at,
+            updated_at=r.updated_at,
+            preview_items=previews.get(r.share_id, []),
+        )
+        for r in recent_rows
+    ]
+
+    return trending, recent, total_published
 
 
 # ---------- internals ----------

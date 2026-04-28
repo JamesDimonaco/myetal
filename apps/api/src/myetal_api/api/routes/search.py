@@ -1,8 +1,12 @@
-"""Public share search endpoint.
+"""Public share search & browse endpoints.
 
 Trigram-similarity search over published, public shares.  No auth
 required.  Rate-limited separately from other anonymous reads because
 the GiST index scan is more expensive than a single-share lookup.
+
+The browse endpoint returns trending + recently-published collections
+without any search query — used as the default view before the user
+starts typing.
 """
 
 import logging
@@ -11,13 +15,39 @@ from fastapi import APIRouter, Query, Request, Response
 from sqlalchemy.exc import OperationalError
 
 from myetal_api.api.deps import DbSession
-from myetal_api.core.rate_limit import SEARCH_LIMIT, limiter
-from myetal_api.schemas.share import ShareSearchResponse
+from myetal_api.core.rate_limit import BROWSE_LIMIT, SEARCH_LIMIT, limiter
+from myetal_api.schemas.share import BrowseResponse, ShareSearchResponse
 from myetal_api.services import share as share_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/public", tags=["search"])
+
+
+@router.get("/browse", response_model=BrowseResponse)
+@limiter.limit(BROWSE_LIMIT)
+async def browse_shares(
+    request: Request,
+    response: Response,
+    db: DbSession,
+) -> BrowseResponse:
+    """Browse trending and recently-published collections.
+
+    Returns the same data for every caller — no auth, no personalisation.
+    Aggressively cached at the CDN / reverse-proxy layer via
+    ``Cache-Control: public, s-maxage=300``.
+    """
+    response.headers["Cache-Control"] = (
+        "public, s-maxage=300, stale-while-revalidate=3600"
+    )
+
+    trending, recent, total_published = await share_service.browse_published_shares(db)
+
+    return BrowseResponse(
+        trending=trending,
+        recent=recent,
+        total_published=total_published,
+    )
 
 
 @router.get("/search", response_model=ShareSearchResponse)

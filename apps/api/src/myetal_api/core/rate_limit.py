@@ -39,3 +39,8 @@ FEEDBACK_LIMIT = "5/hour"
 # than a single-share lookup.  20/min/IP caps scraping while allowing
 # generous browse-and-refine sessions.  Per public-share-search ticket.
 SEARCH_LIMIT = "20/minute"
+
+# Public browse endpoint — returns the same trending/recent data for everyone
+# and is aggressively cached, so the rate limit is more generous than search.
+# Per browse-popular-collections ticket.
+BROWSE_LIMIT = "30/minute"
