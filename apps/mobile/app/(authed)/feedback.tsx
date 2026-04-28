@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { router, Stack } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -27,7 +28,8 @@ interface FeedbackResponse {
 }
 
 export default function FeedbackScreen() {
-  const c = Colors[useColorScheme() ?? 'light'];
+  const scheme = useColorScheme() ?? 'light';
+  const c = Colors[scheme];
   const { user } = useAuth();
 
   const [selectedType, setSelectedType] = useState<FeedbackType | null>(null);
@@ -87,6 +89,22 @@ export default function FeedbackScreen() {
     setSubmittedEmail(null);
   };
 
+  const headerOptions = {
+    title: 'Feedback',
+    headerShown: true,
+    headerStyle: { backgroundColor: c.background },
+    headerTintColor: c.text,
+    headerLeft: () => (
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+      >
+        <Ionicons name="arrow-back" size={24} color={c.text} />
+      </Pressable>
+    ),
+  };
+
   // -- Success state --
   if (success) {
     return (
@@ -94,6 +112,7 @@ export default function FeedbackScreen() {
         edges={['bottom']}
         style={[styles.container, { backgroundColor: c.background }]}
       >
+        <Stack.Screen options={headerOptions} />
         <View style={styles.successContainer}>
           <View
             style={[styles.successIcon, { backgroundColor: c.accentSoft }]}
@@ -159,6 +178,7 @@ export default function FeedbackScreen() {
         edges={['bottom']}
         style={[styles.container, { backgroundColor: c.background }]}
       >
+        <Stack.Screen options={headerOptions} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -237,6 +257,7 @@ export default function FeedbackScreen() {
       edges={['bottom']}
       style={[styles.container, { backgroundColor: c.background }]}
     >
+      <Stack.Screen options={headerOptions} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}

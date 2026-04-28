@@ -368,7 +368,7 @@ export default function ShareEditorScreen() {
             <Pressable
               onPress={() => router.back()}
               hitSlop={12}
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingRight: Spacing.sm })}
+              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
             >
               <Ionicons name="arrow-back" size={24} color={c.text} />
             </Pressable>
