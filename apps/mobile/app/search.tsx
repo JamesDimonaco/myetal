@@ -15,9 +15,15 @@ import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useBrowse } from '@/hooks/useBrowse';
 import { useShareSearch } from '@/hooks/useShareSearch';
 import { formatRelativeTime } from '@/lib/time';
-import type { ShareSearchResult, ShareType } from '@/types/share';
+import type {
+  BrowseResponse,
+  BrowseShareResult,
+  ShareSearchResult,
+  ShareType,
+} from '@/types/share';
 
 const TYPE_FILTERS: { label: string; value: ShareType }[] = [
   { label: 'Paper', value: 'paper' },
@@ -49,6 +55,7 @@ export default function SearchScreen() {
   }, [inputValue]);
 
   const { data, isLoading, isFetching } = useShareSearch(debouncedQuery);
+  const { data: browseData } = useBrowse();
 
   const trimmed = debouncedQuery.trim();
   const hasQuery = trimmed.length >= 2;
@@ -180,23 +187,27 @@ export default function SearchScreen() {
 
         {/* Content area */}
         {!hasQuery ? (
-          /* Empty state — before the user types */
-          <Animated.View
-            entering={FadeIn.duration(300)}
-            style={styles.emptyWrap}
-          >
-            <View
-              style={[styles.emptyIconWrap, { backgroundColor: c.accentSoft }]}
+          /* Browse sections — before the user types */
+          browseData ? (
+            <BrowseSections data={browseData} colors={c} />
+          ) : (
+            <Animated.View
+              entering={FadeIn.duration(300)}
+              style={styles.emptyWrap}
             >
-              <Ionicons name="search" size={24} color={c.accent} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: c.text }]}>
-              Discover collections
-            </Text>
-            <Text style={[styles.emptyBody, { color: c.textMuted }]}>
-              Search for published collections by title, author, or topic.
-            </Text>
-          </Animated.View>
+              <View
+                style={[styles.emptyIconWrap, { backgroundColor: c.accentSoft }]}
+              >
+                <Ionicons name="search" size={24} color={c.accent} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>
+                Discover collections
+              </Text>
+              <Text style={[styles.emptyBody, { color: c.textMuted }]}>
+                Search for published collections by title, author, or topic.
+              </Text>
+            </Animated.View>
+          )
         ) : isLoading || isFetching ? (
           /* Loading */
           <View style={styles.centered}>
@@ -237,6 +248,170 @@ export default function SearchScreen() {
         )}
       </View>
     </>
+  );
+}
+
+/* ──────────────────────── Browse sections ──────────────────────── */
+
+function BrowseSections({
+  data,
+  colors: c,
+}: {
+  data: BrowseResponse;
+  colors: typeof Colors.light;
+}) {
+  const { trending, recent, total_published } = data;
+
+  // Cold start: nothing published
+  if (trending.length === 0 && recent.length === 0) {
+    return (
+      <Animated.View entering={FadeIn.duration(300)} style={styles.emptyWrap}>
+        <View style={[styles.emptyIconWrap, { backgroundColor: c.accentSoft }]}>
+          <Ionicons name="sparkles-outline" size={24} color={c.accent} />
+        </View>
+        <Text style={[styles.emptyTitle, { color: c.text }]}>
+          Be the first
+        </Text>
+        <Text style={[styles.emptyBody, { color: c.textMuted }]}>
+          Publish a collection and it will appear here.
+        </Text>
+      </Animated.View>
+    );
+  }
+
+  const showTrending = trending.length >= 3;
+
+  return (
+    <Animated.View entering={FadeIn.duration(300)}>
+      <ScrollView
+        contentContainerStyle={styles.browseContent}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
+        {showTrending ? (
+          <>
+            <Text style={[styles.sectionHeader, { color: c.textSubtle }]}>
+              Trending this week
+            </Text>
+            {trending.map((item, i) => (
+              <View key={item.short_code}>
+                {i > 0 && (
+                  <View
+                    style={[styles.separator, { backgroundColor: c.border }]}
+                  />
+                )}
+                <BrowseCard item={item} colors={c} showViews />
+              </View>
+            ))}
+          </>
+        ) : null}
+
+        <Text
+          style={[
+            styles.sectionHeader,
+            { color: c.textSubtle },
+            showTrending ? { marginTop: Spacing.xl } : undefined,
+          ]}
+        >
+          Recently published
+        </Text>
+        {recent.map((item, i) => (
+          <View key={item.short_code}>
+            {i > 0 && (
+              <View
+                style={[styles.separator, { backgroundColor: c.border }]}
+              />
+            )}
+            <BrowseCard item={item} colors={c} />
+          </View>
+        ))}
+
+        {total_published >= 5 ? (
+          <Text style={[styles.browseTotal, { color: c.textSubtle }]}>
+            Browse {total_published} collections
+          </Text>
+        ) : null}
+      </ScrollView>
+    </Animated.View>
+  );
+}
+
+function BrowseCard({
+  item,
+  colors: c,
+  showViews,
+}: {
+  item: BrowseShareResult;
+  colors: typeof Colors.light;
+  showViews?: boolean;
+}) {
+  const handlePress = () => {
+    router.push(`/c/${item.short_code}` as any);
+  };
+
+  const typeLabel = item.type.charAt(0).toUpperCase() + item.type.slice(1);
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      accessibilityRole="link"
+      accessibilityLabel={`View ${item.name}`}
+      style={({ pressed }) => [styles.card, { opacity: pressed ? 0.7 : 1 }]}
+    >
+      <Text style={[styles.cardTitle, { color: c.text }]} numberOfLines={2}>
+        {item.name}
+      </Text>
+
+      {item.description ? (
+        <Text
+          style={[styles.cardDesc, { color: c.textMuted }]}
+          numberOfLines={1}
+        >
+          {item.description}
+        </Text>
+      ) : null}
+
+      <View style={styles.metaRow}>
+        {item.owner_name ? (
+          <>
+            <Text style={[styles.metaText, { color: c.textSubtle }]}>
+              {item.owner_name}
+            </Text>
+            <Text style={[styles.metaDot, { color: c.textSubtle }]}>
+              {'\u00B7'}
+            </Text>
+          </>
+        ) : null}
+        <View style={[styles.typePill, { backgroundColor: c.accentSoft }]}>
+          <Text style={[styles.typePillText, { color: c.accent }]}>
+            {typeLabel}
+          </Text>
+        </View>
+        <Text style={[styles.metaDot, { color: c.textSubtle }]}>
+          {'\u00B7'}
+        </Text>
+        <Text style={[styles.metaText, { color: c.textSubtle }]}>
+          {item.item_count} {item.item_count === 1 ? 'item' : 'items'}
+        </Text>
+        <Text style={[styles.metaDot, { color: c.textSubtle }]}>
+          {'\u00B7'}
+        </Text>
+        <Text style={[styles.metaText, { color: c.textSubtle }]}>
+          {showViews && item.view_count != null
+            ? `${item.view_count} ${item.view_count === 1 ? 'view' : 'views'}`
+            : formatRelativeTime(item.published_at)}
+        </Text>
+      </View>
+
+      {item.preview_items.length > 0 && (
+        <Text
+          style={[styles.preview, { color: c.textSubtle }]}
+          numberOfLines={1}
+        >
+          Contains: {item.preview_items.join(', ')}
+        </Text>
+      )}
+    </Pressable>
   );
 }
 
@@ -412,6 +587,25 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* Browse sections */
+  browseContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.xs,
+    marginTop: Spacing.md,
+  },
+  browseTotal: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: Spacing.xl,
   },
 
   /* Results list */
