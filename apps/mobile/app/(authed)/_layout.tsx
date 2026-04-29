@@ -63,6 +63,16 @@ export default function AuthedLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="discover"
+        options={{
+          title: 'Discover',
+          tabBarLabel: 'Discover',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="compass-outline" color={color} size={size} />
+          ),
+        }}
+      />
       {/* Library hidden from tabs but route file kept for future use */}
       <Tabs.Screen name="library" options={{ href: null }} />
       <Tabs.Screen
