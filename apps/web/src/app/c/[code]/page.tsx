@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ReportButton } from '@/components/report-button';
+import { SaveButton } from '@/components/save-button';
 import { ShareItemCard } from '@/components/share-item-card';
 import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { formatItemCount, formatRelativeTime } from '@/lib/format';
@@ -242,6 +243,16 @@ export default async function PublicSharePage({ params }: PageProps) {
           <span>Updated {formatRelativeTime(share.updated_at)}</span>
           <span aria-hidden>·</span>
           <span className="uppercase tracking-wide text-ink-faint">{share.type}</span>
+        </div>
+        <div className="mt-4">
+          <SaveButton
+            shortCode={share.short_code}
+            name={share.name}
+            description={share.description ?? null}
+            type={share.type}
+            ownerName={share.owner_name ?? null}
+            itemCount={share.items.length}
+          />
         </div>
         {share.description ? (
           <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>

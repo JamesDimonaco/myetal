@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { SavedSharesSection } from '@/components/saved-shares-section';
 import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
 import { UserAvatar } from '@/components/user-avatar';
@@ -125,6 +126,8 @@ export default async function LandingPage() {
             </>
           )}
         </div>
+
+        <SavedSharesSection />
       </section>
 
       <section className="mt-24 grid gap-8 sm:mt-32 sm:grid-cols-3">
