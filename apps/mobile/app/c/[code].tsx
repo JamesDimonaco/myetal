@@ -19,6 +19,7 @@ import { ShareItemCard } from '@/components/share-item-card';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHaptics } from '@/hooks/useHaptics';
+import { useIsSaved } from '@/hooks/useIsSaved';
 import { usePublicShare } from '@/hooks/usePublicShare';
 import { ApiError } from '@/lib/api';
 import { trackRecentShare } from '@/lib/recent-shares';
@@ -33,6 +34,15 @@ export default function PublicShareScreen() {
   const [qrVisible, setQrVisible] = useState(false);
 
   const { data, isLoading, error, refetch, isRefetching } = usePublicShare(code);
+
+  const { isSaved, toggle: toggleSave, isLoading: saveLoading } = useIsSaved(code, data ? {
+    short_code: data.short_code,
+    name: data.name,
+    description: data.description ?? null,
+    type: data.type,
+    owner_name: data.owner_name,
+    item_count: data.items.length,
+  } : null);
 
   // Persist this view to recent-shares so it shows up on the landing
   useEffect(() => {
@@ -104,6 +114,25 @@ export default function PublicShareScreen() {
           headerTintColor: c.text,
           headerRight: () => (
             <View style={styles.headerActions}>
+              <Pressable
+                onPress={toggleSave}
+                disabled={saveLoading || !data}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={isSaved ? 'Unsave collection' : 'Save collection'}
+                style={({ pressed }) => [
+                  styles.headerIconBtn,
+                  {
+                    backgroundColor: pressed ? c.accentSoft : 'transparent',
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={22}
+                  color={c.accent}
+                />
+              </Pressable>
               <Pressable
                 onPress={handleOpenQr}
                 hitSlop={12}
