@@ -10,10 +10,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { RecentShareCard } from '@/components/recent-share-card';
+import { SavedShareCard } from '@/components/saved-share-card';
 import { Wordmark } from '@/components/wordmark';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRecentShares } from '@/hooks/useRecentShares';
+import { useSavedShares } from '@/hooks/useSavedShares';
 import { useSplashGate } from '@/hooks/useSplashGate';
 
 export default function LandingScreen() {
@@ -21,6 +23,8 @@ export default function LandingScreen() {
   const c = Colors[scheme];
   const recents = useRecentShares();
   const hasRecents = (recents?.length ?? 0) > 0;
+  const savedShares = useSavedShares();
+  const hasSaved = (savedShares?.length ?? 0) > 0;
   useSplashGate();
 
   return (
@@ -86,6 +90,33 @@ export default function LandingScreen() {
           />
         </Animated.View>
 
+        {/* Saved collections */}
+        {savedShares === null ? null : hasSaved ? (
+          <Animated.View
+            entering={FadeInUp.duration(380).delay(220)}
+            style={styles.section}
+          >
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionLabel, { color: c.textSubtle }]}>
+                SAVED
+              </Text>
+              <Text style={[styles.sectionCount, { color: c.textSubtle }]}>
+                {savedShares!.length}
+              </Text>
+            </View>
+            <Animated.View layout={LinearTransition.springify().damping(20)}>
+              {savedShares!.map((entry, i) => (
+                <Animated.View
+                  key={entry.short_code}
+                  entering={FadeInUp.duration(340).delay(260 + i * 50)}
+                >
+                  <SavedShareCard entry={entry} />
+                </Animated.View>
+              ))}
+            </Animated.View>
+          </Animated.View>
+        ) : null}
+
         {/* Recently viewed — or polished empty state */}
         {recents === null ? null : hasRecents ? (
           <Animated.View
@@ -111,7 +142,10 @@ export default function LandingScreen() {
               ))}
             </Animated.View>
           </Animated.View>
-        ) : (
+        ) : null}
+
+        {/* Empty state — only when both saved and recents are empty */}
+        {recents !== null && savedShares !== null && !hasSaved && !hasRecents ? (
           <Animated.View
             entering={FadeInUp.duration(380).delay(220)}
             style={[styles.emptyState, { borderColor: c.border, backgroundColor: c.surface }]}
@@ -132,7 +166,7 @@ export default function LandingScreen() {
               ones you visit will live here for next time.
             </Text>
           </Animated.View>
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Divider + Sign-in CTA */}
