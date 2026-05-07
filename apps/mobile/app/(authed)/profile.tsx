@@ -3,7 +3,7 @@
 //     (GET /auth/me/sessions, POST /auth/me/sessions/:id/revoke)
 
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -49,12 +49,22 @@ export default function ProfileScreen() {
   const [orcidDraft, setOrcidDraft] = useState<string>(persistedOrcid ?? '');
   const [orcidSaving, setOrcidSaving] = useState(false);
   const [orcidError, setOrcidError] = useState<string | null>(null);
+  // Tracks the last server value we seeded into the draft. Used to detect
+  // whether the user has typed since the last seed — if they have, we leave
+  // their input alone when /auth/me refetches in the background.
+  const lastSeededOrcidRef = useRef<string>(persistedOrcid ?? '');
 
-  // Re-seed the draft if the user object changes (e.g. after a refetch).
+  // Re-seed only when the user hasn't diverged from the last-seeded value
+  // (i.e. they're not actively editing). This prevents a background refetch
+  // of /auth/me from clobbering in-progress input.
   useEffect(() => {
-    setOrcidDraft(persistedOrcid ?? '');
-    setOrcidError(null);
-  }, [persistedOrcid]);
+    const next = persistedOrcid ?? '';
+    if (orcidDraft === lastSeededOrcidRef.current) {
+      setOrcidDraft(next);
+      setOrcidError(null);
+      lastSeededOrcidRef.current = next;
+    }
+  }, [persistedOrcid, orcidDraft]);
 
   const trimmedOrcid = orcidDraft.trim().toUpperCase();
   const orcidChanged = trimmedOrcid !== (persistedOrcid ?? '');
@@ -86,7 +96,13 @@ export default function ProfileScreen() {
     }
     setOrcidSaving(true);
     try {
-      await updateOrcidId(next);
+      const updated = await updateOrcidId(next);
+      // Reflect the canonical server value (e.g. lowercase x → uppercase X)
+      // and keep the "last seeded" ref in sync so the background-refetch
+      // guard above doesn't mistake this for in-progress editing.
+      const canonical = updated.orcid_id ?? '';
+      setOrcidDraft(canonical);
+      lastSeededOrcidRef.current = canonical;
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
@@ -119,6 +135,7 @@ export default function ProfileScreen() {
             try {
               await updateOrcidId(null);
               setOrcidDraft('');
+              lastSeededOrcidRef.current = '';
             } catch (err) {
               if (err instanceof ApiError) {
                 setOrcidError(err.detail || 'Could not remove ORCID iD.');
@@ -181,7 +198,7 @@ export default function ProfileScreen() {
         {/* ORCID iD entry — see docs/tickets/orcid-integration-and-account-linking.md
             (Part 4: manual entry rationale). The user can paste/edit/save their
             iD here even without going through the OAuth flow. */}
-        <View style={styles.orcidSection}>
+        <View>
           <Text style={[styles.prefsLabel, { color: c.textMuted }]}>ORCID iD</Text>
           <View style={[styles.prefsCard, { backgroundColor: c.surface, borderColor: c.border }]}>
             <Text style={[styles.orcidHelp, { color: c.textMuted }]}>
@@ -355,7 +372,6 @@ const styles = StyleSheet.create({
   value: { fontSize: 17, fontWeight: '500' },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.md },
 
-  orcidSection: {},
   orcidHelp: { fontSize: 13, lineHeight: 18, marginBottom: Spacing.sm },
   orcidLinkRow: {
     flexDirection: 'row',

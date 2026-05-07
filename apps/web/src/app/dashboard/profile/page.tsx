@@ -65,7 +65,7 @@ export default async function ProfilePage() {
         </div>
       </section>
 
-      <OrcidSection initialOrcidId={user.orcid_id ?? null} />
+      <OrcidSection initialOrcidId={user.orcid_id} />
 
       <section className="mt-10">
         <h2 className="font-serif text-xl text-ink">Active sessions</h2>

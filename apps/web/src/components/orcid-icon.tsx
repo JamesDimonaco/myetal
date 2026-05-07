@@ -26,7 +26,7 @@ export function OrcidIcon({
         fill="#A6CE39"
       />
       <path
-        d="M86.3,186.2H70.9V79.1h15.4v48.4V186.2z"
+        d="M86.3,186.2H70.9V79.1h15.4V186.2z"
         fill="#FFFFFF"
       />
       <path

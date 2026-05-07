@@ -41,6 +41,12 @@ class UserinfoFailed(OAuthError):
     pass
 
 
+class OrcidIdAlreadyLinked(OAuthError):
+    """The ORCID iD coming back from OAuth is already linked (manually or
+    via OAuth) to another user. Phase A doesn't auto-link accounts, so we
+    surface this clearly instead of silently creating a stub user."""
+
+
 def _callback_url(provider: AuthProvider) -> str:
     return f"{settings.public_api_url.rstrip('/')}/auth/{provider.value}/callback"
 
@@ -194,10 +200,13 @@ async def _find_or_create_user(
             return user
 
     # New user. Set orcid_id from the OAuth subject when signing in with ORCID,
-    # but skip if another user already claimed that iD manually — that's an
-    # account-linking situation we deliberately defer (see plan doc Phase B).
+    # but if another user already claimed that iD (manually or via OAuth) we
+    # raise loudly rather than silently creating a stub user with no library
+    # wiring — account linking is deferred to Phase B.
     orcid_id: str | None = None
-    if provider == AuthProvider.ORCID and not await _orcid_id_taken(db, info.subject):
+    if provider == AuthProvider.ORCID:
+        if await _orcid_id_taken(db, info.subject):
+            raise OrcidIdAlreadyLinked(info.subject)
         orcid_id = info.subject
 
     user = User(
@@ -223,6 +232,7 @@ async def _find_or_create_user(
 # Re-export StateError so callers can catch it without importing from core.oauth
 __all__ = [
     "OAuthError",
+    "OrcidIdAlreadyLinked",
     "StateError",
     "TokenExchangeFailed",
     "UserinfoFailed",

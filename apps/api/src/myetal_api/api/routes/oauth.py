@@ -10,7 +10,12 @@ from myetal_api.core.rate_limit import AUTH_LIMIT, limiter
 from myetal_api.models import AuthProvider
 from myetal_api.oauth_providers import ProviderNotConfigured
 from myetal_api.services import oauth as oauth_service
-from myetal_api.services.oauth import StateError, TokenExchangeFailed, UserinfoFailed
+from myetal_api.services.oauth import (
+    OrcidIdAlreadyLinked,
+    StateError,
+    TokenExchangeFailed,
+    UserinfoFailed,
+)
 
 router = APIRouter(tags=["oauth"])
 
@@ -117,6 +122,8 @@ async def oauth_callback(
         return _bounce_failure(f"token exchange failed: {exc}")
     except UserinfoFailed as exc:
         return _bounce_failure(f"failed to load profile: {exc}")
+    except OrcidIdAlreadyLinked:
+        return _bounce_orcid_already_linked()
     except ProviderNotConfigured as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -160,3 +167,12 @@ def _bounce_failure(message: str) -> RedirectResponse:
     fragment = urlencode({"error": message})
     base = settings.public_base_url.rstrip("/")
     return RedirectResponse(url=f"{base}/auth/finish#{fragment}", status_code=302)
+
+
+def _bounce_orcid_already_linked() -> RedirectResponse:
+    """The ORCID iD on the OAuth subject is already linked to another user.
+    Send the user to the sign-in page with a query-string error code so the
+    web app can surface a useful message instead of dropping them on the
+    silent /auth/finish bounce page."""
+    base = settings.public_base_url.rstrip("/")
+    return RedirectResponse(url=f"{base}/sign-in?error=orcid_already_linked", status_code=302)

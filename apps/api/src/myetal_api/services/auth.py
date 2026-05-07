@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.core.security import (
@@ -158,7 +159,14 @@ async def set_user_orcid_id(db: AsyncSession, user_id: uuid.UUID, orcid_id: str 
             raise OrcidIdAlreadyClaimed
 
     user.orcid_id = orcid_id
-    await db.commit()
+    # The precheck above is the fast path for benign typos, but two concurrent
+    # PATCHes can both pass it — only the unique index will catch that race.
+    # Translate the IntegrityError into a clean 409 instead of a 500.
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise OrcidIdAlreadyClaimed from exc
     return user
 
 
