@@ -354,6 +354,20 @@ async def search_published_shares(
     # Fetch limit+1 to derive has_more without a COUNT(*)
     fetch_limit = limit + 1
 
+    # Author-name search (B1): users complained that searching a paper's author
+    # name returned nothing.  We expand the WHERE clause so a share matches when
+    # any of its attached papers (papers.authors, joined via share_papers) OR
+    # any of its share_items (share_items.authors, the legacy item-level field)
+    # contains the query as a case-insensitive substring.  We use ILIKE rather
+    # than pg_trgm `%` for the author signal because the authors column stores
+    # full author lists ("A. Smith; B. Jones; C. Lee") which trigram similarity
+    # scores poorly against a single name token.  The author signal is OR'd
+    # alongside the existing title/description/owner trigram signals.
+    #
+    # The relevance score still uses trigram similarity on name+description
+    # (those have a GiST index from migration 0007); a small constant boost is
+    # added when the author signal hits so author-only matches still rank above
+    # the noise floor.
     search_sql = text("""
         SELECT
             s.id          AS share_id,
@@ -364,14 +378,22 @@ async def search_published_shares(
             s.published_at,
             s.updated_at,
             u.name        AS owner_name,
-            COUNT(si.id)  AS item_count,
+            COUNT(DISTINCT si.id)  AS item_count,
             GREATEST(
                 similarity(s.name, :query),
-                similarity(COALESCE(s.description, ''), :query)
+                similarity(COALESCE(s.description, ''), :query),
+                CASE
+                    WHEN bool_or(si.authors ILIKE :ilike_query)
+                      OR bool_or(p.authors  ILIKE :ilike_query)
+                    THEN 0.3
+                    ELSE 0
+                END
             ) AS relevance
         FROM shares s
-        LEFT JOIN users u       ON u.id  = s.owner_user_id
+        LEFT JOIN users u        ON u.id  = s.owner_user_id
         LEFT JOIN share_items si ON si.share_id = s.id
+        LEFT JOIN share_papers sp ON sp.share_id = s.id
+        LEFT JOIN papers p        ON p.id = sp.paper_id
         WHERE s.is_public = true
           AND s.published_at IS NOT NULL
           AND s.deleted_at IS NULL
@@ -379,11 +401,26 @@ async def search_published_shares(
               s.name        % :query
            OR s.description % :query
            OR u.name        % :query
+           OR EXISTS (
+                SELECT 1 FROM share_items si2
+                WHERE si2.share_id = s.id AND si2.authors ILIKE :ilike_query
+              )
+           OR EXISTS (
+                SELECT 1
+                FROM share_papers sp2
+                JOIN papers p2 ON p2.id = sp2.paper_id
+                WHERE sp2.share_id = s.id AND p2.authors ILIKE :ilike_query
+              )
           )
         GROUP BY s.id, u.name
         ORDER BY relevance DESC, s.published_at DESC
         LIMIT :fetch_limit OFFSET :offset
-    """).bindparams(query=query, fetch_limit=fetch_limit, offset=offset)
+    """).bindparams(
+        query=query,
+        ilike_query=f"%{query}%",
+        fetch_limit=fetch_limit,
+        offset=offset,
+    )
 
     rows = (await db.execute(search_sql)).all()
 

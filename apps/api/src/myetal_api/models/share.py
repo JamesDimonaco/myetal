@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class ShareType(enum.StrEnum):
     PAPER = "paper"
     COLLECTION = "collection"
-    POSTER = "poster"
+    BUNDLE = "bundle"
     GRANT = "grant"
     PROJECT = "project"
 

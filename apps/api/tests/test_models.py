@@ -51,7 +51,7 @@ def test_share_type_values() -> None:
     assert {t.value for t in ShareType} == {
         "paper",
         "collection",
-        "poster",
+        "bundle",
         "grant",
         "project",
     }

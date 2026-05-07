@@ -138,3 +138,68 @@ async def test_search_offset_capped_at_500(
     r = api_client.get("/public/search?q=test&offset=1000")
     # FastAPI Query(le=500) returns 422 for values > 500
     assert r.status_code == 422
+
+
+# ---------- author-name matching (B1) ----------
+
+
+@patch("myetal_api.api.routes.search.share_service.search_published_shares", new_callable=AsyncMock)
+async def test_search_passes_author_query_through_to_service(
+    mock_search: AsyncMock,
+    api_client: TestClient,
+) -> None:
+    """An author-name query should be routed through to the service layer
+    just like any other query — the service is responsible for matching it
+    against papers.authors / share_items.authors."""
+    from datetime import UTC, datetime
+
+    from myetal_api.schemas.share import ShareSearchResult
+
+    now = datetime.now(UTC)
+    hit = ShareSearchResult(
+        short_code="ab1234",
+        name="Sleep & adolescents",
+        description="Some collection of papers",
+        type="collection",
+        owner_name="Dr Lab",
+        item_count=3,
+        published_at=now,
+        updated_at=now,
+        preview_items=["Paper one", "Paper two"],
+    )
+    mock_search.return_value = ([hit], False)
+
+    r = api_client.get("/public/search?q=Dimonaco")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["results"]) == 1
+    assert body["results"][0]["short_code"] == "ab1234"
+    # Confirms the route forwarded the author-name query string verbatim.
+    mock_search.assert_called_once()
+    call_kwargs = mock_search.call_args.kwargs
+    assert call_kwargs["query"] == "Dimonaco"
+
+
+async def test_search_sql_references_author_columns() -> None:
+    """The raw SQL in search_published_shares must reference both
+    papers.authors and share_items.authors so author-name queries hit.
+
+    This is a regression guard: pg_trgm SQL is Postgres-only so the
+    in-memory SQLite test suite can't execute the query end-to-end.
+    Instead we read the source of the function and assert that the
+    relevant join + author column references are present.
+    """
+    import inspect
+
+    from myetal_api.services import share as share_service
+
+    src = inspect.getsource(share_service.search_published_shares)
+    # Joined the share_papers/papers tables for author lookup.
+    assert "share_papers" in src
+    assert "papers" in src
+    # Both per-item legacy authors and per-paper authors are matched.
+    assert "si.authors" in src or "share_items" in src
+    assert "p.authors" in src or "papers.authors" in src
+    # The query parameter is bound as an ILIKE-style pattern so single
+    # author names match within "A. Smith; B. Jones" lists.
+    assert "ilike_query" in src.lower()
