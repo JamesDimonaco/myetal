@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
@@ -36,6 +37,9 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="user not found",
         )
+    # Stash on request.state so per-user rate-limit key_funcs can read it
+    # without re-doing the bearer decode (see core.rate_limit.authed_user_key).
+    request.state.user = user
     return user
 
 

@@ -194,7 +194,14 @@ async def sync_from_orcid(
     if user.orcid_id is None:
         raise OrcidIdNotSet
 
-    works = await orcid_client.fetch_works(user.orcid_id, http=http)
+    # Capture the iD value at sync start. If the user PATCHes their orcid_id
+    # mid-sync, the work we just imported is against the *old* iD — so the
+    # final last_orcid_sync_at stamp must NOT land against the new one,
+    # otherwise the auto-fire re-arm contract (set_user_orcid_id clears the
+    # stamp on iD change) silently breaks. See H3 in the hardening pass.
+    sync_orcid_id = user.orcid_id
+
+    works = await orcid_client.fetch_works(sync_orcid_id, http=http)
 
     result = OrcidSyncResult()
     for work in works:
@@ -223,6 +230,17 @@ async def sync_from_orcid(
             result.unchanged += 1
         else:  # "unchanged"
             result.unchanged += 1
+
+    # Re-read the user before stamping. If their orcid_id changed mid-sync
+    # (PATCH /auth/me), don't stamp last_orcid_sync_at — the next library
+    # visit needs to see "no last sync" and auto-fire against the new iD.
+    # We still keep the per-DOI inserts that already committed; they're
+    # against the old iD's papers, which is what the user has in their
+    # library now. Only the stamp is suppressed.
+    await db.refresh(user)
+    if user.orcid_id != sync_orcid_id:
+        result.errors.append("orcid_id changed mid-sync; not stamping last_orcid_sync_at")
+        return result
 
     user.last_orcid_sync_at = datetime.now(UTC)
     await db.commit()

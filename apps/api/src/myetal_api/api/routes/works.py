@@ -17,7 +17,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from myetal_api.api.deps import CurrentUser, DbSession
-from myetal_api.core.rate_limit import limiter
+from myetal_api.core.rate_limit import authed_user_key, limiter
 from myetal_api.schemas.works import (
     AddWorkRequest,
     OrcidSyncResponse,
@@ -148,7 +148,7 @@ async def restore_work(
 
 
 @router.post("/sync-orcid", response_model=OrcidSyncResponse)
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=authed_user_key)
 async def sync_orcid(
     request: Request,
     user: CurrentUser,
@@ -162,7 +162,9 @@ async def sync_orcid(
 
     400 if the user has no ``orcid_id`` set.
     503 if ORCID is unreachable / returned a 5xx.
-    429 if called more than 5 times per minute (slowapi).
+    429 if the *same user* calls more than 5 times/minute (per-user key
+    avoids penalising other users behind a shared NAT — see
+    ``core.rate_limit.authed_user_key``).
     """
     try:
         result = await works_service.sync_from_orcid(db, user.id)

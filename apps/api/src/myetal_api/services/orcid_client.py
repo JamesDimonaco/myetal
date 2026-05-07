@@ -23,14 +23,31 @@ matching the OAuth flow toggle in ``oauth_providers._orcid_base()``.
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
+from myetal_api import __version__
 from myetal_api.core.config import settings
 from myetal_api.models import AuthProvider
 from myetal_api.oauth_providers import credentials_for
+
+logger = logging.getLogger(__name__)
+
+
+# Polite-pool style User-Agent so ORCID sysadmins can identify our traffic.
+# Mirrors the pattern in services/papers.py (Crossref/OpenAlex).
+_USER_AGENT = f"myetal/{__version__} (+https://myetal.app)"
+
+# Defence-in-depth ORCID iD shape check at the fetch_works boundary. The
+# schema layer (schemas/user.py) already gates user input, but fetch_works
+# is a public surface and a future caller could bypass that. Keep this
+# consistent with schemas/user.py:_ORCID_ID_RE.
+_ORCID_ID_RE = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
 class UpstreamError(Exception):
@@ -74,6 +91,13 @@ def _orcid_pub_base() -> str:
 # constraint already holds — no shared-cache concerns.
 _cached_token: str | None = None
 
+# Serialise concurrent first-time token fetches. Without this, two
+# simultaneous syncs both see the cache empty and both POST /oauth/token,
+# which is wasteful (not data-corrupting). The lock keeps the cache check
+# and the fetch atomic — the second waiter sees the populated cache and
+# returns immediately.
+_token_lock = asyncio.Lock()
+
 
 def _reset_token_cache() -> None:
     """Clear the cached token. Test-only."""
@@ -94,29 +118,59 @@ async def _fetch_new_token(http: httpx.AsyncClient) -> str:
                 "grant_type": "client_credentials",
                 "scope": "/read-public",
             },
-            headers={"Accept": "application/json"},
+            headers={
+                "Accept": "application/json",
+                "User-Agent": _USER_AGENT,
+            },
         )
     except httpx.HTTPError as exc:
         raise UpstreamError(f"orcid token network error: {exc}") from exc
 
     if response.status_code >= 500:
-        raise UpstreamError(f"orcid token {response.status_code}")
+        # Don't echo the response body in the user-facing exception — log it
+        # separately at warning level for ops debugging. Defence-in-depth
+        # against accidental secret leakage in error paths.
+        logger.warning(
+            "orcid token fetch failed status=%s body=%s",
+            response.status_code,
+            response.text[:200],
+        )
+        raise UpstreamError(f"orcid token fetch failed (status {response.status_code})")
     if response.status_code != 200:
-        raise UpstreamError(f"orcid token {response.status_code}: {response.text[:200]}")
+        logger.warning(
+            "orcid token fetch failed status=%s body=%s",
+            response.status_code,
+            response.text[:200],
+        )
+        raise UpstreamError(f"orcid token fetch failed (status {response.status_code})")
     body = response.json()
     token = body.get("access_token")
     if not token:
-        raise UpstreamError(f"orcid token response missing access_token: {body}")
+        # Body shape problem rather than a status problem — log + raise a
+        # stable message; the body itself stays out of the exception text.
+        logger.warning("orcid token response missing access_token: %s", body)
+        raise UpstreamError("orcid token response missing access_token")
     return str(token)
 
 
 async def get_read_public_token(http: httpx.AsyncClient) -> str:
-    """Return a cached read-public token, fetching one if the cache is empty."""
+    """Return a cached read-public token, fetching one if the cache is empty.
+
+    Wrapped in an ``asyncio.Lock`` so two concurrent first-time syncs don't
+    both fire a token POST. The second waiter sees the populated cache and
+    returns immediately.
+    """
     global _cached_token
+    # Fast path: no lock needed if the cache is already warm.
     if _cached_token is not None:
         return _cached_token
-    _cached_token = await _fetch_new_token(http)
-    return _cached_token
+    async with _token_lock:
+        # Re-check inside the lock — another coroutine may have populated
+        # the cache while we were waiting.
+        if _cached_token is not None:
+            return _cached_token
+        _cached_token = await _fetch_new_token(http)
+        return _cached_token
 
 
 # ---------- works fetch ----------
@@ -133,9 +187,14 @@ async def fetch_works(
     works that share an external-id and the first summary is the
     canonical one. Skips empty groups defensively.
 
-    Raises ``UpstreamError`` on token-fetch failure, network error, or
-    a 5xx response. Routes turn this into HTTP 503.
+    Raises ``ValueError`` if ``orcid_id`` doesn't match the canonical
+    16-digit ORCID iD shape — defence-in-depth against bypassing the
+    schema-layer validation. Raises ``UpstreamError`` on token-fetch
+    failure, network error, or a 5xx response. Routes turn the latter
+    into HTTP 503.
     """
+    if not _ORCID_ID_RE.match(orcid_id):
+        raise ValueError("invalid ORCID iD format")
     owns_client = http is None
     client = http or httpx.AsyncClient(timeout=10.0)
     try:
@@ -158,6 +217,7 @@ async def _get_works_with_retry(
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
+        "User-Agent": _USER_AGENT,
     }
     try:
         response = await http.get(url, headers=headers)
@@ -172,7 +232,11 @@ async def _get_works_with_retry(
         try:
             response = await http.get(
                 url,
-                headers={"Authorization": f"Bearer {new_token}", "Accept": "application/json"},
+                headers={
+                    "Authorization": f"Bearer {new_token}",
+                    "Accept": "application/json",
+                    "User-Agent": _USER_AGENT,
+                },
             )
         except httpx.HTTPError as exc:
             raise UpstreamError(f"orcid works network error: {exc}") from exc

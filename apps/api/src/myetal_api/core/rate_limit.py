@@ -7,6 +7,7 @@ counter, so 5/min across 4 workers is effectively 20/min.
 
 from __future__ import annotations
 
+from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -14,6 +15,25 @@ from slowapi.util import get_remote_address
 # real client IP via X-Forwarded-For; uvicorn translates that into the request
 # scope `client` tuple when started with --proxy-headers (see DEPLOY.md).
 limiter = Limiter(key_func=get_remote_address)
+
+
+def authed_user_key(request: Request) -> str:
+    """Per-user key for rate limits on bearer-authed routes.
+
+    Falls back to the remote IP for anonymous requests so misconfigurations
+    don't disable the limit entirely. Routes opt in via
+    ``@limiter.limit("...", key_func=authed_user_key)``.
+
+    The auth dep stashes the resolved user on ``request.state.user`` (see
+    ``api.deps.get_current_user``) — that's the value we read here.
+    """
+    user = getattr(request.state, "user", None)
+    if user is not None:
+        user_id = getattr(user, "id", None)
+        if user_id is not None:
+            return f"user:{user_id}"
+    return get_remote_address(request)
+
 
 # Default rule for sensitive auth endpoints — applied via decorator on each
 # route, NOT here, so the routes' intent is visible at the call site.
