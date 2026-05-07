@@ -10,6 +10,7 @@ export interface AuthUser {
   is_admin: boolean;
   avatar_url: string | null;
   orcid_id: string | null;
+  last_orcid_sync_at: string | null;
   created_at: string;
 }
 

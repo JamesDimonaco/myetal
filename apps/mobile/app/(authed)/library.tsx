@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Linking,
   Pressable,
@@ -12,20 +14,106 @@ import {
   View,
 } from 'react-native';
 
+import { OrcidIcon } from '@/components/orcid-icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAddWork, useHideWork, useRestoreWork, useWorks } from '@/hooks/useWorks';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  useAddWork,
+  useHideWork,
+  useRestoreWork,
+  useSyncOrcid,
+  useWorks,
+  type OrcidSyncResult,
+} from '@/hooks/useWorks';
+import { ApiError } from '@/lib/api';
 import type { WorkResponse } from '@/types/works';
 
 export default function LibraryScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
+  const { user } = useAuth();
   const { data, isLoading, isError, error, refetch, isRefetching } = useWorks();
   const addWork = useAddWork();
   const hideWork = useHideWork();
   const restoreWork = useRestoreWork();
+  const syncOrcid = useSyncOrcid();
 
   const [doi, setDoi] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
+
+  // Single-fire guard for the "auto-import on first visit" behavior. We can't
+  // rely solely on `last_orcid_sync_at == null` because between the success
+  // callback firing and the me-query refetch settling there's a window where
+  // the field is still null in cache — without this ref strict-mode's double
+  // mount or a transient cache state could re-fire the mutation. Once we've
+  // launched once for this user, never re-launch within the screen's lifetime.
+  const autoFiredForUserRef = useRef<string | null>(null);
+
+  const orcidId = user?.orcid_id ?? null;
+  const lastSyncAt = user?.last_orcid_sync_at ?? null;
+  const userId = user?.id ?? null;
+
+  const runSync = (opts: { source: 'auto' | 'manual' }) => {
+    // Don't stack concurrent runs — auto-fire and manual press share one
+    // mutation. If the user taps the row mid-auto-import we no-op.
+    if (syncOrcid.isPending) return;
+    syncOrcid.mutate(undefined, {
+      onSuccess: (result: OrcidSyncResult) => {
+        Alert.alert(
+          'Imported from ORCID',
+          `Imported ${result.added} new. ${result.updated} updated, ${result.unchanged} already in your library, ${result.skipped} skipped.`,
+        );
+      },
+      onError: (err) => {
+        if (err instanceof ApiError) {
+          if (err.status === 400) {
+            Alert.alert(
+              'Add your ORCID iD on your profile first',
+              undefined,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Go to profile',
+                  onPress: () => router.push('/(authed)/profile'),
+                },
+              ],
+            );
+            return;
+          }
+          if (err.status === 503) {
+            Alert.alert(
+              'ORCID is unavailable right now. Try again in a minute.',
+            );
+            return;
+          }
+          if (err.status === 429) {
+            Alert.alert('Slow down — try again in a minute.');
+            return;
+          }
+        }
+        // Auto-fire shouldn't surface generic alerts (less surprising on first
+        // visit). Manual press always surfaces something so the user gets feedback.
+        if (opts.source === 'manual') {
+          const detail =
+            err instanceof Error ? err.message : 'Could not import from ORCID.';
+          Alert.alert("Couldn't import from ORCID. Try again in a minute.", detail);
+        }
+      },
+    });
+  };
+
+  // Auto-fire on first mount when the user has set an ORCID iD but never
+  // synced. The ref guard handles strict-mode double mount. We key the guard
+  // by user id so signing in as someone else still triggers their first sync.
+  useEffect(() => {
+    if (!userId) return;
+    if (!orcidId || lastSyncAt) return;
+    if (autoFiredForUserRef.current === userId) return;
+    if (syncOrcid.isPending) return;
+    autoFiredForUserRef.current = userId;
+    runSync({ source: 'auto' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, orcidId, lastSyncAt]);
 
   const handleAdd = () => {
     const trimmed = doi.trim();
@@ -69,9 +157,44 @@ export default function LibraryScreen() {
   }
 
   const works = data ?? [];
+  const orcidDisabled = !orcidId;
+  const orcidLabel = lastSyncAt ? 'Re-sync from ORCID' : 'Import from ORCID';
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]}>
+      {/* ORCID re-sync row — sits above the manual add form. Disabled with a
+          hint when the user hasn't set an orcid_id yet. */}
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => runSync({ source: 'manual' })}
+        disabled={orcidDisabled || syncOrcid.isPending}
+        style={({ pressed }) => [
+          styles.orcidRow,
+          {
+            borderBottomColor: c.border,
+            opacity:
+              orcidDisabled ? 0.5 : syncOrcid.isPending ? 0.7 : pressed ? 0.7 : 1,
+          },
+        ]}
+      >
+        <OrcidIcon size={20} />
+        <View style={styles.orcidRowText}>
+          <Text style={[styles.orcidRowLabel, { color: c.text }]}>
+            {orcidLabel}
+          </Text>
+          {orcidDisabled ? (
+            <Text style={[styles.orcidRowSub, { color: c.textMuted }]}>
+              Add your ORCID iD on your profile first
+            </Text>
+          ) : null}
+        </View>
+        {syncOrcid.isPending ? (
+          <ActivityIndicator size="small" color={c.text} />
+        ) : (
+          <Ionicons name="refresh" size={18} color={c.textMuted} />
+        )}
+      </Pressable>
+
       {/* Add by DOI */}
       <View style={[styles.addRow, { borderBottomColor: c.border }]}>
         <TextInput
@@ -122,6 +245,21 @@ export default function LibraryScreen() {
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={c.text} />
+        }
+        ListHeaderComponent={
+          syncOrcid.isPending ? (
+            <View
+              style={[
+                styles.syncBanner,
+                { borderColor: c.border, backgroundColor: c.surface },
+              ]}
+            >
+              <ActivityIndicator size="small" color={c.text} />
+              <Text style={[styles.syncBannerText, { color: c.textMuted }]}>
+                Importing your works from ORCID…
+              </Text>
+            </View>
+          ) : null
         }
         ItemSeparatorComponent={() => (
           <View style={[styles.separator, { backgroundColor: c.border }]} />
@@ -223,6 +361,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
+  orcidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  orcidRowText: { flex: 1 },
+  orcidRowLabel: { fontSize: 15, fontWeight: '600' },
+  orcidRowSub: { fontSize: 12, marginTop: 2 },
+
   addRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
@@ -253,6 +403,19 @@ const styles = StyleSheet.create({
 
   list: { paddingHorizontal: Spacing.lg, flexGrow: 1 },
   separator: { height: StyleSheet.hairlineWidth },
+
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  syncBannerText: { fontSize: 13, flex: 1 },
 
   empty: {
     flex: 1,

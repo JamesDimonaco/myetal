@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Platform,
   Pressable,
@@ -74,6 +75,20 @@ export default function ProfileScreen() {
     return ORCID_REGEX.test(trimmedOrcid);
   }, [orcidChanged, trimmedOrcid, persistedOrcid]);
 
+  // Single-button collapse logic (§2.2). At most one primary action visible:
+  //   - 'save'   → input differs from saved AND is valid
+  //   - 'remove' → input matches saved (so editing is a no-op), OR input
+  //                empty while a value is persisted
+  //   - 'none'   → empty input + nothing saved
+  // We never render Save and Remove simultaneously.
+  type OrcidButtonMode = 'save' | 'remove' | 'none';
+  const orcidButtonMode: OrcidButtonMode = (() => {
+    if (orcidValidForSave && trimmedOrcid !== '') return 'save';
+    if (persistedOrcid && trimmedOrcid === '') return 'remove';
+    if (persistedOrcid && trimmedOrcid === persistedOrcid) return 'remove';
+    return 'none';
+  })();
+
   const handleOpenOrcidProfile = () => {
     if (!persistedOrcid) return;
     Linking.openURL(`https://orcid.org/${persistedOrcid}`).catch(() => {
@@ -91,7 +106,9 @@ export default function ProfileScreen() {
     setOrcidError(null);
     const next = trimmedOrcid === '' ? null : trimmedOrcid;
     if (next !== null && !ORCID_REGEX.test(next)) {
-      setOrcidError('Use the format 0000-0000-0000-0000 (last digit may be X).');
+      setOrcidError(
+        "That doesn't look like a valid ORCID iD. Use the format 0000-0000-0000-0000 (last digit may be X).",
+      );
       return;
     }
     setOrcidSaving(true);
@@ -106,14 +123,16 @@ export default function ProfileScreen() {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
-          setOrcidError('This ORCID iD is already linked to another account.');
+          setOrcidError('That ORCID iD is already linked to another account.');
         } else if (err.status === 422) {
-          setOrcidError('That ORCID iD does not look valid.');
+          setOrcidError(
+            "That doesn't look like a valid ORCID iD. Use the format 0000-0000-0000-0000 (last digit may be X).",
+          );
         } else {
-          setOrcidError(err.detail || 'Could not save ORCID iD.');
+          setOrcidError('Could not save your ORCID iD.');
         }
       } else {
-        setOrcidError('Network error — try again.');
+        setOrcidError('Could not save your ORCID iD.');
       }
     } finally {
       setOrcidSaving(false);
@@ -136,12 +155,8 @@ export default function ProfileScreen() {
               await updateOrcidId(null);
               setOrcidDraft('');
               lastSeededOrcidRef.current = '';
-            } catch (err) {
-              if (err instanceof ApiError) {
-                setOrcidError(err.detail || 'Could not remove ORCID iD.');
-              } else {
-                setOrcidError('Network error — try again.');
-              }
+            } catch {
+              setOrcidError('Could not save your ORCID iD.');
             } finally {
               setOrcidSaving(false);
             }
@@ -181,10 +196,14 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: c.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
           <Text style={[styles.label, { color: c.textMuted }]}>NAME</Text>
           <Text style={[styles.value, { color: c.text }]}>{user?.name ?? '—'}</Text>
@@ -202,11 +221,12 @@ export default function ProfileScreen() {
           <Text style={[styles.prefsLabel, { color: c.textMuted }]}>ORCID iD</Text>
           <View style={[styles.prefsCard, { backgroundColor: c.surface, borderColor: c.border }]}>
             <Text style={[styles.orcidHelp, { color: c.textMuted }]}>
-              Link your ORCID iD so collaborators can find your work.
+              Add your ORCID iD to import your public works. We only read — we never write to your ORCID record.
             </Text>
 
             {persistedOrcid ? (
               <Pressable
+                accessibilityRole="link"
                 onPress={handleOpenOrcidProfile}
                 style={({ pressed }) => [
                   styles.orcidLinkRow,
@@ -238,43 +258,59 @@ export default function ProfileScreen() {
               <Text style={[styles.orcidError, { color: '#B00020' }]}>{orcidError}</Text>
             ) : null}
 
-            <View style={styles.orcidButtonRow}>
-              <Pressable
-                onPress={handleSaveOrcid}
-                disabled={!orcidValidForSave || orcidSaving}
-                style={({ pressed }) => [
-                  styles.orcidSave,
-                  {
-                    backgroundColor: c.text,
-                    opacity:
-                      !orcidValidForSave || orcidSaving ? 0.4 : pressed ? 0.85 : 1,
-                  },
-                ]}
-              >
-                {orcidSaving ? (
-                  <ActivityIndicator color={c.background} />
+            {orcidButtonMode !== 'none' ? (
+              <View style={styles.orcidButtonRow}>
+                {orcidButtonMode === 'save' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleSaveOrcid}
+                    disabled={orcidSaving}
+                    style={({ pressed }) => [
+                      styles.orcidSave,
+                      {
+                        backgroundColor: c.text,
+                        opacity: orcidSaving ? 0.4 : pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    {orcidSaving ? (
+                      <ActivityIndicator color={c.background} />
+                    ) : (
+                      <Text style={[styles.orcidSaveText, { color: c.background }]}>
+                        Save
+                      </Text>
+                    )}
+                  </Pressable>
                 ) : (
-                  <Text style={[styles.orcidSaveText, { color: c.background }]}>
-                    Save
-                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleClearOrcid}
+                    disabled={orcidSaving}
+                    style={({ pressed }) => [
+                      styles.orcidSave,
+                      {
+                        backgroundColor: '#B00020',
+                        opacity: orcidSaving ? 0.4 : pressed ? 0.85 : 1,
+                      },
+                    ]}
+                  >
+                    {orcidSaving ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={[styles.orcidSaveText, { color: '#FFFFFF' }]}>
+                        Remove
+                      </Text>
+                    )}
+                  </Pressable>
                 )}
-              </Pressable>
+              </View>
+            ) : null}
 
-              {persistedOrcid ? (
-                <Pressable
-                  onPress={handleClearOrcid}
-                  disabled={orcidSaving}
-                  style={({ pressed }) => [
-                    styles.orcidRemove,
-                    { borderColor: c.border, opacity: orcidSaving ? 0.5 : pressed ? 0.6 : 1 },
-                  ]}
-                >
-                  <Text style={[styles.orcidRemoveText, { color: c.text }]}>Remove</Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            <Pressable onPress={handleOpenOrcidExplainer} hitSlop={8}>
+            <Pressable
+              accessibilityRole="link"
+              onPress={handleOpenOrcidExplainer}
+              hitSlop={8}
+            >
               <Text style={[styles.orcidExplainer, { color: c.textMuted }]}>
                 What&apos;s an ORCID iD? {'↗'}
               </Text>
@@ -355,13 +391,15 @@ export default function ProfileScreen() {
             <Text style={[styles.signOutText, { color: c.text }]}>Sign out</Text>
           )}
         </Pressable>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: Spacing.lg },
+  flex: { flex: 1 },
   scroll: { paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.md },
   card: {
     borderRadius: Radius.md,

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
+import { OrcidIcon } from '@/components/orcid-icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -117,9 +119,14 @@ export default function SignInScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'GitHub sign-in failed';
       if (msg.startsWith('github_devjson_manual')) {
-        // Expected: the in-app browser landed on the JSON page. Surface the
-        // paste UI so the user can complete the flow.
-        setShowGithubPaste(true);
+        // Expected: the in-app browser landed on the JSON page. Dev-only
+        // shortcut — in release builds we surface the error instead so the
+        // paste UI never renders.
+        if (__DEV__) {
+          setShowGithubPaste(true);
+        } else {
+          Alert.alert('GitHub sign-in failed', msg);
+        }
       } else if (msg === 'github_oauth_cancel' || msg === 'github_oauth_dismiss') {
         // user backed out — silent
       } else {
@@ -136,7 +143,11 @@ export default function SignInScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Google sign-in failed';
       if (msg.startsWith('google_devjson_manual')) {
-        setShowGithubPaste(true);
+        if (__DEV__) {
+          setShowGithubPaste(true);
+        } else {
+          Alert.alert('Google sign-in failed', msg);
+        }
       } else if (msg === 'google_oauth_cancel' || msg === 'google_oauth_dismiss') {
         // user backed out — silent
       } else {
@@ -153,7 +164,11 @@ export default function SignInScreen() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'ORCID sign-in failed';
       if (msg.startsWith('orcid_devjson_manual')) {
-        setShowGithubPaste(true);
+        if (__DEV__) {
+          setShowGithubPaste(true);
+        } else {
+          Alert.alert('ORCID sign-in failed', msg);
+        }
       } else if (msg === 'orcid_oauth_cancel' || msg === 'orcid_oauth_dismiss') {
         // user backed out — silent
       } else {
@@ -239,18 +254,25 @@ export default function SignInScreen() {
                 },
               ]}
             >
-              <Text style={[styles.providerText, { color: c.text }]}>
-                Continue with ORCID
-              </Text>
+              <View style={styles.providerRow}>
+                <OrcidIcon size={18} />
+                <Text style={[styles.providerText, { color: c.text }]}>
+                  Continue with ORCID
+                </Text>
+              </View>
             </Pressable>
+            <Text style={[styles.providerCaption, { color: c.textMuted }]}>
+              Already signed up with Google or GitHub? Add your ORCID iD on
+              your profile instead — signing in with ORCID will create a
+              separate account.
+            </Text>
           </View>
 
-          {showGithubPaste ? (
+          {__DEV__ && showGithubPaste ? (
             <View style={[styles.pasteBox, { borderColor: c.border, backgroundColor: c.surface }]}>
-              <Text style={[styles.pasteTitle, { color: c.text }]}>Finish GitHub sign-in</Text>
+              <Text style={[styles.pasteTitle, { color: c.text }]}>Finish OAuth sign-in</Text>
               <Text style={[styles.pasteHint, { color: c.textMuted }]}>
-                The browser is showing a JSON response. Copy the entire body and
-                paste it here. (Dev shortcut — Universal Links land soon.)
+                The browser is showing a JSON response. Copy the entire body and paste it here.
               </Text>
               <TextInput
                 value={pasteValue}
@@ -393,6 +415,17 @@ const styles = StyleSheet.create({
   },
   providerText: { fontSize: 16, fontWeight: '500' },
   providerSub: { fontSize: 12, marginTop: 2 },
+  providerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  providerCaption: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+  },
 
   pasteBox: {
     marginTop: Spacing.md,
