@@ -142,9 +142,7 @@ async def list_sessions(db: AsyncSession, user_id: uuid.UUID) -> list[RefreshTok
     return list(rows.all())
 
 
-async def set_user_orcid_id(
-    db: AsyncSession, user_id: uuid.UUID, orcid_id: str | None
-) -> User:
+async def set_user_orcid_id(db: AsyncSession, user_id: uuid.UUID, orcid_id: str | None) -> User:
     """Set or clear ``orcid_id`` for a user. Format is assumed pre-validated
     by the schema layer. Raises ``OrcidIdAlreadyClaimed`` if the iD is
     already linked to another user (account linking is deferred to Phase B)."""

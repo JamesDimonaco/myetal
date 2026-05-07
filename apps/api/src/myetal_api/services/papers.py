@@ -318,10 +318,12 @@ def _parse_openalex_work(work: dict[str, Any]) -> PaperSearchResult:
     topics: list[TopicInfo] = []
     for t in (work.get("topics") or [])[:5]:
         if isinstance(t, dict) and t.get("display_name"):
-            topics.append(TopicInfo(
-                name=t["display_name"],
-                score=float(t.get("score", 0)),
-            ))
+            topics.append(
+                TopicInfo(
+                    name=t["display_name"],
+                    score=float(t.get("score", 0)),
+                )
+            )
 
     # Keywords — top 8 display names
     keywords: list[str] = []

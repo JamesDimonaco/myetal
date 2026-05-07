@@ -37,9 +37,7 @@ async def browse_shares(
     Aggressively cached at the CDN / reverse-proxy layer via
     ``Cache-Control: public, s-maxage=300``.
     """
-    response.headers["Cache-Control"] = (
-        "public, s-maxage=300, stale-while-revalidate=3600"
-    )
+    response.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=3600"
 
     trending, recent, total_published = await share_service.browse_published_shares(db)
 

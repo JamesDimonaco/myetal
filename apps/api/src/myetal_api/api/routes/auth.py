@@ -75,9 +75,7 @@ async def me(user: CurrentUser) -> UserResponse:
 
 
 @router.patch("/me", response_model=UserResponse)
-async def update_me(
-    body: UpdateMeRequest, user: CurrentUser, db: DbSession
-) -> UserResponse:
+async def update_me(body: UpdateMeRequest, user: CurrentUser, db: DbSession) -> UserResponse:
     """Partial update of the calling user's profile. Currently only
     ``orcid_id`` is updatable here. Fields omitted from the request body
     are left unchanged; sending ``null`` (or ``""``) clears the field."""

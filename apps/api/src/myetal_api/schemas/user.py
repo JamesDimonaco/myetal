@@ -44,7 +44,5 @@ class UpdateMeRequest(BaseModel):
         if cleaned == "":
             return None
         if not _ORCID_ID_RE.match(cleaned):
-            raise ValueError(
-                "orcid_id must match 0000-0000-0000-000X (16 digits, last may be X)"
-            )
+            raise ValueError("orcid_id must match 0000-0000-0000-000X (16 digits, last may be X)")
         return cleaned

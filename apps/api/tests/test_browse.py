@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 
 from myetal_api.schemas.share import BrowseShareResult
 
-
 # ---------- response structure ----------
 
 

@@ -178,10 +178,7 @@ async def list_sitemap_shares(
             )
         )
     ).all()
-    return [
-        {"short_code": r.short_code, "updated_at": r.updated_at.isoformat()}
-        for r in rows
-    ]
+    return [{"short_code": r.short_code, "updated_at": r.updated_at.isoformat()} for r in rows]
 
 
 async def publish_share(db: AsyncSession, share: Share) -> Share:
@@ -246,9 +243,7 @@ async def get_share_analytics(
         total_views=agg_row.total,
         views_last_7d=agg_row.last_7d,
         views_last_30d=agg_row.last_30d,
-        daily_views=[
-            DailyViewCount(date=str(r.date), count=r.count) for r in daily_rows
-        ],
+        daily_views=[DailyViewCount(date=str(r.date), count=r.count) for r in daily_rows],
     )
 
 
@@ -269,9 +264,7 @@ async def get_related_shares(db: AsyncSession, share: Share) -> list[RelatedShar
             func.count().label("papers_in_common"),
         )
         .select_from(
-            sp1.join(sp2, sp1.c.paper_id == sp2.c.paper_id).join(
-                s, s.c.id == sp2.c.share_id
-            )
+            sp1.join(sp2, sp1.c.paper_id == sp2.c.paper_id).join(s, s.c.id == sp2.c.share_id)
         )
         .where(
             sp1.c.share_id == share.id,
@@ -512,9 +505,7 @@ async def browse_published_shares(
     total_published = (await db.execute(count_sql)).scalar_one()
 
     # ── Preview items (batch for both sets) ─────────────────────────────
-    all_share_ids = [r.share_id for r in trending_rows] + [
-        r.share_id for r in recent_rows
-    ]
+    all_share_ids = [r.share_id for r in trending_rows] + [r.share_id for r in recent_rows]
     previews: dict[uuid.UUID, list[str]] = {}
     if all_share_ids:
         # Deduplicate to avoid redundant rows

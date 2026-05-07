@@ -41,7 +41,11 @@ async def send_feedback_notification(
         )
         return
 
-    icon = "\U0001f4a1 Feature Request" if feedback_type == FeedbackType.FEATURE_REQUEST else "\U0001f41b Bug Report"
+    icon = (
+        "\U0001f4a1 Feature Request"
+        if feedback_type == FeedbackType.FEATURE_REQUEST
+        else "\U0001f41b Bug Report"
+    )
 
     if user_name and user_email:
         from_line = f"{user_name} ({user_email})"
