@@ -153,6 +153,43 @@ async def test_set_user_orcid_id_resets_last_sync_when_cleared(
     assert user.last_orcid_sync_at is None
 
 
+async def test_set_user_orcid_id_translates_integrity_error_to_already_claimed(
+    db_session: AsyncSession,
+) -> None:
+    """The pre-check (``select where orcid_id == ... and id != self``) is the
+    fast path for benign typos, but two concurrent PATCHes can both pass
+    it. Only the unique index catches that race — the service must turn
+    the resulting IntegrityError into ``OrcidIdAlreadyClaimed`` (and roll
+    back) rather than letting a 500 escape.
+    """
+    from unittest.mock import AsyncMock
+
+    from sqlalchemy.exc import IntegrityError
+
+    user, _, _ = await auth_service.register_with_password(
+        db_session, "race@example.com", "hunter22hunter22", "Race"
+    )
+
+    # Sneak past the pre-check (no row currently holds the iD), then make
+    # commit fail as if a concurrent insert had won the race.
+    fake_commit = AsyncMock(side_effect=IntegrityError("stmt", {}, Exception("uniq")))
+    fake_rollback = AsyncMock()
+
+    real_commit = db_session.commit
+    real_rollback = db_session.rollback
+    db_session.commit = fake_commit  # type: ignore[method-assign]
+    db_session.rollback = fake_rollback  # type: ignore[method-assign]
+    try:
+        with pytest.raises(auth_service.OrcidIdAlreadyClaimed):
+            await auth_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
+    finally:
+        db_session.commit = real_commit  # type: ignore[method-assign]
+        db_session.rollback = real_rollback  # type: ignore[method-assign]
+
+    assert fake_commit.await_count == 1
+    assert fake_rollback.await_count == 1
+
+
 async def test_set_user_orcid_id_does_not_reset_on_idempotent_set(
     db_session: AsyncSession,
 ) -> None:

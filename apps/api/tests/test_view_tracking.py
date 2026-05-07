@@ -165,3 +165,36 @@ async def test_tombstoned_share_returns_410_no_view_recorded(
 async def test_nonexistent_short_code_returns_404(api_client) -> None:
     r = api_client.get("/public/c/nonexistent")
     assert r.status_code == 404
+
+
+async def test_record_view_swallows_db_error_and_does_not_raise(
+    db_session: AsyncSession,
+) -> None:
+    """``record_view`` is documented as best-effort — it must NEVER raise
+    even if the DB layer is poisoned. A view-tracking failure must not
+    block the share response. There's no other negative test for this
+    contract today, hence this guard rail.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from myetal_api.services import share_view as share_view_service
+
+    share_view_dedup._reset_for_tests()
+    user = await _make_user(db_session)
+    share = await _make_share(db_session, user)
+
+    # Build a request stand-in with the headers/client our path reads.
+    request = MagicMock()
+    request.headers = {"user-agent": "Mozilla/5.0"}
+    request.client = MagicMock()
+    request.client.host = "1.2.3.4"
+
+    # Poison the session: every query path explodes. The contract is that
+    # record_view catches it, logs, and returns None.
+    poisoned = MagicMock()
+    poisoned.scalar = AsyncMock(side_effect=RuntimeError("db is gone"))
+    poisoned.add = MagicMock(side_effect=RuntimeError("db is gone"))
+    poisoned.commit = AsyncMock(side_effect=RuntimeError("db is gone"))
+
+    # Should not raise.
+    await share_view_service.record_view(poisoned, share, request)

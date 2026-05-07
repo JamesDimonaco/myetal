@@ -189,6 +189,34 @@ async def test_complete_oauth_with_wrong_provider_state(db_session: AsyncSession
             )
 
 
+async def test_orcid_id_already_linked_raises_when_pre_claimed(
+    db_session: AsyncSession,
+) -> None:
+    """If user A has already claimed an ORCID iD (manually via set_user_orcid_id),
+    a fresh OAuth callback from a *different* sub-shadowed user with the same
+    orcid_id must raise OrcidIdAlreadyLinked rather than silently creating a
+    stub user."""
+    from myetal_api.core.oauth import ProviderUserInfo
+    from myetal_api.services import auth as auth_service
+    from myetal_api.services.oauth import OrcidIdAlreadyLinked, _find_or_create_user
+
+    pre_claimed_id = "0000-0001-2345-6789"
+
+    # User A registers via password and manually claims the iD on their profile.
+    user_a, _, _ = await auth_service.register_with_password(
+        db_session, "first@example.com", "hunter22hunter22", "First"
+    )
+    await auth_service.set_user_orcid_id(db_session, user_a.id, pre_claimed_id)
+    await db_session.commit()
+
+    # User B is a fresh OAuth subject — same iD comes back from ORCID.
+    info = ProviderUserInfo(
+        subject=pre_claimed_id, name="Second", email="second@example.com", avatar_url=None
+    )
+    with pytest.raises(OrcidIdAlreadyLinked):
+        await _find_or_create_user(db_session, AuthProvider.ORCID, info)
+
+
 async def test_complete_oauth_orcid_with_only_sub(db_session: AsyncSession) -> None:
     """ORCID OIDC may return only `sub` if the user denied email scope.
     User should still be created, with name and email null."""
