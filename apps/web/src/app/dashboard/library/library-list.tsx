@@ -1,13 +1,32 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
+import { OrcidIcon } from '@/components/orcid-icon';
+import { ApiError } from '@/lib/api';
 import { clientApi } from '@/lib/client-api';
-import type { WorkResponse } from '@/types/works';
+import type { OrcidSyncResponse, WorkResponse } from '@/types/works';
 
-export function LibraryList({ initialWorks }: { initialWorks: WorkResponse[] }) {
+interface LibraryListProps {
+  initialWorks: WorkResponse[];
+  orcidId: string | null;
+  lastOrcidSyncAt: string | null;
+}
+
+type SyncBanner =
+  | { kind: 'running' }
+  | { kind: 'success'; result: OrcidSyncResponse }
+  | { kind: 'error'; message: string };
+
+export function LibraryList({
+  initialWorks,
+  orcidId,
+  lastOrcidSyncAt,
+}: LibraryListProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { data: works } = useQuery({
     queryKey: ['works'],
@@ -17,6 +36,8 @@ export function LibraryList({ initialWorks }: { initialWorks: WorkResponse[] }) 
 
   const [doi, setDoi] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<SyncBanner | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addWork = useMutation({
     mutationFn: (identifier: string) =>
@@ -50,32 +71,140 @@ export function LibraryList({ initialWorks }: { initialWorks: WorkResponse[] }) 
     },
   });
 
+  // Single mutation hook shared by auto-fire and manual button — `isPending`
+  // serves as the runtime guard, so a button click during auto-fire is a no-op
+  // (see `disabled` on the button below).
+  const syncOrcid = useMutation({
+    mutationFn: () =>
+      clientApi<OrcidSyncResponse>('/me/works/sync-orcid', { method: 'POST' }),
+    onMutate: () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
+      setBanner({ kind: 'running' });
+    },
+    onSuccess: (result) => {
+      setBanner({ kind: 'success', result });
+      queryClient.invalidateQueries({ queryKey: ['works'] });
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      // Auto-dismiss after 8s
+      dismissTimerRef.current = setTimeout(() => {
+        setBanner(null);
+        dismissTimerRef.current = null;
+      }, 8000);
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        if (err.status === 400) {
+          setBanner(null);
+          router.push('/dashboard/profile?flash=set_orcid_id_to_import');
+          return;
+        }
+        if (err.status === 503) {
+          setBanner({
+            kind: 'error',
+            message: 'ORCID is unavailable right now. Try again in a minute.',
+          });
+          return;
+        }
+        if (err.status === 429) {
+          setBanner({
+            kind: 'error',
+            message: 'Slow down — try again in a minute.',
+          });
+          return;
+        }
+      }
+      setBanner({
+        kind: 'error',
+        message:
+          err instanceof Error
+            ? err.message
+            : "Couldn't import from ORCID. Try again in a minute.",
+      });
+    },
+  });
+
+  // Auto-fire on first mount when orcid_id is set but never synced.
+  // Ref guard ensures this fires exactly once even under React 18 StrictMode's
+  // double-render of effects in dev. We also gate on `isPending` defensively.
+  const autoFiredRef = useRef(false);
+  const syncMutate = syncOrcid.mutate;
+  const syncIsPending = syncOrcid.isPending;
+  useEffect(() => {
+    if (autoFiredRef.current) return;
+    if (!orcidId) return;
+    if (lastOrcidSyncAt !== null) return;
+    if (syncIsPending) return;
+    autoFiredRef.current = true;
+    syncMutate();
+  }, [orcidId, lastOrcidSyncAt, syncIsPending, syncMutate]);
+
+  // Cleanup the auto-dismiss timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const importDisabled = !orcidId || syncOrcid.isPending;
+  const importLabel = syncOrcid.isPending
+    ? 'Importing from ORCID…'
+    : lastOrcidSyncAt === null
+      ? 'Import from ORCID'
+      : 'Re-sync from ORCID';
+  const importTooltip = !orcidId
+    ? 'Add your ORCID iD on your profile first'
+    : undefined;
+
   return (
     <>
-      {/* Add by DOI */}
-      <form
-        className="flex gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const trimmed = doi.trim();
-          if (trimmed) addWork.mutate(trimmed);
-        }}
-      >
-        <input
-          type="text"
-          value={doi}
-          onChange={(e) => setDoi(e.target.value)}
-          placeholder="Paste a DOI (e.g. 10.1234/example)"
-          className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={addWork.isPending || !doi.trim()}
-          className="rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+      {/* Sync banner */}
+      {banner ? (
+        <SyncBannerView banner={banner} onDismiss={() => setBanner(null)} />
+      ) : null}
+
+      {/* Add by DOI + Import from ORCID */}
+      <div className="flex flex-wrap items-stretch gap-3">
+        <form
+          className="flex flex-1 gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const trimmed = doi.trim();
+            if (trimmed) addWork.mutate(trimmed);
+          }}
         >
-          {addWork.isPending ? 'Adding...' : '+ Add paper'}
+          <input
+            type="text"
+            value={doi}
+            onChange={(e) => setDoi(e.target.value)}
+            placeholder="Paste a DOI (e.g. 10.1234/example)"
+            className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={addWork.isPending || !doi.trim()}
+            className="rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          >
+            {addWork.isPending ? 'Adding...' : '+ Add paper'}
+          </button>
+        </form>
+        <button
+          type="button"
+          onClick={() => syncOrcid.mutate()}
+          disabled={importDisabled}
+          title={importTooltip}
+          aria-label={importLabel}
+          className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+        >
+          <OrcidIcon size={16} />
+          {importLabel}
         </button>
-      </form>
+      </div>
       {error ? (
         <p className="mt-2 text-sm text-danger">{error}</p>
       ) : null}
@@ -100,6 +229,63 @@ export function LibraryList({ initialWorks }: { initialWorks: WorkResponse[] }) 
         </div>
       )}
     </>
+  );
+}
+
+function SyncBannerView({
+  banner,
+  onDismiss,
+}: {
+  banner: SyncBanner;
+  onDismiss: () => void;
+}) {
+  let body: React.ReactNode;
+  let tone = 'border-rule bg-paper-soft text-ink';
+
+  if (banner.kind === 'running') {
+    body = (
+      <span className="inline-flex items-center gap-2">
+        <Spinner />
+        <span>Importing your works from ORCID…</span>
+      </span>
+    );
+  } else if (banner.kind === 'success') {
+    const { added, updated, unchanged, skipped } = banner.result;
+    body = (
+      <span>
+        Imported {added} new, {updated} updated, {unchanged} already in your
+        library, {skipped} skipped.
+      </span>
+    );
+  } else {
+    tone = 'border-danger/40 bg-danger/5 text-ink';
+    body = <span>{banner.message}</span>;
+  }
+
+  return (
+    <div
+      role="status"
+      className={`mb-4 flex items-start justify-between gap-3 rounded-md border px-4 py-3 text-sm ${tone}`}
+    >
+      <div className="flex-1">{body}</div>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="-mr-1 rounded-md px-2 text-ink-muted transition hover:text-ink"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink/20 border-t-ink"
+    />
   );
 }
 

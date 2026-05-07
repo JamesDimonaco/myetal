@@ -11,6 +11,7 @@ export interface UserResponse {
   avatar_url: string | null;
   is_admin: boolean;
   orcid_id: string | null;
+  last_orcid_sync_at: string | null;
   created_at: string;
 }
 

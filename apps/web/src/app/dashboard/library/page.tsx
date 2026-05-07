@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
+import type { UserResponse } from '@/types/auth';
 import type { WorkResponse } from '@/types/works';
 
 import { LibraryList } from './library-list';
@@ -11,8 +12,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function LibraryPage() {
   let works: WorkResponse[];
+  let user: UserResponse;
   try {
-    works = await serverFetch<WorkResponse[]>('/me/works', { cache: 'no-store' });
+    [works, user] = await Promise.all([
+      serverFetch<WorkResponse[]>('/me/works', { cache: 'no-store' }),
+      serverFetch<UserResponse>('/auth/me', { cache: 'no-store' }),
+    ]);
   } catch (err) {
     if (err instanceof ApiError && (err.isUnauthorized || err.isForbidden)) {
       redirect('/sign-in?return_to=/dashboard/library');
@@ -35,7 +40,11 @@ export default async function LibraryPage() {
       </div>
 
       <div className="mt-10">
-        <LibraryList initialWorks={works} />
+        <LibraryList
+          initialWorks={works}
+          orcidId={user.orcid_id}
+          lastOrcidSyncAt={user.last_orcid_sync_at}
+        />
       </div>
     </div>
   );

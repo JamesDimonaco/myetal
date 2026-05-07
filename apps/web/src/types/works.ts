@@ -32,3 +32,12 @@ export interface WorkResponse {
 export interface AddWorkRequest {
   identifier: string;
 }
+
+/** POST /me/works/sync-orcid response shape. */
+export interface OrcidSyncResponse {
+  added: number;
+  updated: number;
+  unchanged: number;
+  skipped: number;
+  errors: string[];
+}

@@ -9,6 +9,12 @@ import type { UserResponse } from '@/types/auth';
 
 const ORCID_REGEX = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
 
+const ORCID_VALIDATION_ERROR =
+  "That doesn't look like a valid ORCID iD. Use the format 0000-0000-0000-0000 (last digit may be X).";
+const ORCID_CONFLICT_ERROR =
+  'That ORCID iD is already linked to another account.';
+const ORCID_GENERIC_SAVE_ERROR = 'Could not save your ORCID iD.';
+
 interface Props {
   initialOrcidId: string | null;
 }
@@ -26,9 +32,23 @@ export function OrcidSection({ initialOrcidId }: Props) {
 
   const trimmed = draft.trim().toUpperCase();
   const normalisedSaved = savedValue ?? '';
-  const hasChange = trimmed !== normalisedSaved;
-  const isClearing = trimmed === '' && savedValue !== null;
+  const inputDiffers = trimmed !== normalisedSaved;
+  const inputIsEmpty = trimmed === '';
   const formatValid = trimmed === '' || ORCID_REGEX.test(trimmed);
+
+  // Per §2.2:
+  //   Empty + nothing saved          → no button.
+  //   Differs from saved (and valid) → Save (primary).
+  //   Matches saved exactly          → Remove (destructive, with confirm).
+  //   Empty + value saved            → Remove (destructive, with confirm).
+  const buttonMode: 'none' | 'save' | 'remove' =
+    !savedValue && inputIsEmpty
+      ? 'none'
+      : !inputDiffers
+        ? 'remove'
+        : inputIsEmpty && savedValue
+          ? 'remove'
+          : 'save';
 
   async function patch(body: { orcid_id: string | null }): Promise<UserResponse> {
     return clientApi<UserResponse>('/auth/me', {
@@ -42,10 +62,15 @@ export function OrcidSection({ initialOrcidId }: Props) {
     setError(null);
     setJustSaved(false);
 
+    if (buttonMode === 'remove') {
+      await handleRemove();
+      return;
+    }
+
+    if (buttonMode !== 'save') return;
+
     if (!formatValid) {
-      setError(
-        "That doesn't look like a valid ORCID iD — try the format 0000-0000-0000-0000.",
-      );
+      setError(ORCID_VALIDATION_ERROR);
       return;
     }
 
@@ -60,16 +85,14 @@ export function OrcidSection({ initialOrcidId }: Props) {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
-          setError('That ORCID iD is already linked to another account.');
+          setError(ORCID_CONFLICT_ERROR);
         } else if (err.status === 422) {
-          setError(
-            "That doesn't look like a valid ORCID iD — try the format 0000-0000-0000-0000.",
-          );
+          setError(ORCID_VALIDATION_ERROR);
         } else {
-          setError(err.detail || 'Could not save your ORCID iD.');
+          setError(err.detail || ORCID_GENERIC_SAVE_ERROR);
         }
       } else {
-        setError('Could not save your ORCID iD.');
+        setError(ORCID_GENERIC_SAVE_ERROR);
       }
     } finally {
       setSubmitting(false);
@@ -79,6 +102,14 @@ export function OrcidSection({ initialOrcidId }: Props) {
   async function handleRemove() {
     setError(null);
     setJustSaved(false);
+    // Web Remove confirmation per §2.4 — native confirm() mirrors mobile's
+    // Alert.alert; no new dependency needed.
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm(
+        'Remove your ORCID iD? You can add it back any time.',
+      );
+      if (!ok) return;
+    }
     setSubmitting(true);
     try {
       const updated = await patch({ orcid_id: null });
@@ -87,9 +118,9 @@ export function OrcidSection({ initialOrcidId }: Props) {
       setJustSaved(true);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.detail || 'Could not remove your ORCID iD.');
+        setError(err.detail || ORCID_GENERIC_SAVE_ERROR);
       } else {
-        setError('Could not remove your ORCID iD.');
+        setError(ORCID_GENERIC_SAVE_ERROR);
       }
     } finally {
       setSubmitting(false);
@@ -103,7 +134,8 @@ export function OrcidSection({ initialOrcidId }: Props) {
         <h2 className="font-serif text-xl text-ink">ORCID iD</h2>
       </header>
       <p className="mt-1 text-sm text-ink-muted">
-        Connect your ORCID record so you can import your works.
+        Add your ORCID iD to import your public works. We only read — we never
+        write to your ORCID record.
       </p>
 
       {savedValue ? (
@@ -141,27 +173,28 @@ export function OrcidSection({ initialOrcidId }: Props) {
             autoComplete="off"
             spellCheck={false}
             maxLength={19}
+            aria-invalid={!!error}
+            aria-describedby={error ? 'orcid-id-error' : undefined}
             className={[
               'rounded-md border bg-paper px-3 py-2.5 font-mono text-base text-ink outline-none focus:border-accent',
               error ? 'border-danger' : 'border-rule',
             ].join(' ')}
           />
-          <span className="text-xs text-ink-muted">
-            Don&apos;t know yours?{' '}
-            <a
-              href="https://orcid.org"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="underline decoration-ink-faint underline-offset-2 hover:decoration-ink"
-            >
-              Find your ORCID iD
-            </a>
-            .
-          </span>
         </label>
 
+        <p className="text-xs text-ink-muted">
+          <a
+            href="https://orcid.org"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline decoration-ink-faint underline-offset-2 hover:decoration-ink"
+          >
+            What&apos;s an ORCID iD? ↗
+          </a>
+        </p>
+
         {error ? (
-          <p className="text-sm text-danger" role="alert">
+          <p id="orcid-id-error" className="text-sm text-danger" role="alert">
             {error}
           </p>
         ) : null}
@@ -170,29 +203,28 @@ export function OrcidSection({ initialOrcidId }: Props) {
           <p className="text-sm text-ink-muted">Saved.</p>
         ) : null}
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="submit"
-            disabled={submitting || !hasChange}
-            className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
-          >
-            {submitting
-              ? 'Saving…'
-              : isClearing
-                ? 'Save (clear)'
-                : 'Save'}
-          </button>
-          {savedValue ? (
-            <button
-              type="button"
-              onClick={handleRemove}
-              disabled={submitting}
-              className="rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-danger transition hover:bg-paper-soft disabled:opacity-60"
-            >
-              Remove
-            </button>
-          ) : null}
-        </div>
+        {buttonMode !== 'none' ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {buttonMode === 'save' ? (
+              <button
+                type="submit"
+                disabled={submitting || !formatValid}
+                className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+              >
+                {submitting ? 'Saving…' : 'Save'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={submitting}
+                className="rounded-md border border-danger/40 bg-paper px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
+              >
+                {submitting ? 'Removing…' : 'Remove'}
+              </button>
+            )}
+          </div>
+        ) : null}
       </form>
     </section>
   );

@@ -58,6 +58,11 @@ export default function SignInPage({
           <OrcidIcon size={18} />
           Continue with ORCID
         </a>
+        <p className="text-xs text-ink-muted">
+          Already signed up with Google or GitHub? Add your ORCID iD on your
+          profile instead — signing in with ORCID will create a separate
+          account.
+        </p>
       </div>
 
       {/* --- Divider --- */}
