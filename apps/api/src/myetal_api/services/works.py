@@ -1,8 +1,12 @@
 """Personal works library — add, list, hide, restore.
 
-Per `docs/tickets/works-library-and-orcid-sync.md` chunk D scope: manual
-DOI add via Crossref, list/hide/restore. ORCID sync (the bigger feature)
-defers to its own ticket once sandbox is approved.
+Two add-paths share `add_paper_by_doi`:
+
+  - **Manual DOI paste** (POST /me/works) — re-adding a previously hidden
+    entry restores it (the paste is a clear "I want this back" signal).
+  - **ORCID sync** (POST /me/works/sync-orcid) — re-syncing must NOT
+    restore hidden entries (per W-S5: hiding is the user's "don't
+    re-import this" signal). The ORCID path passes `restore_hidden=False`.
 
 Add flow:
   1. Resolve the DOI through `services/papers.py:lookup_doi` (Crossref;
@@ -10,8 +14,13 @@ Add flow:
   2. Find-or-create the global `papers` row (DOI dedup is enforced by
      the partial-unique index on `papers.doi`).
   3. Find-or-create the per-user `user_papers` row (composite PK
-     enforces dedup-per-user). If the entry was hidden, restore it.
-  4. Return the freshly attached library entry.
+     enforces dedup-per-user). Restore-on-re-add is gated by the
+     `restore_hidden` kwarg.
+  4. Return (paper, entry, status) where status classifies the outcome
+     for the ORCID counter:
+        "added"     — a new user_papers row was created this call
+        "unchanged" — row already existed and was not hidden
+        "hidden"    — row exists but is hidden_at!=None and we left it that way
 
 All operations idempotent on (user_id, doi) — a user can paste the same
 DOI twice without surprises.
@@ -20,33 +29,82 @@ DOI twice without surprises.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Literal
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from myetal_api.models import Paper, PaperSource, UserPaper, UserPaperAddedVia
+from myetal_api.models import Paper, PaperSource, User, UserPaper, UserPaperAddedVia
+from myetal_api.services import orcid_client
 from myetal_api.services import papers as papers_service
+
+AddStatus = Literal["added", "unchanged", "hidden"]
 
 
 class LibraryEntryNotFound(Exception):
     """The user has no library entry for the given paper id."""
 
 
+class OrcidIdNotSet(Exception):
+    """Sync attempted for a user with no ``orcid_id`` set. Route → 400."""
+
+
+@dataclass
+class OrcidSyncResult:
+    """Counts returned from ``sync_from_orcid``.
+
+    - ``added``: new user_papers rows created this call.
+    - ``updated``: paper existed globally but was newly linked to the user.
+      In this PR ``added`` and ``updated`` are reported under ``added`` —
+      the field is kept for response-shape parity with the spec; future
+      versions can split them. (We always create a user_papers row when
+      one didn't exist; whether the global paper was new is irrelevant
+      to the user's library count.)
+    - ``unchanged``: row already in user's library (including hidden ones
+      we deliberately left hidden).
+    - ``skipped``: works without a DOI, or per-DOI lookup failures.
+    - ``errors``: per-DOI failure messages, capped at 10.
+    """
+
+    added: int = 0
+    updated: int = 0
+    unchanged: int = 0
+    skipped: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
 async def add_paper_by_doi(
     db: AsyncSession,
     user_id: uuid.UUID,
     identifier: str,
-) -> tuple[Paper, UserPaper]:
+    *,
+    added_via: UserPaperAddedVia = UserPaperAddedVia.MANUAL,
+    restore_hidden: bool = True,
+) -> tuple[Paper, UserPaper, AddStatus]:
     """Add a paper to a user's library by DOI (or DOI URL).
 
     Resolves the DOI via Crossref (existing `services/papers.py`), upserts
     the global `papers` row, then upserts the per-user `user_papers` row.
 
-    Raises `ValueError` for malformed identifiers (route turns into 422),
-    `papers_service.PaperNotFound` for unknown DOIs (route turns into 404),
-    `papers_service.PaperUpstreamError` for Crossref outages (503).
+    ``added_via`` is stamped on newly created user_papers rows (existing
+    rows keep their original value — re-adding via ORCID doesn't rewrite
+    a row added manually).
+
+    ``restore_hidden=True`` (manual paste default): if the entry exists
+    and is hidden, un-hide it. ``restore_hidden=False`` (ORCID sync):
+    leave hidden entries hidden — the user's hide gesture wins.
+
+    Returns ``(paper, entry, status)`` where status is one of
+    ``"added"`` / ``"unchanged"`` / ``"hidden"`` so callers can count
+    outcomes without re-reading the row.
+
+    Raises ``ValueError`` for malformed identifiers (route turns into 422),
+    ``papers_service.PaperNotFound`` for unknown DOIs (route turns into 404),
+    ``papers_service.PaperUpstreamError`` for Crossref outages (503).
     """
     # 1. Hit Crossref. Throws on bad input / unknown / upstream error —
     #    let those bubble up so the route can map to the right HTTP code.
@@ -76,28 +134,100 @@ async def add_paper_by_doi(
         db.add(paper)
         await db.flush()  # populate paper.id
 
-    # 3. Find-or-create the per-user library entry. If it exists but was
-    #    hidden, restore it (re-adding signals intent to surface again).
+    # 3. Find-or-create the per-user library entry. The hidden_at branch
+    #    differs by add-path: manual paste restores; ORCID sync respects
+    #    the user's prior hide decision.
     entry = await db.scalar(
         select(UserPaper).where(
             UserPaper.user_id == user_id,
             UserPaper.paper_id == paper.id,
         )
     )
+    status: AddStatus
     if entry is None:
         entry = UserPaper(
             user_id=user_id,
             paper_id=paper.id,
-            added_via=UserPaperAddedVia.MANUAL,
+            added_via=added_via,
         )
         db.add(entry)
+        status = "added"
     elif entry.hidden_at is not None:
-        entry.hidden_at = None
+        if restore_hidden:
+            entry.hidden_at = None
+            status = "added"
+        else:
+            status = "hidden"
+    else:
+        status = "unchanged"
 
     await db.commit()
     await db.refresh(entry)
     await db.refresh(paper)
-    return paper, entry
+    return paper, entry, status
+
+
+async def sync_from_orcid(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    http: httpx.AsyncClient | None = None,
+) -> OrcidSyncResult:
+    """Pull the user's public ORCID works and import each by DOI.
+
+    Skips works without a DOI (counted as ``skipped``). Per-DOI errors
+    (Crossref 404 / 5xx) are captured into ``errors`` (cap 10) and
+    counted as ``skipped``; the sync as a whole keeps going. Hidden
+    entries stay hidden (W-S5).
+
+    Stamps ``user.last_orcid_sync_at`` on success and commits in a
+    single final transaction (each ``add_paper_by_doi`` already commits
+    its own work, so the final commit is just for the timestamp).
+
+    Raises ``OrcidIdNotSet`` if the user has no ``orcid_id`` (→ 400).
+    Lets ``orcid_client.UpstreamError`` propagate (→ 503).
+    """
+    user = await db.get(User, user_id)
+    if user is None:
+        # Defensive — auth dep should have already 401'd, but don't crash.
+        raise OrcidIdNotSet
+    if user.orcid_id is None:
+        raise OrcidIdNotSet
+
+    works = await orcid_client.fetch_works(user.orcid_id, http=http)
+
+    result = OrcidSyncResult()
+    for work in works:
+        if not work.doi:
+            result.skipped += 1
+            continue
+        try:
+            _, _, status = await add_paper_by_doi(
+                db,
+                user_id,
+                work.doi,
+                added_via=UserPaperAddedVia.ORCID,
+                restore_hidden=False,
+            )
+        except (papers_service.PaperNotFound, papers_service.PaperUpstreamError, ValueError) as exc:
+            if len(result.errors) < 10:
+                result.errors.append(f"{work.doi}: {exc}")
+            result.skipped += 1
+            continue
+
+        if status == "added":
+            result.added += 1
+        elif status == "hidden":
+            # User explicitly hid this previously — count as unchanged
+            # for client-facing purposes; we did nothing.
+            result.unchanged += 1
+        else:  # "unchanged"
+            result.unchanged += 1
+
+    user.last_orcid_sync_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(user)
+    return result
 
 
 async def list_library(

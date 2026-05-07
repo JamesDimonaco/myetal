@@ -41,9 +41,11 @@ services:
       # Mount alembic so the auto-migrate step on startup sees the latest revisions
       - ./apps/api/alembic:/app/alembic
       - ./apps/api/alembic.ini:/app/alembic.ini
-    # Apply any pending DB migrations, then start uvicorn with reload
+    # Apply any pending DB migrations, then start uvicorn with reload.
+    # --log-level warning silences uvicorn's per-request INFO access log
+    # (the loud /healthz polling output). App structlog output is unaffected.
     command: >
-      sh -c "alembic upgrade head && uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "alembic upgrade head && uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --reload --log-level warning"
     # /healthz never touches the DB, so this only reflects "is the process up".
     # /readyz is the DB-aware probe; it's not used here because compose has
     # no native concept of routing decisions, only restart triggers.

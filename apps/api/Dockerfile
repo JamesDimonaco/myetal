@@ -54,9 +54,13 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # multi-worker deployments would multiply the effective limit. See DEPLOY.md.
 # --proxy-headers makes uvicorn trust X-Forwarded-For from Caddy so slowapi
 # rate-limits by the real client IP, not the loopback address.
+# --log-level warning silences the per-request INFO access log (the loud
+# /healthz polling output); errors/warnings still surface, and the
+# application's structlog output is unaffected.
 CMD ["uvicorn", "myetal_api.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
      "--workers", "1", \
      "--proxy-headers", \
-     "--forwarded-allow-ips", "*"]
+     "--forwarded-allow-ips", "*", \
+     "--log-level", "warning"]

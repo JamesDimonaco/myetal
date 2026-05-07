@@ -158,6 +158,12 @@ async def set_user_orcid_id(db: AsyncSession, user_id: uuid.UUID, orcid_id: str 
         if clash is not None:
             raise OrcidIdAlreadyClaimed
 
+    # If the iD is *changing* (incl. clearing or replacing), drop the
+    # last-sync timestamp so the next library visit re-fires the auto-import
+    # for the new iD. Idempotent set (same value) leaves the timestamp alone.
+    if user.orcid_id != orcid_id:
+        user.last_orcid_sync_at = None
+
     user.orcid_id = orcid_id
     # The precheck above is the fast path for benign typos, but two concurrent
     # PATCHes can both pass it — only the unique index will catch that race.

@@ -12,11 +12,19 @@ composite PK.
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from myetal_api.api.deps import CurrentUser, DbSession
-from myetal_api.schemas.works import AddWorkRequest, PaperOut, WorkResponse
+from myetal_api.core.rate_limit import limiter
+from myetal_api.schemas.works import (
+    AddWorkRequest,
+    OrcidSyncResponse,
+    PaperOut,
+    WorkResponse,
+)
+from myetal_api.services import orcid_client
 from myetal_api.services import papers as papers_service
 from myetal_api.services import works as works_service
 
@@ -35,7 +43,7 @@ async def add_work(
     entry was previously hidden, it gets restored.
     """
     try:
-        paper, entry = await works_service.add_paper_by_doi(db, user.id, body.identifier)
+        paper, entry, _ = await works_service.add_paper_by_doi(db, user.id, body.identifier)
     except ValueError as exc:
         # Malformed DOI / unparseable identifier
         raise HTTPException(
@@ -137,3 +145,35 @@ async def restore_work(
         added_at=entry.added_at,
         hidden_at=entry.hidden_at,
     )
+
+
+@router.post("/sync-orcid", response_model=OrcidSyncResponse)
+@limiter.limit("5/minute")
+async def sync_orcid(
+    request: Request,
+    user: CurrentUser,
+    db: DbSession,
+) -> OrcidSyncResponse:
+    """Pull the user's public ORCID works and import each by DOI.
+
+    Synchronous: the request hangs until the import is done. Returns
+    counts of what changed. Idempotent — re-running is a no-op for
+    already-saved papers, and previously hidden entries stay hidden.
+
+    400 if the user has no ``orcid_id`` set.
+    503 if ORCID is unreachable / returned a 5xx.
+    429 if called more than 5 times per minute (slowapi).
+    """
+    try:
+        result = await works_service.sync_from_orcid(db, user.id)
+    except works_service.OrcidIdNotSet as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="set your ORCID iD on your profile first",
+        ) from exc
+    except orcid_client.UpstreamError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ORCID is unavailable, try again in a minute",
+        ) from exc
+    return OrcidSyncResponse(**asdict(result))

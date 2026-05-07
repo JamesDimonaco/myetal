@@ -110,3 +110,67 @@ async def test_email_normalised_on_login(db_session: AsyncSession) -> None:
     await auth_service.register_with_password(db_session, "Foo@Example.COM", "hunter22", None)
     user, _, _ = await auth_service.login_with_password(db_session, "FOO@example.com", "hunter22")
     assert user.email == "foo@example.com"
+
+
+# ---------- set_user_orcid_id: last_orcid_sync_at reset rule ----------
+
+
+async def test_set_user_orcid_id_resets_last_sync_when_value_changes(
+    db_session: AsyncSession,
+) -> None:
+    """Changing the iD to a *different* value clears last_orcid_sync_at so
+    the auto-import re-fires for the new iD."""
+    from datetime import UTC, datetime
+
+    user, _, _ = await auth_service.register_with_password(
+        db_session, "orcid-reset@example.com", "hunter22hunter22", None
+    )
+    user = await auth_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
+    user.last_orcid_sync_at = datetime.now(UTC)
+    await db_session.commit()
+    assert user.last_orcid_sync_at is not None
+
+    # Set to a *different* iD → reset.
+    user = await auth_service.set_user_orcid_id(db_session, user.id, "0000-0001-2345-6789")
+    assert user.last_orcid_sync_at is None
+
+
+async def test_set_user_orcid_id_resets_last_sync_when_cleared(
+    db_session: AsyncSession,
+) -> None:
+    """Clearing the iD (None) is a "change" too — reset the timestamp."""
+    from datetime import UTC, datetime
+
+    user, _, _ = await auth_service.register_with_password(
+        db_session, "orcid-clear@example.com", "hunter22hunter22", None
+    )
+    user = await auth_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
+    user.last_orcid_sync_at = datetime.now(UTC)
+    await db_session.commit()
+    assert user.last_orcid_sync_at is not None
+
+    user = await auth_service.set_user_orcid_id(db_session, user.id, None)
+    assert user.last_orcid_sync_at is None
+
+
+async def test_set_user_orcid_id_does_not_reset_on_idempotent_set(
+    db_session: AsyncSession,
+) -> None:
+    """Re-setting the *same* value is a no-op for the timestamp."""
+    from datetime import UTC, datetime
+
+    user, _, _ = await auth_service.register_with_password(
+        db_session, "orcid-idem@example.com", "hunter22hunter22", None
+    )
+    user = await auth_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
+    stamp = datetime.now(UTC)
+    user.last_orcid_sync_at = stamp
+    await db_session.commit()
+
+    user = await auth_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
+    assert user.last_orcid_sync_at is not None
+    # Stored timestamp may lose tz info on SQLite, but it must not be None.
+    stored = user.last_orcid_sync_at
+    if stored.tzinfo is None:
+        stored = stored.replace(tzinfo=UTC)
+    assert stored == stamp.replace(microsecond=stamp.microsecond)

@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, String, Uuid
+from sqlalchemy import Boolean, DateTime, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from myetal_api.models.base import Base, TimestampMixin
@@ -20,6 +21,12 @@ class User(Base, TimestampMixin):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     orcid_id: Mapped[str | None] = mapped_column(String(19), nullable=True, unique=True)
+    # Stamped on the first/most-recent successful POST /me/works/sync-orcid.
+    # NULL = never synced; clients use the (orcid_id, last_orcid_sync_at) pair
+    # to decide whether to auto-fire the import on first library visit.
+    last_orcid_sync_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     auth_identities: Mapped[list["AuthIdentity"]] = relationship(
         back_populates="user",

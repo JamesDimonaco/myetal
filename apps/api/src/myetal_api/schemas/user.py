@@ -20,6 +20,7 @@ class UserResponse(BaseModel):
     is_admin: bool
     avatar_url: str | None
     orcid_id: str | None
+    last_orcid_sync_at: datetime | None
     created_at: datetime
 
 

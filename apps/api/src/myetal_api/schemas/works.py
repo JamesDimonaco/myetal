@@ -54,3 +54,17 @@ class WorkResponse(BaseModel):
     added_via: UserPaperAddedVia
     added_at: datetime
     hidden_at: datetime | None
+
+
+class OrcidSyncResponse(BaseModel):
+    """Counts returned from POST /me/works/sync-orcid.
+
+    Mirrors ``services.works.OrcidSyncResult``. ``errors`` is capped at
+    10 entries — enough to debug, not enough to flood the response.
+    """
+
+    added: int
+    updated: int
+    unchanged: int
+    skipped: int
+    errors: list[str]
