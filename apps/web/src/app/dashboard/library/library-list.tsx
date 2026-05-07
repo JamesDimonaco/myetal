@@ -1,13 +1,20 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { OrcidIcon } from '@/components/orcid-icon';
 import { ApiError } from '@/lib/api';
 import { clientApi } from '@/lib/client-api';
-import type { OrcidSyncResponse, WorkResponse } from '@/types/works';
+import { SHARES_KEY, shareKey } from '@/lib/hooks/useShares';
+import type {
+  ShareItemInput,
+  ShareResponse,
+  ShareUpdateInput,
+} from '@/types/share';
+import type { OrcidSyncResponse, PaperOut, WorkResponse } from '@/types/works';
 
 interface LibraryListProps {
   initialWorks: WorkResponse[];
@@ -20,6 +27,8 @@ type SyncBanner =
   | { kind: 'success'; result: OrcidSyncResponse }
   | { kind: 'error'; message: string }
   | { kind: 'needs-orcid'; message: string };
+
+type AddedToast = { paperTitle: string; shareName: string };
 
 export function LibraryList({
   initialWorks,
@@ -38,7 +47,9 @@ export function LibraryList({
   const [doi, setDoi] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [banner, setBanner] = useState<SyncBanner | null>(null);
+  const [addedToast, setAddedToast] = useState<AddedToast | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addWork = useMutation({
     mutationFn: (identifier: string) =>
@@ -147,15 +158,83 @@ export function LibraryList({
     syncMutate();
   }, [orcidId, lastOrcidSyncAt, syncIsPending, syncMutate]);
 
-  // Cleanup the auto-dismiss timer on unmount.
+  // Cleanup the auto-dismiss timers on unmount.
   useEffect(() => {
     return () => {
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
         dismissTimerRef.current = null;
       }
+      if (addedTimerRef.current) {
+        clearTimeout(addedTimerRef.current);
+        addedTimerRef.current = null;
+      }
     };
   }, []);
+
+  // Append a paper to an existing share via PATCH /shares/{id}. We fetch the
+  // current share so we can preserve existing items (the PATCH replaces items
+  // wholesale when `items` is provided).
+  const addToShare = useMutation({
+    mutationFn: async (args: { share: ShareResponse; paper: PaperOut }) => {
+      const { share, paper } = args;
+      const fresh = await clientApi<ShareResponse>(`/shares/${share.id}`);
+      // Skip silently if the paper is already in the share (DOI match) so we
+      // don't create duplicates. Title-only would over-match.
+      const dupe =
+        paper.doi &&
+        fresh.items.some(
+          (it) => it.kind === 'paper' && it.doi && it.doi === paper.doi,
+        );
+      if (dupe) return { share: fresh, alreadyPresent: true };
+
+      const existingItems: ShareItemInput[] = fresh.items.map((it) => ({
+        kind: it.kind,
+        title: it.title,
+        scholar_url: it.scholar_url,
+        doi: it.doi,
+        authors: it.authors,
+        year: it.year,
+        notes: it.notes,
+        url: it.url,
+        subtitle: it.subtitle,
+        image_url: it.image_url,
+      }));
+      const newItem: ShareItemInput = {
+        kind: 'paper',
+        title: paper.title,
+        scholar_url: null,
+        doi: paper.doi,
+        authors: paper.authors,
+        year: paper.year,
+        notes: null,
+        url: paper.url,
+        subtitle: paper.subtitle,
+        image_url: paper.image_url,
+      };
+      const body: ShareUpdateInput = {
+        items: [...existingItems, newItem],
+      };
+      const updated = await clientApi<ShareResponse>(`/shares/${share.id}`, {
+        method: 'PATCH',
+        json: body,
+      });
+      return { share: updated, alreadyPresent: false };
+    },
+    onSuccess: ({ share }, vars) => {
+      queryClient.setQueryData(shareKey(share.id), share);
+      queryClient.invalidateQueries({ queryKey: SHARES_KEY });
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+      setAddedToast({
+        paperTitle: vars.paper.title,
+        shareName: share.name,
+      });
+      addedTimerRef.current = setTimeout(() => {
+        setAddedToast(null);
+        addedTimerRef.current = null;
+      }, 4000);
+    },
+  });
 
   const importDisabled = !orcidId || syncOrcid.isPending;
   const importLabel = syncOrcid.isPending
@@ -169,6 +248,34 @@ export function LibraryList({
       {/* Sync banner */}
       {banner ? (
         <SyncBannerView banner={banner} onDismiss={() => setBanner(null)} />
+      ) : null}
+
+      {/* "Added to share" toast */}
+      {addedToast ? (
+        <div
+          role="status"
+          className="mb-4 flex items-start justify-between gap-3 rounded-md border border-accent/40 bg-accent-soft px-4 py-3 text-sm text-ink"
+        >
+          <span>
+            Added{' '}
+            <span className="font-medium">
+              &ldquo;{addedToast.paperTitle}&rdquo;
+            </span>{' '}
+            to{' '}
+            <span className="font-medium">
+              &ldquo;{addedToast.shareName}&rdquo;
+            </span>
+            .
+          </span>
+          <button
+            type="button"
+            onClick={() => setAddedToast(null)}
+            aria-label="Dismiss"
+            className="-mr-1 rounded-md px-2 text-ink-muted transition hover:text-ink"
+          >
+            ×
+          </button>
+        </div>
       ) : null}
 
       {/* Add by DOI + Import from ORCID */}
@@ -229,10 +336,18 @@ export function LibraryList({
             <WorkCard
               key={work.paper.id}
               work={work}
+              orcidId={orcidId}
               onHide={() => hideWork.mutate(work.paper.id)}
               onRestore={() => restoreWork.mutate(work.paper.id)}
+              onAddToShare={(share) =>
+                addToShare.mutate({ share, paper: work.paper })
+              }
               isHiding={hideWork.isPending}
               isRestoring={restoreWork.isPending}
+              isAddingToShare={
+                addToShare.isPending &&
+                addToShare.variables?.paper.id === work.paper.id
+              }
             />
           ))}
         </div>
@@ -313,16 +428,22 @@ function Spinner() {
 
 function WorkCard({
   work,
+  orcidId,
   onHide,
   onRestore,
+  onAddToShare,
   isHiding,
   isRestoring,
+  isAddingToShare,
 }: {
   work: WorkResponse;
+  orcidId: string | null;
   onHide: () => void;
   onRestore: () => void;
+  onAddToShare: (share: ShareResponse) => void;
   isHiding: boolean;
   isRestoring: boolean;
+  isAddingToShare: boolean;
 }) {
   const { paper } = work;
   const meta = [paper.authors, paper.year ? String(paper.year) : null, paper.venue]
@@ -330,6 +451,7 @@ function WorkCard({
     .join(' · ');
 
   const isHidden = work.hidden_at !== null;
+  const isOrcidImport = work.added_via === 'orcid';
 
   return (
     <article className={`border-t border-rule py-5 first:border-t-0 ${isHidden ? 'opacity-50' : ''}`}>
@@ -352,6 +474,9 @@ function WorkCard({
               {paper.title}
             </span>
           )}
+          {isOrcidImport ? (
+            <OrcidProvenanceBadge orcidId={orcidId} />
+          ) : null}
           {meta ? <p className="mt-1 text-sm text-ink-muted">{meta}</p> : null}
           {paper.doi ? (
             <p className="mt-1 text-xs text-ink-faint">
@@ -369,6 +494,14 @@ function WorkCard({
           <p className="mt-1 text-xs text-ink-faint">
             Added via {work.added_via}
           </p>
+          {!isHidden ? (
+            <div className="mt-3">
+              <AddToShareMenu
+                onPick={onAddToShare}
+                isAdding={isAddingToShare}
+              />
+            </div>
+          ) : null}
         </div>
         <div className="flex-shrink-0">
           {isHidden ? (
@@ -391,5 +524,138 @@ function WorkCard({
         </div>
       </div>
     </article>
+  );
+}
+
+/**
+ * "Imported from ORCID ↗" provenance pill. The arrow links to the user's
+ * public ORCID profile so a viewer can verify the source. Informational only —
+ * no in-app action.
+ */
+function OrcidProvenanceBadge({ orcidId }: { orcidId: string | null }) {
+  const baseClass =
+    'mt-1.5 inline-flex items-center gap-1 rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted';
+  if (!orcidId) {
+    return <span className={baseClass}>Imported from ORCID</span>;
+  }
+  return (
+    <a
+      href={`https://orcid.org/${orcidId}`}
+      target="_blank"
+      rel="noreferrer noopener"
+      className={`${baseClass} transition hover:border-ink/30 hover:text-ink`}
+    >
+      Imported from ORCID
+      <span aria-hidden>↗</span>
+    </a>
+  );
+}
+
+/**
+ * "Add to share..." button + popover. Loads the user's shares lazily on first
+ * click (the dashboard shell preloads `/shares` server-side, but the library
+ * page does not — so we fetch on demand and cache via TanStack).
+ *
+ * The popover lists existing shares plus a "+ New share" entry as the last
+ * row that just navigates to /dashboard/share/new — pre-attaching the paper
+ * inline isn't supported by the share editor today, so we take the spec's
+ * documented fallback rather than building a query-param hack.
+ */
+function AddToShareMenu({
+  onPick,
+  isAdding,
+}: {
+  onPick: (share: ShareResponse) => void;
+  isAdding: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { data: shares, isLoading } = useQuery({
+    queryKey: SHARES_KEY,
+    queryFn: () => clientApi<ShareResponse[]>('/shares'),
+    enabled: open,
+    staleTime: 30_000,
+  });
+
+  // Click-outside + Escape to close.
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={isAdding}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+      >
+        {isAdding ? 'Adding…' : 'Add to share…'}
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute left-0 z-20 mt-1 w-72 overflow-hidden rounded-md border border-rule bg-paper shadow-lg"
+        >
+          {isLoading ? (
+            <div className="px-3 py-2 text-xs text-ink-muted">
+              Loading shares…
+            </div>
+          ) : !shares || shares.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-ink-muted">
+              You don&apos;t have any shares yet.
+            </div>
+          ) : (
+            <ul className="max-h-64 overflow-y-auto py-1">
+              {shares.map((share) => (
+                <li key={share.id}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      onPick(share);
+                    }}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-ink transition hover:bg-paper-soft"
+                  >
+                    <span className="truncate">{share.name}</span>
+                    <span className="flex-shrink-0 text-[10px] uppercase tracking-wider text-ink-faint">
+                      {share.items.length}{' '}
+                      {share.items.length === 1 ? 'item' : 'items'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            href="/dashboard/share/new"
+            className="block border-t border-rule px-3 py-2 text-xs font-medium text-ink transition hover:bg-paper-soft"
+          >
+            + New share
+          </Link>
+        </div>
+      ) : null}
+    </div>
   );
 }

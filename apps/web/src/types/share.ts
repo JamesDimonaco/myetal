@@ -7,7 +7,7 @@
 export type ShareType =
   | 'paper'
   | 'collection'
-  | 'poster'
+  | 'bundle'
   | 'grant'
   | 'project';
 

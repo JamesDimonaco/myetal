@@ -35,7 +35,7 @@ type DemoItemDraft = {
 const SHARE_TYPES: { value: ShareType; label: string }[] = [
   { value: 'paper', label: 'Paper' },
   { value: 'collection', label: 'Collection' },
-  { value: 'poster', label: 'Poster' },
+  { value: 'bundle', label: 'Bundle' },
   { value: 'grant', label: 'Grant' },
   { value: 'project', label: 'Project' },
 ];

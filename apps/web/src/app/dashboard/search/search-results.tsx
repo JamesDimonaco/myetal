@@ -34,7 +34,7 @@ const SORT_LABELS: Record<SortOption, string> = {
 const TYPE_FILTERS: ShareType[] = [
   'paper',
   'collection',
-  'poster',
+  'bundle',
   'grant',
   'project',
 ];

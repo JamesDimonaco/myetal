@@ -1,6 +1,23 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Permanent redirects for routes that used to live at the top level but
+  // now sit under /dashboard/* so they inherit the authed shell (header,
+  // nav, footer). Cheap insurance against stale bookmarks / external links.
+  async redirects() {
+    return [
+      {
+        source: '/search',
+        destination: '/dashboard/search',
+        permanent: true,
+      },
+      {
+        source: '/feedback',
+        destination: '/dashboard/feedback',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

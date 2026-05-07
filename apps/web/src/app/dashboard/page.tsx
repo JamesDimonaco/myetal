@@ -43,7 +43,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
             Each share is one QR code — could be a single paper, a curated
-            list, or a poster bundle.
+            list, or a bundle of links.
           </p>
         </div>
         <Link

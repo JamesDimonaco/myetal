@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 
@@ -17,27 +15,15 @@ export default async function FeedbackPage() {
     });
     userEmail = user.email;
   } catch {
-    // Any error (401, network, etc.) — render without pre-filled email
+    // Any error (401, network, etc.) — render without pre-filled email.
+    // The dashboard layout already redirects unauthed users, so this is
+    // mostly defensive.
     userEmail = null;
   }
 
-  const isSignedIn = userEmail !== null;
-
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
-      <div className="text-sm text-ink-muted">
-        {isSignedIn ? (
-          <Link href="/dashboard" className="hover:text-ink">
-            &larr; Back to dashboard
-          </Link>
-        ) : (
-          <Link href="/" className="hover:text-ink">
-            &larr; MyEtAl
-          </Link>
-        )}
-      </div>
-
-      <h1 className="mt-8 font-serif text-4xl tracking-tight text-ink">
+    <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
+      <h1 className="font-serif text-4xl tracking-tight text-ink">
         Send us feedback
       </h1>
       <p className="mt-3 text-base text-ink-muted">
@@ -48,12 +34,6 @@ export default async function FeedbackPage() {
       <div className="mt-10">
         <FeedbackForm userEmail={userEmail} />
       </div>
-
-      <footer className="mt-16 text-xs text-ink-faint">
-        <Link href="/" className="underline-offset-2 hover:underline">
-          myetal.app
-        </Link>
-      </footer>
-    </main>
+    </div>
   );
 }

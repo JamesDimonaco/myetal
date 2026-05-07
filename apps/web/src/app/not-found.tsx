@@ -18,7 +18,7 @@ export default function NotFound() {
           Back to MyEtAl
         </Link>
         <Link
-          href="/search"
+          href="/dashboard/search"
           className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
         >
           Try searching for it

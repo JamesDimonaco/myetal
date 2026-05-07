@@ -365,7 +365,7 @@ export default async function PublicSharePage({ params }: PageProps) {
             myetal.app
           </Link>
           {' · '}
-          <Link href="/search" className="underline-offset-2 hover:underline">
+          <Link href="/dashboard/search" className="underline-offset-2 hover:underline">
             Search collections
           </Link>
           {' · '}

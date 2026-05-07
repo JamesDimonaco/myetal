@@ -32,7 +32,7 @@ import type {
 const SHARE_TYPES: ShareType[] = [
   'paper',
   'collection',
-  'poster',
+  'bundle',
   'grant',
   'project',
 ];
@@ -63,7 +63,7 @@ const itemSchema = z
 const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
   description: z.string().trim().optional().or(z.literal('')),
-  type: z.enum(['paper', 'collection', 'poster', 'grant', 'project']),
+  type: z.enum(['paper', 'collection', 'bundle', 'grant', 'project']),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
@@ -337,7 +337,7 @@ export function ShareEditor({ initial, id }: Props) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. My ASMS 2026 poster"
+            placeholder="e.g. My ASMS 2026 bundle"
             required
             maxLength={200}
             className={[
