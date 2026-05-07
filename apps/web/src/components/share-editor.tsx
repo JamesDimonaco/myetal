@@ -11,6 +11,7 @@ import {
 } from '@/components/add-item-modal';
 import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
+import { TagInput } from '@/components/tag-input';
 import { ApiError } from '@/lib/api';
 import {
   useCreateShare,
@@ -189,6 +190,9 @@ export function ShareEditor({ initial, id }: Props) {
       ? initial.items.map(fromResponseItem)
       : [],
   );
+  const [tags, setTags] = useState<string[]>(
+    initial?.tags?.map((t) => t.slug) ?? [],
+  );
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -271,6 +275,7 @@ export function ShareEditor({ initial, id }: Props) {
       description: parsed.data.description ? parsed.data.description : null,
       type: parsed.data.type,
       items: apiItems,
+      tags,
     };
 
     setSubmitting(true);
@@ -359,6 +364,14 @@ export function ShareEditor({ initial, id }: Props) {
             rows={3}
             className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
           />
+        </Field>
+
+        {/* Tags — topical labels, max 5 (Q10). Slugs only on the wire. */}
+        <Field
+          label="Tags (optional)"
+          hint="What topics? E.g. virology, microbiome"
+        >
+          <TagInput value={tags} onChange={setTags} />
         </Field>
 
         {/* Type pills */}

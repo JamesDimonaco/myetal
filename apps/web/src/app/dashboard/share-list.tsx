@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { QrModal } from '@/components/qr-modal';
+import { TagChips } from '@/components/tag-chips';
 import { ApiError } from '@/lib/api';
 import { useDeleteShare, useShares } from '@/lib/hooks/useShares';
 import type { ShareItemKind, ShareResponse } from '@/types/share';
@@ -86,6 +88,9 @@ const iconBtnClass =
 
 interface Props {
   initialShares: ShareResponse[];
+  /** Total number of papers in the user's library — used to switch the
+   *  empty-state copy when the user has papers but no shares (E3). */
+  libraryCount?: number;
 }
 
 /**
@@ -93,7 +98,7 @@ interface Props {
  * buttons are icon-only with tooltips and use stopPropagation so they don't
  * trigger navigation.
  */
-export function ShareList({ initialShares }: Props) {
+export function ShareList({ initialShares, libraryCount = 0 }: Props) {
   const router = useRouter();
   const { data, refetch } = useShares(initialShares);
   const deleteShare = useDeleteShare();
@@ -131,6 +136,34 @@ export function ShareList({ initialShares }: Props) {
   const shares = data ?? [];
 
   if (shares.length === 0) {
+    // E3 — has papers but no shares. Different copy that nudges the user
+    // toward the library-driven flow rather than starting from scratch.
+    if (libraryCount > 0) {
+      return (
+        <div className="rounded-lg border border-rule bg-paper-soft p-12 text-center">
+          <h2 className="font-serif text-xl text-ink">No shares yet</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted">
+            You have {libraryCount}{' '}
+            {libraryCount === 1 ? 'paper' : 'papers'} in your library. Click any
+            to add it to a new share — that&apos;s how you get a QR code.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/dashboard/library"
+              className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+            >
+              Open library
+            </Link>
+            <Link
+              href="/dashboard/share/new"
+              className="inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+            >
+              Create a share
+            </Link>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="rounded-lg border border-rule bg-paper-soft p-12 text-center">
         <h2 className="font-serif text-xl text-ink">No shares yet</h2>
@@ -138,15 +171,21 @@ export function ShareList({ initialShares }: Props) {
           Create your first share to generate a QR for a poster, a slide, or
           your CV page.
         </p>
-        <a
+        <Link
           href="/dashboard/share/new"
           className="mt-6 inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
         >
           Create a share
-        </a>
+        </Link>
       </div>
     );
   }
+
+  // E4 — drafts-only. Surface a one-liner above the grid so the owner sees
+  // their work isn't yet visible in discovery / search. We use `published_at`
+  // as the discoverable flag; `is_public` is the legacy "anyone-with-the-link"
+  // flag and is true by default.
+  const allDrafts = shares.every((s) => s.published_at === null);
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -162,6 +201,17 @@ export function ShareList({ initialShares }: Props) {
 
   return (
     <>
+      {allDrafts ? (
+        <div
+          role="status"
+          className="mb-4 rounded-md border border-rule bg-paper-soft px-4 py-3 text-sm text-ink-muted"
+        >
+          None of your shares are listed in discovery yet. Open one and toggle{' '}
+          <span className="font-medium text-ink">Publish</span> to make it
+          findable.
+        </div>
+      ) : null}
+
       <ul className="grid gap-4 sm:grid-cols-2">
         {shares.map((share) => (
           <li
@@ -178,9 +228,16 @@ export function ShareList({ initialShares }: Props) {
             className="flex cursor-pointer flex-col rounded-lg border border-rule bg-paper-soft p-5 transition hover:border-ink/30"
           >
             <div className="flex-1">
-              <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
-                {share.short_code}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+                  {share.short_code}
+                </p>
+                {share.published_at === null ? (
+                  <span className="inline-flex items-center rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+                    Unlisted
+                  </span>
+                ) : null}
+              </div>
               <h3 className="mt-2 font-serif text-lg leading-snug text-ink">
                 {share.name}
               </h3>
@@ -189,8 +246,13 @@ export function ShareList({ initialShares }: Props) {
                 {' \u00b7 '}
                 <span className="capitalize">{share.type}</span>
                 {' \u00b7 '}
-                {share.is_public ? 'Published' : 'Draft'}
+                {share.published_at !== null ? 'Published' : 'Unlisted'}
               </p>
+              {share.tags && share.tags.length > 0 ? (
+                <div className="mt-2">
+                  <TagChips tags={share.tags} max={2} />
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-4 flex items-center gap-2">

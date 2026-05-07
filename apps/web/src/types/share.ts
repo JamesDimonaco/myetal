@@ -13,6 +13,18 @@ export type ShareType =
 
 export type ShareItemKind = 'paper' | 'repo' | 'link';
 
+/**
+ * A topical tag attached to a share. `slug` is the canonical lowercased,
+ * trimmed, hyphenated form (mirrors backend canonicalisation per Q8). `label`
+ * is the title-cased display string. `usage_count` powers autocomplete sort.
+ */
+export interface Tag {
+  id: string;
+  slug: string;
+  label: string;
+  usage_count: number;
+}
+
 export interface ShareItem {
   id: string;
   position: number;
@@ -53,6 +65,7 @@ export interface PublicShareResponse {
   updated_at: string;
   related_shares: RelatedShare[];
   similar_shares: SimilarShare[];
+  tags: Tag[];
 }
 
 /** Authed owner view (`GET /shares` and `GET /shares/{id}`). */
@@ -70,6 +83,7 @@ export interface ShareResponse {
   created_at: string;
   updated_at: string;
   items: ShareItem[];
+  tags: Tag[];
 }
 
 /** Item input shape — matches ShareItemCreate on the backend. `kind` defaults
@@ -94,6 +108,8 @@ export interface ShareCreateInput {
   type?: ShareType;
   is_public?: boolean;
   items?: ShareItemInput[];
+  /** Slugs only, max 5. */
+  tags?: string[];
 }
 
 export interface ShareUpdateInput {
@@ -103,6 +119,8 @@ export interface ShareUpdateInput {
   is_public?: boolean;
   /** null/undefined = leave items alone, [] = clear them. */
   items?: ShareItemInput[];
+  /** Replaces the share's tag set atomically (slugs only, max 5). */
+  tags?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +137,7 @@ export interface ShareSearchResult {
   published_at: string;
   updated_at: string;
   preview_items: string[];
+  tags?: Tag[];
 }
 
 export interface ShareSearchResponse {
@@ -141,6 +160,7 @@ export interface BrowseShareResult {
   updated_at: string;
   preview_items: string[];
   view_count: number | null;
+  tags?: Tag[];
 }
 
 export interface BrowseResponse {

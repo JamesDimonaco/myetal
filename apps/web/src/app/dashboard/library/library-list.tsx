@@ -325,11 +325,36 @@ export function LibraryList({
         <p className="mt-2 text-sm text-danger">{error}</p>
       ) : null}
 
+      {/* E8 — ORCID auto-import network failure. The auto-fire on first
+          mount can fail silently; surface a banner with a Retry CTA. The
+          existing SyncBanner shows transient running/success states; this
+          one persists until dismissed or fixed. */}
+      {syncOrcid.isError && works.length === 0 && orcidId ? (
+        <div
+          role="status"
+          className="mt-6 flex flex-wrap items-start justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink"
+        >
+          <p className="flex-1">
+            We couldn&apos;t reach ORCID. Pull down to retry, or paste a DOI
+            to add a paper manually.
+          </p>
+          <button
+            type="button"
+            onClick={() => syncOrcid.mutate()}
+            disabled={syncOrcid.isPending}
+            className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft disabled:opacity-50"
+          >
+            {syncOrcid.isPending ? 'Retrying…' : 'Retry'}
+          </button>
+        </div>
+      ) : null}
+
       {/* Works list */}
       {works.length === 0 ? (
-        <p className="mt-10 text-center text-sm text-ink-muted">
-          Your library is empty. Paste a DOI above to get started.
-        </p>
+        <EmptyLibraryCopy
+          orcidId={orcidId}
+          lastOrcidSyncAt={lastOrcidSyncAt}
+        />
       ) : (
         <div className="mt-8 space-y-0">
           {works.map((work) => (
@@ -353,6 +378,57 @@ export function LibraryList({
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Empty-library copy that branches on whether the user has linked ORCID and
+ * whether we've ever synced (E1 vs E2). The E8 ORCID-network-failure banner
+ * lives above this, so a fresh user with a flaky connection sees both: the
+ * "we couldn't reach ORCID" alert and the relevant empty-state nudge.
+ */
+function EmptyLibraryCopy({
+  orcidId,
+  lastOrcidSyncAt,
+}: {
+  orcidId: string | null;
+  lastOrcidSyncAt: string | null;
+}) {
+  if (orcidId && lastOrcidSyncAt) {
+    return (
+      <p className="mt-10 max-w-prose text-center text-sm text-ink-muted sm:mx-auto">
+        We synced your ORCID record but didn&apos;t find any works yet. Add
+        your first paper at{' '}
+        <a
+          href="https://orcid.org"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline-offset-2 hover:underline"
+        >
+          orcid.org
+        </a>
+        , or paste a DOI here to get started.
+      </p>
+    );
+  }
+  if (!orcidId) {
+    return (
+      <p className="mt-10 max-w-prose text-center text-sm text-ink-muted sm:mx-auto">
+        Your library is where your papers live. Add your{' '}
+        <Link
+          href="/dashboard/profile"
+          className="underline-offset-2 hover:underline"
+        >
+          ORCID iD on your profile
+        </Link>{' '}
+        to auto-import them, or paste a DOI above to add one manually.
+      </p>
+    );
+  }
+  return (
+    <p className="mt-10 text-center text-sm text-ink-muted">
+      Your library is empty. Paste a DOI above to get started.
+    </p>
   );
 }
 

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { TagChips } from '@/components/tag-chips';
 import { clientApi } from '@/lib/client-api';
 import { formatRelativeTime } from '@/lib/format';
 import type {
@@ -379,6 +380,13 @@ function BrowseCard({
       {previewText ? (
         <p className="mt-1.5 text-xs italic text-ink-faint">{previewText}</p>
       ) : null}
+
+      {/* Tags */}
+      {result.tags && result.tags.length > 0 ? (
+        <div className="mt-2">
+          <TagChips tags={result.tags} max={2} />
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -429,6 +437,13 @@ function ResultCard({ result }: { result: ShareSearchResult }) {
       {/* Preview items */}
       {previewText ? (
         <p className="mt-1.5 text-xs italic text-ink-faint">{previewText}</p>
+      ) : null}
+
+      {/* Tags */}
+      {result.tags && result.tags.length > 0 ? (
+        <div className="mt-2">
+          <TagChips tags={result.tags} max={2} />
+        </div>
       ) : null}
     </article>
   );

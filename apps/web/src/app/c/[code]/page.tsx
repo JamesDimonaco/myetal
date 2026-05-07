@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { ReportButton } from '@/components/report-button';
 import { SaveButton } from '@/components/save-button';
 import { ShareItemCard } from '@/components/share-item-card';
+import { TagChips } from '@/components/tag-chips';
 import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { formatItemCount, formatRelativeTime } from '@/lib/format';
 import { lookupManyRepos, parseGithubUrl } from '@/lib/github';
@@ -256,6 +257,14 @@ export default async function PublicSharePage({ params }: PageProps) {
         </div>
         {share.description ? (
           <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>
+        ) : null}
+        {share.tags && share.tags.length > 0 ? (
+          <div className="mt-4">
+            {/* All tags shown on the detail view; each chip links to the
+                browse list filtered by that tag. The /browse route ships in
+                PR-B — until then the hrefs are inert. */}
+            <TagChips tags={share.tags} max={share.tags.length} />
+          </div>
         ) : null}
       </header>
 
