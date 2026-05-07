@@ -44,7 +44,7 @@ import type {
   ShareType,
 } from '@/types/share';
 
-const SHARE_TYPES: ShareType[] = ['paper', 'collection', 'poster', 'grant', 'project'];
+const SHARE_TYPES: ShareType[] = ['paper', 'collection', 'bundle', 'grant', 'project'];
 
 const itemSchema = z.object({
   kind: z.enum(['paper', 'repo', 'link']).optional(),
@@ -64,7 +64,7 @@ const itemSchema = z.object({
 const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
   description: z.string().trim().optional().or(z.literal('')),
-  type: z.enum(['paper', 'collection', 'poster', 'grant', 'project']),
+  type: z.enum(['paper', 'collection', 'bundle', 'grant', 'project']),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
@@ -406,7 +406,7 @@ export default function ShareEditorScreen() {
             <TextInput
               value={name}
               onChangeText={(v) => setName(v.slice(0, 200))}
-              placeholder="e.g. My ASMS 2026 poster"
+              placeholder="e.g. My ASMS 2026 bundle"
               placeholderTextColor={c.textMuted}
               maxLength={200}
               style={[
@@ -466,6 +466,11 @@ export default function ShareEditorScreen() {
                 );
               })}
             </View>
+            {shareType === 'bundle' ? (
+              <Text style={[styles.helperText, { color: c.textSubtle }]}>
+                A bundle of links — paper, repo, or any URL — presented together.
+              </Text>
+            ) : null}
           </View>
 
           {/* Publish to discovery toggle — only for existing shares */}
@@ -863,6 +868,7 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 70, textAlignVertical: 'top' },
 
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  helperText: { fontSize: 12, marginTop: Spacing.xs, lineHeight: 16 },
   pill: {
     paddingVertical: 8,
     paddingHorizontal: 14,

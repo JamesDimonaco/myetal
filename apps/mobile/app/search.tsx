@@ -28,7 +28,7 @@ import type {
 const TYPE_FILTERS: { label: string; value: ShareType }[] = [
   { label: 'Paper', value: 'paper' },
   { label: 'Collection', value: 'collection' },
-  { label: 'Poster', value: 'poster' },
+  { label: 'Bundle', value: 'bundle' },
   { label: 'Grant', value: 'grant' },
   { label: 'Project', value: 'project' },
 ];
