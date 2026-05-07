@@ -11,6 +11,7 @@ import {
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 
 import { SavedShareCard } from '@/components/saved-share-card';
+import { TagChips } from '@/components/tag-chips';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useBrowse } from '@/hooks/useBrowse';
@@ -222,6 +223,7 @@ function BrowseCard({
           Contains: {item.preview_items.join(', ')}
         </Text>
       )}
+      <TagChips tags={item.tags} max={2} />
     </Pressable>
   );
 }

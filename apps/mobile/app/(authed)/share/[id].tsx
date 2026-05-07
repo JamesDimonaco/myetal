@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { QrModal } from '@/components/qr-modal';
+import { TagInput } from '@/components/tag-input';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -171,6 +172,7 @@ export default function ShareEditorScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [shareType, setShareType] = useState<ShareType>('paper');
+  const [tags, setTags] = useState<string[]>([]);
   // publishedAt is derived from the query cache, not local state.
   // This avoids the snap-back bug where local state fights TanStack refetches.
   // For optimistic UI, we use a local override that clears after the mutation.
@@ -194,6 +196,7 @@ export default function ShareEditorScreen() {
       setName('');
       setDescription('');
       setShareType('paper');
+      setTags([]);
       setPublishedAtOverride(null);
       setItems([]);
       setError(null);
@@ -213,6 +216,7 @@ export default function ShareEditorScreen() {
     setName(existing.data.name);
     setDescription(existing.data.description ?? '');
     setShareType(existing.data.type);
+    setTags((existing.data.tags ?? []).map((t) => t.slug));
     // publishedAt is derived from existing.data, not set here
     setItems(
       existing.data.items.length
@@ -301,6 +305,7 @@ export default function ShareEditorScreen() {
       description: parsed.data.description ? parsed.data.description : null,
       type: parsed.data.type,
       items: apiItems,
+      tags: tags.slice(0, 5),
     };
 
     setSubmitting(true);
@@ -431,6 +436,12 @@ export default function ShareEditorScreen() {
                 { color: c.text, borderColor: c.border, backgroundColor: c.surface },
               ]}
             />
+          </View>
+
+          {/* Tags */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: c.textMuted }]}>Tags (optional)</Text>
+            <TagInput value={tags} onChange={setTags} max={5} />
           </View>
 
           {/* Type */}

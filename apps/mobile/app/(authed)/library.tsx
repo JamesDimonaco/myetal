@@ -404,6 +404,32 @@ export default function LibraryScreen() {
                 Importing your works from ORCID…
               </Text>
             </View>
+          ) : works.length === 0 && syncOrcid.isError ? (
+            // E8 — ORCID auto-import network failure on a fresh sign-in.
+            <View
+              style={[
+                styles.syncBanner,
+                { borderColor: '#B0002040', backgroundColor: '#B0002010' },
+              ]}
+            >
+              <Ionicons name="warning-outline" size={18} color="#B00020" />
+              <Text style={[styles.syncBannerText, { color: '#B00020' }]}>
+                We couldn&apos;t reach ORCID. Pull down to retry, or paste a DOI to add a paper manually.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => runSync({ source: 'manual' })}
+                hitSlop={6}
+                style={({ pressed }) => [
+                  styles.retryBtn,
+                  { borderColor: '#B00020', opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Text style={[styles.retryBtnText, { color: '#B00020' }]}>
+                  Retry
+                </Text>
+              </Pressable>
+            </View>
           ) : null
         }
         ItemSeparatorComponent={() => (
@@ -416,7 +442,13 @@ export default function LibraryScreen() {
               Your library is empty
             </Text>
             <Text style={[styles.emptyBody, { color: c.textMuted }]}>
-              Paste a DOI above to add your first paper.
+              {!orcidId
+                ? // E1 — library no-ORCID prompt
+                  'Your library is where your papers live. Add your ORCID iD on your profile to auto-import them, or paste a DOI above to add one manually.'
+                : lastSyncAt
+                ? // E2 — ORCID synced but no works.
+                  "We synced your ORCID record but didn't find any works yet. Add your first paper at orcid.org, or paste a DOI here to get started."
+                : 'Paste a DOI above to add your first paper.'}
             </Text>
           </View>
         }
@@ -602,6 +634,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   syncBannerText: { fontSize: 13, flex: 1 },
+
+  retryBtn: {
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  retryBtnText: { fontSize: 12, fontWeight: '600' },
 
   empty: {
     flex: 1,

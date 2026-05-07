@@ -12,6 +12,19 @@ export type ShareType = 'paper' | 'collection' | 'bundle' | 'grant' | 'project';
  */
 export type ShareItemKind = 'paper' | 'repo' | 'link';
 
+/**
+ * Topical tag. Mirrors the backend `TagOut` schema. `slug` is the canonical
+ * lowercased + hyphenated form used for filtering / autocomplete; `label` is
+ * the title-cased display form. `usage_count` only present on listing
+ * endpoints (autocomplete + popular).
+ */
+export interface Tag {
+  id: string;
+  slug: string;
+  label: string;
+  usage_count?: number;
+}
+
 export interface ShareItem {
   id: string;
   position: number;
@@ -51,6 +64,7 @@ export interface PublicShareResponse {
   updated_at: string;
   related_shares: RelatedShare[];
   similar_shares: SimilarShare[];
+  tags?: Tag[];
 }
 
 /** Owner-facing share — returned by /shares CRUD (authed). */
@@ -68,6 +82,8 @@ export interface ShareResponse {
   created_at: string;
   updated_at: string;
   items: ShareItem[];
+  /** Topical tags (PR-A). Slugs lowercased + hyphenated, max 5. */
+  tags?: Tag[];
 }
 
 export interface ShareItemInput {
@@ -89,6 +105,8 @@ export interface ShareCreateInput {
   type: ShareType;
   is_public?: boolean;
   items: ShareItemInput[];
+  /** Tag slugs. Max 5; server canonicalises further. */
+  tags?: string[];
 }
 
 export interface ShareUpdateInput {
@@ -97,6 +115,8 @@ export interface ShareUpdateInput {
   type?: ShareType;
   is_public?: boolean;
   items?: ShareItemInput[];
+  /** Tag slugs (replace semantics). Max 5; omit to leave unchanged. */
+  tags?: string[];
 }
 
 /** A single result from the public share search endpoint. */
@@ -110,6 +130,7 @@ export interface ShareSearchResult {
   published_at: string;
   updated_at: string;
   preview_items: string[];
+  tags?: Tag[];
 }
 
 /** Paginated response from `GET /public/search`. */
@@ -133,6 +154,7 @@ export interface BrowseShareResult {
   updated_at: string;
   preview_items: string[];
   view_count: number | null;
+  tags?: Tag[];
 }
 
 export interface BrowseResponse {
