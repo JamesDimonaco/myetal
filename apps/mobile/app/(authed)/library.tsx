@@ -45,8 +45,14 @@ export default function LibraryScreen() {
   // rely solely on `last_orcid_sync_at == null` because between the success
   // callback firing and the me-query refetch settling there's a window where
   // the field is still null in cache — without this ref strict-mode's double
-  // mount or a transient cache state could re-fire the mutation. Once we've
-  // launched once for this user, never re-launch within the screen's lifetime.
+  // mount or a transient cache state could re-fire the mutation.
+  //
+  // The key is composite (`${userId}:${orcid_id ?? 'none'}`) so that when the
+  // user changes their orcid_id on the profile tab — which resets
+  // `last_orcid_sync_at = NULL` server-side — returning to this tab re-arms
+  // the auto-fire for the new iD. Tab screens persist across navigations in
+  // Expo Router, so without this re-keying the auto-import would never fire
+  // for the new ORCID.
   const autoFiredForUserRef = useRef<string | null>(null);
 
   const orcidId = user?.orcid_id ?? null;
@@ -61,7 +67,7 @@ export default function LibraryScreen() {
       onSuccess: (result: OrcidSyncResult) => {
         Alert.alert(
           'Imported from ORCID',
-          `Imported ${result.added} new. ${result.updated} updated, ${result.unchanged} already in your library, ${result.skipped} skipped.`,
+          `Imported ${result.added} new, ${result.updated} updated, ${result.unchanged} already in your library, ${result.skipped} skipped.`,
         );
       },
       onError: (err) => {
@@ -104,13 +110,16 @@ export default function LibraryScreen() {
 
   // Auto-fire on first mount when the user has set an ORCID iD but never
   // synced. The ref guard handles strict-mode double mount. We key the guard
-  // by user id so signing in as someone else still triggers their first sync.
+  // by `${userId}:${orcidId ?? 'none'}` so signing in as someone else, OR the
+  // current user changing their orcid_id (which resets last_orcid_sync_at on
+  // the server), re-arms the auto-fire for the new composite identity.
   useEffect(() => {
     if (!userId) return;
     if (!orcidId || lastSyncAt) return;
-    if (autoFiredForUserRef.current === userId) return;
+    const key = `${userId}:${orcidId ?? 'none'}`;
+    if (autoFiredForUserRef.current === key) return;
     if (syncOrcid.isPending) return;
-    autoFiredForUserRef.current = userId;
+    autoFiredForUserRef.current = key;
     runSync({ source: 'auto' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, orcidId, lastSyncAt]);

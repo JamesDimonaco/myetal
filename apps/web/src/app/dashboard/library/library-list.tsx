@@ -18,7 +18,8 @@ interface LibraryListProps {
 type SyncBanner =
   | { kind: 'running' }
   | { kind: 'success'; result: OrcidSyncResponse }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  | { kind: 'needs-orcid'; message: string };
 
 export function LibraryList({
   initialWorks,
@@ -87,7 +88,9 @@ export function LibraryList({
     onSuccess: (result) => {
       setBanner({ kind: 'success', result });
       queryClient.invalidateQueries({ queryKey: ['works'] });
-      queryClient.invalidateQueries({ queryKey: ['me'] });
+      // Re-fetch the SSR data so `last_orcid_sync_at` is reflected immediately,
+      // and a subsequent navigation back doesn't re-trigger the auto-fire.
+      router.refresh();
       // Auto-dismiss after 8s
       dismissTimerRef.current = setTimeout(() => {
         setBanner(null);
@@ -97,8 +100,11 @@ export function LibraryList({
     onError: (err) => {
       if (err instanceof ApiError) {
         if (err.status === 400) {
-          setBanner(null);
-          router.push('/dashboard/profile?flash=set_orcid_id_to_import');
+          setBanner({
+            kind: 'needs-orcid',
+            message:
+              'Add your ORCID iD on your profile to import your works.',
+          });
           return;
         }
         if (err.status === 503) {
@@ -157,9 +163,6 @@ export function LibraryList({
     : lastOrcidSyncAt === null
       ? 'Import from ORCID'
       : 'Re-sync from ORCID';
-  const importTooltip = !orcidId
-    ? 'Add your ORCID iD on your profile first'
-    : undefined;
 
   return (
     <>
@@ -193,17 +196,23 @@ export function LibraryList({
             {addWork.isPending ? 'Adding...' : '+ Add paper'}
           </button>
         </form>
-        <button
-          type="button"
-          onClick={() => syncOrcid.mutate()}
-          disabled={importDisabled}
-          title={importTooltip}
-          aria-label={importLabel}
-          className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
-        >
-          <OrcidIcon size={16} />
-          {importLabel}
-        </button>
+        <div className="flex flex-col items-start">
+          <button
+            type="button"
+            onClick={() => syncOrcid.mutate()}
+            disabled={importDisabled}
+            aria-label={importLabel}
+            className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+          >
+            <OrcidIcon size={16} />
+            {importLabel}
+          </button>
+          {!orcidId ? (
+            <p className="mt-1 text-xs text-ink-muted">
+              Add your ORCID iD on your profile first
+            </p>
+          ) : null}
+        </div>
       </div>
       {error ? (
         <p className="mt-2 text-sm text-danger">{error}</p>
@@ -255,6 +264,19 @@ function SyncBannerView({
       <span>
         Imported {added} new, {updated} updated, {unchanged} already in your
         library, {skipped} skipped.
+      </span>
+    );
+  } else if (banner.kind === 'needs-orcid') {
+    body = (
+      <span>
+        {banner.message}{' '}
+        <a
+          href="/dashboard/profile"
+          className="underline decoration-ink-faint underline-offset-2 hover:decoration-ink"
+        >
+          Go to profile
+        </a>
+        .
       </span>
     );
   } else {

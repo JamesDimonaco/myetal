@@ -76,18 +76,28 @@ export default function ProfileScreen() {
   }, [orcidChanged, trimmedOrcid, persistedOrcid]);
 
   // Single-button collapse logic (§2.2). At most one primary action visible:
-  //   - 'save'   → input differs from saved AND is valid
+  //   - 'save'   → input differs from saved (valid → enabled, invalid → disabled)
   //   - 'remove' → input matches saved (so editing is a no-op), OR input
   //                empty while a value is persisted
   //   - 'none'   → empty input + nothing saved
-  // We never render Save and Remove simultaneously.
+  // We never render Save and Remove simultaneously. We mirror the web flow
+  // (orcid-section.tsx) which keeps a disabled Save visible while the user
+  // is mid-typing an invalid replacement, rather than hiding the button — a
+  // disappearing button reads as broken.
   type OrcidButtonMode = 'save' | 'remove' | 'none';
   const orcidButtonMode: OrcidButtonMode = (() => {
     if (orcidValidForSave && trimmedOrcid !== '') return 'save';
     if (persistedOrcid && trimmedOrcid === '') return 'remove';
     if (persistedOrcid && trimmedOrcid === persistedOrcid) return 'remove';
+    // Non-empty but invalid (mid-typing a replacement): show a disabled Save
+    // rather than hiding the button.
+    if (trimmedOrcid !== '' && trimmedOrcid !== (persistedOrcid ?? '')) return 'save';
     return 'none';
   })();
+  // Save is enabled only when the input is a valid, distinct iD. Otherwise
+  // we still render the Save button (mode === 'save') but visually dim it
+  // and skip the press handler.
+  const orcidSaveDisabled = orcidButtonMode === 'save' && !orcidValidForSave;
 
   const handleOpenOrcidProfile = () => {
     if (!persistedOrcid) return;
@@ -263,13 +273,19 @@ export default function ProfileScreen() {
                 {orcidButtonMode === 'save' ? (
                   <Pressable
                     accessibilityRole="button"
-                    onPress={handleSaveOrcid}
-                    disabled={orcidSaving}
+                    onPress={orcidSaveDisabled ? undefined : handleSaveOrcid}
+                    disabled={orcidSaving || orcidSaveDisabled}
                     style={({ pressed }) => [
                       styles.orcidSave,
                       {
                         backgroundColor: c.text,
-                        opacity: orcidSaving ? 0.4 : pressed ? 0.85 : 1,
+                        opacity: orcidSaving
+                          ? 0.4
+                          : orcidSaveDisabled
+                            ? 0.55
+                            : pressed
+                              ? 0.85
+                              : 1,
                       },
                     ]}
                   >
