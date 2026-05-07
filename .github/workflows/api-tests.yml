@@ -1,16 +1,12 @@
 name: api-tests
 
 # Lint + test the FastAPI backend on every PR that touches it.
-# Pushes to main are also tested so the protected-branch status check is
-# always populated even if a PR was merged via the "rebase" path.
+# We intentionally do NOT also run on push to main — api-image.yml has an
+# inline `test` job that runs the same checks before publishing the image,
+# so duplicating them here would just double the CI minutes per push.
 
 on:
   pull_request:
-    paths:
-      - "apps/api/**"
-      - ".github/workflows/api-tests.yml"
-  push:
-    branches: [main]
     paths:
       - "apps/api/**"
       - ".github/workflows/api-tests.yml"
