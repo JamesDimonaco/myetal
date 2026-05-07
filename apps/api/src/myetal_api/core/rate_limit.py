@@ -64,3 +64,9 @@ SEARCH_LIMIT = "20/minute"
 # and is aggressively cached, so the rate limit is more generous than search.
 # Per browse-popular-collections ticket.
 BROWSE_LIMIT = "30/minute"
+
+# Tag autocomplete (and the related popular-tags endpoint) — these fire on
+# every keystroke in the share editor's tag input, so the limit needs to be
+# much more generous than BROWSE_LIMIT.  The tag table is tiny and the queries
+# are GIN/usage-count index lookups, so even at 120/min the load is trivial.
+TAG_AUTOCOMPLETE_LIMIT = "120/minute"

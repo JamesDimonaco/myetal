@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from myetal_api.core.security import generate_short_code
-from myetal_api.models import Share, ShareItem, SharePaper, ShareSimilar, ShareView
+from myetal_api.models import Share, ShareItem, SharePaper, ShareSimilar, ShareView, Tag
 from myetal_api.schemas.share import (
     BrowseShareResult,
     DailyViewCount,
@@ -17,7 +17,9 @@ from myetal_api.schemas.share import (
     ShareSearchResult,
     ShareUpdate,
     SimilarShareOut,
+    TagOut,
 )
+from myetal_api.services import tags as tags_service
 
 _MAX_SHORT_CODE_ATTEMPTS = 10
 
@@ -31,6 +33,17 @@ async def create_share(
     owner_id: uuid.UUID,
     payload: ShareCreate,
 ) -> Share:
+    # Pre-validate tags before persisting the share so a bad slug
+    # doesn't leak an empty share.
+    canonical_tags: list[str] | None = None
+    if payload.tags is not None:
+        if len(payload.tags) > tags_service.MAX_TAGS_PER_SHARE:
+            raise tags_service.TooManyTags(
+                f"a share may have at most {tags_service.MAX_TAGS_PER_SHARE} tags "
+                f"(got {len(payload.tags)})"
+            )
+        canonical_tags = [tags_service.canonicalize(t) for t in payload.tags]
+
     short_code = await _allocate_short_code(db)
     share = Share(
         owner_user_id=owner_id,
@@ -44,6 +57,12 @@ async def create_share(
         share.items.append(_make_item(index, item))
     db.add(share)
     await db.commit()
+
+    # Attach tags after the share row exists. Slugs were already
+    # validated above, so set_share_tags can't raise on canonicalisation.
+    if canonical_tags is not None:
+        await tags_service.set_share_tags(db, share.id, canonical_tags)
+
     return await _reload_with_items(db, share.id)
 
 
@@ -58,7 +77,11 @@ async def list_user_shares(
 
     Per discovery ticket D-BL2.
     """
-    stmt = select(Share).options(selectinload(Share.items)).where(Share.owner_user_id == owner_id)
+    stmt = (
+        select(Share)
+        .options(selectinload(Share.items), selectinload(Share.tags))
+        .where(Share.owner_user_id == owner_id)
+    )
     if not include_deleted:
         stmt = stmt.where(Share.deleted_at.is_(None))
     result = await db.scalars(stmt.order_by(Share.created_at.desc()))
@@ -77,7 +100,7 @@ async def get_share_for_owner(
     """
     return await db.scalar(
         select(Share)
-        .options(selectinload(Share.items))
+        .options(selectinload(Share.items), selectinload(Share.tags))
         .where(Share.id == share_id, Share.owner_user_id == owner_id)
     )
 
@@ -91,7 +114,7 @@ async def get_public_share(db: AsyncSession, short_code: str) -> Share | None:
     """
     return await db.scalar(
         select(Share)
-        .options(selectinload(Share.items), selectinload(Share.owner))
+        .options(selectinload(Share.items), selectinload(Share.owner), selectinload(Share.tags))
         .where(
             Share.short_code == short_code,
             Share.is_public.is_(True),
@@ -115,7 +138,7 @@ async def get_public_share_with_tombstone(
     """
     share = await db.scalar(
         select(Share)
-        .options(selectinload(Share.items), selectinload(Share.owner))
+        .options(selectinload(Share.items), selectinload(Share.owner), selectinload(Share.tags))
         .where(Share.short_code == short_code, Share.is_public.is_(True))
     )
     if share is None:
@@ -126,6 +149,17 @@ async def get_public_share_with_tombstone(
 
 
 async def update_share(db: AsyncSession, share: Share, payload: ShareUpdate) -> Share:
+    # Pre-validate tags before persisting the share so a bad slug
+    # doesn't leak partial updates.
+    canonical_tags: list[str] | None = None
+    if payload.tags is not None:
+        if len(payload.tags) > tags_service.MAX_TAGS_PER_SHARE:
+            raise tags_service.TooManyTags(
+                f"a share may have at most {tags_service.MAX_TAGS_PER_SHARE} tags "
+                f"(got {len(payload.tags)})"
+            )
+        canonical_tags = [tags_service.canonicalize(t) for t in payload.tags]
+
     if payload.name is not None:
         share.name = payload.name
     if payload.description is not None:
@@ -142,7 +176,18 @@ async def update_share(db: AsyncSession, share: Share, payload: ShareUpdate) -> 
         for index, item in enumerate(payload.items):
             share.items.append(_make_item(index, item))
 
+    # Flush items to the session so they're visible inside this transaction
+    # without committing yet — set_share_tags below participates in the same
+    # transaction and we commit once at the end.
+    await db.flush()
+
+    if canonical_tags is not None:
+        # Atomic replace via tags service — handles canonicalisation,
+        # auto-create, usage_count maintenance, and the 5-tag cap (Q10).
+        await tags_service.set_share_tags(db, share.id, canonical_tags, commit=False)
+
     await db.commit()
+
     return await _reload_with_items(db, share.id)
 
 
@@ -451,6 +496,8 @@ async def search_published_shares(
     for pr in preview_rows:
         previews.setdefault(pr.share_id, []).append(pr.title)
 
+    tags_by_share = await _fetch_tags_for_shares(db, share_ids)
+
     results = [
         ShareSearchResult(
             short_code=r.short_code,
@@ -462,6 +509,7 @@ async def search_published_shares(
             published_at=r.published_at,
             updated_at=r.updated_at,
             preview_items=previews.get(r.share_id, []),
+            tags=tags_by_share.get(r.share_id, []),
         )
         for r in rows
     ]
@@ -470,15 +518,59 @@ async def search_published_shares(
 
 async def browse_published_shares(
     db: AsyncSession,
+    *,
+    tags: list[str] | None = None,
+    sort: str = "recent",
 ) -> tuple[list[BrowseShareResult], list[BrowseShareResult], int]:
     """Returns (trending, recent, total_count) for the browse page.
 
     Trending: top 5 from ``trending_shares`` (7-day view-weighted score).
     Recent:   last 5 (or 10 if trending < 3) by ``published_at DESC``.
     Total:    COUNT of all published, public, non-deleted shares.
+
+    Optional filters (per feedback-round-2 §2 / §4, Q14-A):
+
+    * ``tags`` — list of tag slugs. When non-empty, results are
+      restricted to shares whose tag set intersects (OR semantics —
+      "more permissive, more useful for discovery"). Slugs must
+      already be canonical; the route layer canonicalises before
+      calling.
+    * ``sort`` — ``"recent"`` (default) keeps the existing
+      ``published_at DESC`` order on the recent block. ``"popular"``
+      orders the recent block by the trending score (joining
+      ``trending_shares.score`` with a ``COALESCE(..., 0)`` fallback so
+      shares with no recorded views still appear, just at the bottom).
+      The trending block itself is always ``score DESC``.
+
+    Cache-key implication: the route uses these params in the URL, so
+    the CDN edge cache fragments per (tags, sort) combination — fine
+    for the high-traffic combos (no params, single popular tag,
+    ``sort=recent``) which dominate.
     """
+    has_tag_filter = bool(tags)
+
+    # Reusable WHERE-fragment + params.  Tag filter uses an EXISTS
+    # subquery against share_tags + tags so a share matching ANY of
+    # the given slugs (OR) is included.  The slugs come in already
+    # canonicalised; using ``= ANY(:tag_slugs)`` works on Postgres and
+    # ``slug IN (...)`` is identical from the planner's POV.
+    tag_join = (
+        """
+          AND EXISTS (
+              SELECT 1 FROM share_tags st
+              JOIN tags t ON t.id = st.tag_id
+              WHERE st.share_id = s.id AND t.slug = ANY(:tag_slugs)
+          )
+        """
+        if has_tag_filter
+        else ""
+    )
+
     # ── Trending ────────────────────────────────────────────────────────
-    trending_sql = text("""
+    # ``tag_join`` is a hardcoded SQL fragment (no user input); the tag
+    # slugs themselves are passed as a bound parameter. S608 is a false
+    # positive on the f-string interpolation here.
+    trending_sql_str = f"""
         SELECT
             ts.share_id,
             ts.score,
@@ -498,17 +590,32 @@ async def browse_published_shares(
         WHERE s.is_public = true
           AND s.published_at IS NOT NULL
           AND s.deleted_at IS NULL
+          {tag_join}
         GROUP BY ts.share_id, ts.score, ts.view_count_7d,
                  s.short_code, s.name, s.description, s.type,
                  s.published_at, s.updated_at, u.name
         ORDER BY ts.score DESC
         LIMIT 5
-    """)
+    """  # noqa: S608
+    trending_sql = text(trending_sql_str)
+    if has_tag_filter:
+        trending_sql = trending_sql.bindparams(tag_slugs=tags)
     trending_rows = (await db.execute(trending_sql)).all()
 
     # ── Recent ──────────────────────────────────────────────────────────
     recent_limit = 10 if len(trending_rows) < 3 else 5
-    recent_sql = text("""
+    # When sort=popular, order the "recent" block by trending score
+    # rather than published_at. Fall back to published_at DESC inside
+    # the score ordering so untracked/zero-score shares still sort
+    # consistently.  The trending_shares LEFT JOIN keeps shares with
+    # no view records visible (vs an INNER JOIN that would silently
+    # hide them).
+    sort_order = (
+        "ORDER BY COALESCE(ts.score, 0) DESC, s.published_at DESC"
+        if sort == "popular"
+        else "ORDER BY s.published_at DESC"
+    )
+    recent_sql_str = f"""
         SELECT
             s.id AS share_id,
             s.short_code,
@@ -522,23 +629,34 @@ async def browse_published_shares(
         FROM shares s
         LEFT JOIN users u ON u.id = s.owner_user_id
         LEFT JOIN share_items si ON si.share_id = s.id
+        LEFT JOIN trending_shares ts ON ts.share_id = s.id
         WHERE s.is_public = true
           AND s.published_at IS NOT NULL
           AND s.deleted_at IS NULL
+          {tag_join}
         GROUP BY s.id, s.short_code, s.name, s.description, s.type,
-                 s.published_at, s.updated_at, u.name
-        ORDER BY s.published_at DESC
+                 s.published_at, s.updated_at, u.name, ts.score
+        {sort_order}
         LIMIT :recent_limit
-    """).bindparams(recent_limit=recent_limit)
+    """  # noqa: S608
+    recent_sql = text(recent_sql_str)
+    recent_params: dict[str, object] = {"recent_limit": recent_limit}
+    if has_tag_filter:
+        recent_params["tag_slugs"] = tags
+    recent_sql = recent_sql.bindparams(**recent_params)
     recent_rows = (await db.execute(recent_sql)).all()
 
     # ── Total count ─────────────────────────────────────────────────────
-    count_sql = text("""
-        SELECT COUNT(*) AS cnt FROM shares
-        WHERE is_public = true
-          AND published_at IS NOT NULL
-          AND deleted_at IS NULL
-    """)
+    count_sql_str = f"""
+        SELECT COUNT(*) AS cnt FROM shares s
+        WHERE s.is_public = true
+          AND s.published_at IS NOT NULL
+          AND s.deleted_at IS NULL
+          {tag_join}
+    """  # noqa: S608
+    count_sql = text(count_sql_str)
+    if has_tag_filter:
+        count_sql = count_sql.bindparams(tag_slugs=tags)
     total_published = (await db.execute(count_sql)).scalar_one()
 
     # ── Preview items (batch for both sets) ─────────────────────────────
@@ -563,6 +681,9 @@ async def browse_published_shares(
         for pr in preview_rows:
             previews.setdefault(pr.share_id, []).append(pr.title)
 
+    # ── Tags per share (batch) ──────────────────────────────────────────
+    tags_by_share = await _fetch_tags_for_shares(db, all_share_ids)
+
     # ── Assemble results ────────────────────────────────────────────────
     trending = [
         BrowseShareResult(
@@ -576,6 +697,7 @@ async def browse_published_shares(
             updated_at=r.updated_at,
             preview_items=previews.get(r.share_id, []),
             view_count=r.view_count_7d,
+            tags=tags_by_share.get(r.share_id, []),
         )
         for r in trending_rows
     ]
@@ -591,11 +713,49 @@ async def browse_published_shares(
             published_at=r.published_at,
             updated_at=r.updated_at,
             preview_items=previews.get(r.share_id, []),
+            tags=tags_by_share.get(r.share_id, []),
         )
         for r in recent_rows
     ]
 
     return trending, recent, total_published
+
+
+async def _fetch_tags_for_shares(
+    db: AsyncSession,
+    share_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, list[TagOut]]:
+    """Batch-fetch tag rows attached to a list of shares.
+
+    Returns ``{share_id: [TagOut, ...]}``. Empty dict if ``share_ids``
+    is empty (avoids issuing a no-op query). Used by both browse and
+    search assemblers — N+1 avoided.
+    """
+    if not share_ids:
+        return {}
+    from myetal_api.models import ShareTag
+
+    unique_ids = list(set(share_ids))
+    rows = (
+        await db.execute(
+            select(
+                ShareTag.share_id,
+                Tag.id,
+                Tag.slug,
+                Tag.label,
+                Tag.usage_count,
+            )
+            .join(Tag, Tag.id == ShareTag.tag_id)
+            .where(ShareTag.share_id.in_(unique_ids))
+            .order_by(Tag.label)
+        )
+    ).all()
+    out: dict[uuid.UUID, list[TagOut]] = {}
+    for r in rows:
+        out.setdefault(r.share_id, []).append(
+            TagOut(id=r.id, slug=r.slug, label=r.label, usage_count=r.usage_count)
+        )
+    return out
 
 
 # ---------- internals ----------
@@ -628,7 +788,9 @@ def _make_item(position: int, payload: ShareItemCreate) -> ShareItem:
 
 async def _reload_with_items(db: AsyncSession, share_id: uuid.UUID) -> Share:
     share = await db.scalar(
-        select(Share).options(selectinload(Share.items)).where(Share.id == share_id)
+        select(Share)
+        .options(selectinload(Share.items), selectinload(Share.tags))
+        .where(Share.id == share_id)
     )
     assert share is not None  # we just inserted it
     return share

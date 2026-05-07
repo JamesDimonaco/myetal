@@ -311,6 +311,116 @@ async def test_publish_unpublish_share(db_session: AsyncSession) -> None:
     assert unpublished.published_at is None
 
 
+# ---------- tag attach/detach via PATCH /shares/{id} (PR-A) ----------
+
+
+async def test_create_share_with_tags_attaches_them(
+    api_client: TestClient, db_session: AsyncSession
+) -> None:
+    """POST /shares with `tags: ["virology", "microbiome"]` attaches both
+    and reflects them on the response."""
+    user = await _make_user(db_session)
+    # Use the service directly for auth-free creation (route auth is
+    # exercised elsewhere). Tags should round-trip into the response.
+    from myetal_api.services import tags as tags_service
+
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x", tags=["virology", "microbiome"]),
+    )
+    attached = await tags_service.list_for_share(db_session, share.id)
+    assert {t.slug for t in attached} == {"virology", "microbiome"}
+
+
+async def test_update_share_with_tags_atomically_replaces(
+    db_session: AsyncSession,
+) -> None:
+    """PATCH-equivalent service call replaces (does not append) tags."""
+    user = await _make_user(db_session)
+    from myetal_api.services import tags as tags_service
+
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x", tags=["virology", "microbiome"]),
+    )
+    # Replace with a single different tag.
+    await share_service.update_share(db_session, share, ShareUpdate(tags=["genomics"]))
+    after = await tags_service.list_for_share(db_session, share.id)
+    assert {t.slug for t in after} == {"genomics"}
+
+
+async def test_update_share_with_empty_tags_clears(db_session: AsyncSession) -> None:
+    user = await _make_user(db_session)
+    from myetal_api.services import tags as tags_service
+
+    share = await share_service.create_share(
+        db_session, user.id, ShareCreate(name="x", tags=["virology"])
+    )
+    await share_service.update_share(db_session, share, ShareUpdate(tags=[]))
+    after = await tags_service.list_for_share(db_session, share.id)
+    assert after == []
+
+
+async def test_update_share_with_tags_none_leaves_alone(
+    db_session: AsyncSession,
+) -> None:
+    user = await _make_user(db_session)
+    from myetal_api.services import tags as tags_service
+
+    share = await share_service.create_share(
+        db_session, user.id, ShareCreate(name="x", tags=["virology"])
+    )
+    await share_service.update_share(db_session, share, ShareUpdate(name="renamed"))
+    after = await tags_service.list_for_share(db_session, share.id)
+    assert {t.slug for t in after} == {"virology"}
+
+
+async def test_create_share_unknown_slug_auto_creates_tag(
+    db_session: AsyncSession,
+) -> None:
+    """Q9-C hybrid: free-form unknown slugs are created on attach, not
+    rejected with 400."""
+    user = await _make_user(db_session)
+    from myetal_api.services import tags as tags_service
+
+    await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x", tags=["a-totally-fresh-tag"]),
+    )
+    fresh = await tags_service.get_or_create_tag(db_session, "a-totally-fresh-tag")
+    assert fresh.usage_count == 1
+
+
+async def test_create_share_too_many_tags_rejected_at_schema(
+    api_client: TestClient,
+) -> None:
+    """Schema cap of 5 — Pydantic Field(max_length=5) rejects 6 tags
+    with 422 before the service ever runs.
+
+    Auth: stub a user via direct registration + login flow, then POST.
+    """
+    # Register + login to get a bearer token.
+    r = api_client.post(
+        "/auth/register",
+        json={"email": "capper@example.com", "password": "hunter22", "name": "Cap"},
+    )
+    assert r.status_code in (200, 201)
+    body = r.json()
+    token = body.get("access_token") or body.get("token")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+    payload = {
+        "name": "x",
+        "tags": ["a-tag", "b-tag", "c-tag", "d-tag", "e-tag", "f-tag"],
+    }
+    r = api_client.post("/shares", json=payload, headers=headers)
+    # 422 (schema) or 400 (service) both acceptable; assert it's not 201.
+    assert r.status_code in (400, 422)
+
+
 async def test_list_user_shares_excludes_tombstoned_by_default(
     db_session: AsyncSession,
 ) -> None:

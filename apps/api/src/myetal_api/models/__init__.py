@@ -9,6 +9,7 @@ from myetal_api.models.share_paper import SharePaper
 from myetal_api.models.share_report import ShareReport, ShareReportReason, ShareReportStatus
 from myetal_api.models.share_similar import ShareSimilar
 from myetal_api.models.share_view import ShareView
+from myetal_api.models.tag import ShareTag, Tag
 from myetal_api.models.trending_share import TrendingShare
 from myetal_api.models.user import User
 from myetal_api.models.user_paper import UserPaper, UserPaperAddedVia
@@ -32,8 +33,10 @@ __all__ = [
     "ShareReportReason",
     "ShareReportStatus",
     "ShareSimilar",
+    "ShareTag",
     "ShareType",
     "ShareView",
+    "Tag",
     "TrendingShare",
     "User",
     "UserPaper",

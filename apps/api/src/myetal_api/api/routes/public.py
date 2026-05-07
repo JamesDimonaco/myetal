@@ -7,7 +7,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from myetal_api.api.deps import DbSession, OptionalUser
 from myetal_api.core.config import settings
 from myetal_api.core.rate_limit import ANON_READ_LIMIT, limiter
-from myetal_api.schemas.share import PublicShareResponse, ShareItemResponse
+from myetal_api.schemas.share import PublicShareResponse, ShareItemResponse, TagOut
 from myetal_api.services import share as share_service
 from myetal_api.services import share_view as share_view_service
 
@@ -70,6 +70,7 @@ async def resolve_public_share(
         updated_at=share.updated_at,
         related_shares=related_shares,
         similar_shares=similar_shares,
+        tags=[TagOut.model_validate(t) for t in share.tags],
     )
 
 

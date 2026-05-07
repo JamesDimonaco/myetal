@@ -5,13 +5,17 @@ from fastapi import APIRouter, HTTPException, Query, status
 from myetal_api.api.deps import CurrentUser, DbSession
 from myetal_api.schemas.share import ShareAnalyticsResponse, ShareCreate, ShareResponse, ShareUpdate
 from myetal_api.services import share as share_service
+from myetal_api.services.tags import InvalidTagSlug, TooManyTags
 
 router = APIRouter(prefix="/shares", tags=["shares"])
 
 
 @router.post("", response_model=ShareResponse, status_code=status.HTTP_201_CREATED)
 async def create_share(body: ShareCreate, user: CurrentUser, db: DbSession) -> ShareResponse:
-    share = await share_service.create_share(db, user.id, body)
+    try:
+        share = await share_service.create_share(db, user.id, body)
+    except (InvalidTagSlug, TooManyTags) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return ShareResponse.model_validate(share)
 
 
@@ -64,7 +68,10 @@ async def update_share(
             status_code=status.HTTP_410_GONE,
             detail="share has been deleted",
         )
-    updated = await share_service.update_share(db, share, body)
+    try:
+        updated = await share_service.update_share(db, share, body)
+    except (InvalidTagSlug, TooManyTags) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return ShareResponse.model_validate(updated)
 
 

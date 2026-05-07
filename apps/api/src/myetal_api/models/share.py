@@ -10,6 +10,7 @@ from myetal_api.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from myetal_api.models.share_paper import SharePaper
+    from myetal_api.models.tag import Tag
     from myetal_api.models.user import User
 
 
@@ -72,6 +73,14 @@ class Share(Base, TimestampMixin):
         back_populates="share",
         cascade="all, delete-orphan",
         order_by="SharePaper.position",
+    )
+    # Topical tags attached to this share (Q7-A join, Q10 cap of 5).
+    # `selectin` so card-rendering paths get tags in one extra query
+    # rather than N+1.
+    tags: Mapped[list["Tag"]] = relationship(
+        secondary="share_tags",
+        lazy="selectin",
+        order_by="Tag.label",
     )
 
 

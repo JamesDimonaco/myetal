@@ -15,8 +15,10 @@ from myetal_api.models import (
     ShareReportReason,
     ShareReportStatus,
     ShareSimilar,
+    ShareTag,
     ShareType,
     ShareView,
+    Tag,
     TrendingShare,
     User,
     UserPaper,
@@ -40,6 +42,8 @@ def test_all_tables_registered_on_metadata() -> None:
         "trending_shares",
         "share_reports",
         "feedback",
+        "tags",
+        "share_tags",
     }
 
 
@@ -107,5 +111,42 @@ def test_models_are_classes() -> None:
         ShareSimilar,
         TrendingShare,
         ShareReport,
+        Tag,
+        ShareTag,
     ):
         assert hasattr(cls, "__tablename__")
+
+
+def test_tag_model_shape() -> None:
+    """Tag mirrors the existing model-shape pattern: __tablename__,
+    primary key, slug + label columns, default usage_count."""
+    assert Tag.__tablename__ == "tags"
+    cols = {c.name for c in Tag.__table__.columns}
+    assert {"id", "slug", "label", "usage_count", "created_at"} <= cols
+
+
+def test_share_tag_join_shape() -> None:
+    """ShareTag is a composite-PK join row; cascade-delete on both FKs."""
+    assert ShareTag.__tablename__ == "share_tags"
+    cols = {c.name for c in ShareTag.__table__.columns}
+    assert {"share_id", "tag_id", "created_at"} <= cols
+    pk_cols = {c.name for c in ShareTag.__table__.primary_key.columns}
+    assert pk_cols == {"share_id", "tag_id"}
+
+
+async def test_share_tags_relationship_loads(db_session) -> None:  # type: ignore[no-untyped-def]
+    """Share.tags relationship loads attached tags in label order."""
+    from myetal_api.schemas.share import ShareCreate
+    from myetal_api.services import auth as auth_service
+    from myetal_api.services import share as share_service
+    from myetal_api.services import tags as tags_service
+
+    user, _, _ = await auth_service.register_with_password(
+        db_session, "rel@example.com", "hunter22", "Rel"
+    )
+    share = await share_service.create_share(db_session, user.id, ShareCreate(name="x"))
+    await tags_service.set_share_tags(db_session, share.id, ["virology", "microbiome"])
+
+    refreshed = await share_service.get_share_for_owner(db_session, share.id, user.id)
+    assert refreshed is not None
+    assert {t.slug for t in refreshed.tags} == {"virology", "microbiome"}

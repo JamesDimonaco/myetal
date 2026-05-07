@@ -5,6 +5,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from myetal_api.models import ItemKind, ShareType
 
+# ---------- tags ----------
+
+
+class TagOut(BaseModel):
+    """A tag as returned by autocomplete / popular endpoints and embedded
+    on share responses. Per feedback-round-2 §2."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    slug: str
+    label: str
+    usage_count: int
+
 
 class ShareItemCreate(BaseModel):
     kind: ItemKind = ItemKind.PAPER
@@ -25,6 +39,10 @@ class ShareCreate(BaseModel):
     type: ShareType = ShareType.PAPER
     is_public: bool = True
     items: list[ShareItemCreate] = Field(default_factory=list)
+    # Optional tag slugs. Slugs are canonicalised + auto-created server-side
+    # (Q9-C hybrid: free-form allowed, owner doesn't need to pre-register).
+    # Cap of 5 enforced in the service (Q10). None = leave unset; [] = no tags.
+    tags: list[str] | None = Field(default=None, max_length=5)
 
 
 class ShareUpdate(BaseModel):
@@ -35,6 +53,11 @@ class ShareUpdate(BaseModel):
     type: ShareType | None = None
     is_public: bool | None = None
     items: list[ShareItemCreate] | None = None
+    # Tag slugs. None = leave existing tags alone; [] = clear all tags;
+    # [slugs...] = atomically replace the share's tag set with these
+    # (creating any missing tags on the fly). Cap of 5 enforced in
+    # service layer (Q10).
+    tags: list[str] | None = Field(default=None, max_length=5)
 
 
 class ShareItemResponse(BaseModel):
@@ -73,6 +96,7 @@ class ShareResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: list[ShareItemResponse]
+    tags: list[TagOut] = Field(default_factory=list)
 
 
 class RelatedShareOut(BaseModel):
@@ -103,6 +127,7 @@ class PublicShareResponse(BaseModel):
     updated_at: datetime
     related_shares: list[RelatedShareOut] = Field(default_factory=list)
     similar_shares: list[SimilarShareOut] = Field(default_factory=list)
+    tags: list[TagOut] = Field(default_factory=list)
 
 
 class ShareSearchResult(BaseModel):
@@ -117,6 +142,7 @@ class ShareSearchResult(BaseModel):
     published_at: datetime
     updated_at: datetime
     preview_items: list[str]  # first 3 item titles
+    tags: list[TagOut] = Field(default_factory=list)
 
 
 class ShareSearchResponse(BaseModel):
@@ -137,6 +163,7 @@ class BrowseShareResult(BaseModel):
     updated_at: datetime
     preview_items: list[str]  # first 3 item titles
     view_count: int | None = None  # only populated for trending results
+    tags: list[TagOut] = Field(default_factory=list)
 
 
 class BrowseResponse(BaseModel):
