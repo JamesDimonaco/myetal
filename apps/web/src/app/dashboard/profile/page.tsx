@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { OrcidSection } from './orcid-section';
 import { ProfileActions } from './profile-actions';
 import { SessionsList } from './sessions-list';
 import { ApiError } from '@/lib/api';
@@ -63,6 +64,8 @@ export default async function ProfilePage() {
           <ProfileActions />
         </div>
       </section>
+
+      <OrcidSection initialOrcidId={user.orcid_id ?? null} />
 
       <section className="mt-10">
         <h2 className="font-serif text-xl text-ink">Active sessions</h2>

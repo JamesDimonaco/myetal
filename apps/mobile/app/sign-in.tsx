@@ -45,7 +45,14 @@ const signUpSchema = z.object({
  */
 export default function SignInScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
-  const { signIn, signUp, signInWithGitHub, signInWithGoogle, consumeDevJsonTokens } = useAuth();
+  const {
+    signIn,
+    signUp,
+    signInWithGitHub,
+    signInWithGoogle,
+    signInWithOrcid,
+    consumeDevJsonTokens,
+  } = useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -138,6 +145,23 @@ export default function SignInScreen() {
     }
   };
 
+  const handleOrcid = async () => {
+    setError(null);
+    try {
+      await signInWithOrcid();
+      goToDashboard();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'ORCID sign-in failed';
+      if (msg.startsWith('orcid_devjson_manual')) {
+        setShowGithubPaste(true);
+      } else if (msg === 'orcid_oauth_cancel' || msg === 'orcid_oauth_dismiss') {
+        // user backed out — silent
+      } else {
+        setError(msg);
+      }
+    }
+  };
+
   const handleConsumePaste = async () => {
     setPasteError(null);
     try {
@@ -203,23 +227,22 @@ export default function SignInScreen() {
               </Text>
             </Pressable>
 
-            <View
-              style={[
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleOrcid}
+              style={({ pressed }) => [
                 styles.providerButton,
                 {
                   borderColor: c.border,
                   backgroundColor: c.surface,
-                  opacity: 0.55,
+                  opacity: pressed ? 0.7 : 1,
                 },
               ]}
             >
               <Text style={[styles.providerText, { color: c.text }]}>
                 Continue with ORCID
               </Text>
-              <Text style={[styles.providerSub, { color: c.textMuted }]}>
-                Coming soon
-              </Text>
-            </View>
+            </Pressable>
           </View>
 
           {showGithubPaste ? (

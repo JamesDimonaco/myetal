@@ -21,8 +21,42 @@ permissions:
   contents: read
 
 jobs:
+  # Re-run lint+tests inline so the build step has a hard dependency on a
+  # green test suite. Mirrors api-tests.yml — keep them in sync.  Without
+  # this, a broken main push would publish the bad image and Railway would
+  # deploy it before api-tests finished running in parallel.
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.4"
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --all-groups --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Pytest
+        run: uv run pytest
+
   build-and-push:
     runs-on: ubuntu-latest
+    needs: test
     env:
       IMAGE_NAME: jamesdimonaco/myetal-api
       IMAGE_SHA: ${{ github.sha }}

@@ -117,7 +117,12 @@ async def list_library(
     )
     if not include_hidden:
         stmt = stmt.where(UserPaper.hidden_at.is_(None))
-    stmt = stmt.order_by(UserPaper.added_at.desc())
+    # Secondary key on paper_id keeps ordering deterministic if two rows
+    # share an added_at timestamp (possible on SQLite tests where the
+    # server-side default has only second precision; the model's Python-side
+    # default normally avoids this, but the tiebreaker makes the query
+    # well-defined regardless of how the row was inserted).
+    stmt = stmt.order_by(UserPaper.added_at.desc(), UserPaper.paper_id.desc())
     rows = (await db.scalars(stmt)).all()
     return [(r.paper, r) for r in rows]
 

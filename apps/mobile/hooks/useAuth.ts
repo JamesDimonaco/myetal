@@ -161,6 +161,60 @@ export function useAuth() {
     });
   }, [persistTokensAndRefreshUser]);
 
+  const signInWithOrcid = useCallback(async (): Promise<AuthUser> => {
+    /**
+     * ORCID OAuth — identical flow to GitHub/Google but hitting /auth/orcid/start.
+     * The backend handles the OAuth dance and bounces tokens back via the
+     * mobile_redirect parameter.
+     */
+    const startUrl =
+      `${API_BASE_URL}/auth/orcid/start?platform=mobile&return_to=/dashboard`;
+
+    if (Platform.OS === 'web') {
+      window.open(startUrl, '_blank');
+      throw new Error(
+        'orcid_devjson_manual: paste the JSON tokens into the debug input below.',
+      );
+    }
+
+    const returnUrl = Linking.createURL('/auth-finish');
+    const url =
+      `${startUrl}&mobile_redirect=${encodeURIComponent(returnUrl)}`;
+
+    const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      throw new Error('orcid_oauth_cancel');
+    }
+    if (result.type !== 'success') {
+      throw new Error(`orcid_oauth_${result.type}`);
+    }
+
+    const parsed = new URL(result.url);
+    const fragment = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+    const accessToken = fragment.get('access_token');
+    const refreshToken = fragment.get('refresh_token');
+    if (!accessToken || !refreshToken) {
+      throw new Error('ORCID callback returned no tokens.');
+    }
+
+    return persistTokensAndRefreshUser({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_type: 'bearer',
+    });
+  }, [persistTokensAndRefreshUser]);
+
+  const updateOrcidIdMutation = useMutation({
+    mutationFn: async (orcid_id: string | null) => {
+      const updated = await api<AuthUser>('/auth/me', {
+        method: 'PATCH',
+        json: { orcid_id },
+      });
+      queryClient.setQueryData(ME_KEY, updated);
+      return updated;
+    },
+  });
+
   const signInWithGoogle = useCallback(async (): Promise<AuthUser> => {
     /**
      * Google OAuth — identical flow to GitHub but hitting /auth/google/start.
@@ -247,7 +301,9 @@ export function useAuth() {
       signOut: signOutMutation.mutateAsync,
       signInWithGitHub,
       signInWithGoogle,
+      signInWithOrcid,
       consumeDevJsonTokens,
+      updateOrcidId: updateOrcidIdMutation.mutateAsync,
     }),
     [
       meQuery.data,
@@ -258,7 +314,9 @@ export function useAuth() {
       signOutMutation.mutateAsync,
       signInWithGitHub,
       signInWithGoogle,
+      signInWithOrcid,
       consumeDevJsonTokens,
+      updateOrcidIdMutation.mutateAsync,
     ],
   );
 }

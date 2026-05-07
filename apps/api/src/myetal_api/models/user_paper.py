@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Uuid, func
@@ -62,6 +62,12 @@ class UserPaper(Base):
     )
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        # Python-side default gives microsecond precision (vs server_default
+        # `CURRENT_TIMESTAMP` which is second-precision on SQLite); this makes
+        # back-to-back inserts strictly orderable by added_at, including in
+        # tests against SQLite. server_default stays as a backstop for raw
+        # SQL inserts (e.g. the works-library migration's data backfill).
+        default=lambda: datetime.now(UTC),
         server_default=func.now(),
         nullable=False,
     )

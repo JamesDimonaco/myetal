@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 
 import { GitHubIcon } from '@/components/github-icon';
 import { GoogleIcon } from '@/components/google-icon';
+import { OrcidIcon } from '@/components/orcid-icon';
 
 import { AuthEmailSection } from './auth-email-section';
 
@@ -50,17 +51,13 @@ export default function SignInPage({
           <GitHubIcon size={18} />
           Continue with GitHub
         </a>
-        <button
-          type="button"
-          disabled
-          title="Coming soon — ORCID app is in registration"
-          className="inline-flex cursor-not-allowed items-center justify-center gap-2.5 rounded-md border border-rule bg-paper-soft px-5 py-3.5 text-sm font-medium text-ink-faint"
+        <a
+          href="/api/auth/orcid/start"
+          className="inline-flex items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3.5 text-sm font-medium text-ink transition hover:border-ink/40"
         >
+          <OrcidIcon size={18} />
           Continue with ORCID
-          <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] uppercase tracking-wider">
-            soon
-          </span>
-        </button>
+        </a>
       </div>
 
       {/* --- Divider --- */}

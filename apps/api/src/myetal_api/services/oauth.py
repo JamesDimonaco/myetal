@@ -154,6 +154,15 @@ async def _fetch_userinfo(client: httpx.AsyncClient, userinfo_url: str, access_t
     return response.json()
 
 
+async def _orcid_id_taken(
+    db: AsyncSession, orcid_id: str, *, exclude_user_id: object = None
+) -> bool:
+    stmt = select(User.id).where(User.orcid_id == orcid_id)
+    if exclude_user_id is not None:
+        stmt = stmt.where(User.id != exclude_user_id)
+    return (await db.scalar(stmt)) is not None
+
+
 async def _find_or_create_user(
     db: AsyncSession,
     provider: AuthProvider,
@@ -176,12 +185,26 @@ async def _find_or_create_user(
             # Update avatar on subsequent logins — it may have changed.
             if info.avatar_url:
                 user.avatar_url = info.avatar_url
+            # Backfill orcid_id for users who signed in with ORCID before
+            # the column existed (or had it skipped due to a prior collision
+            # that has since been resolved).
+            if provider == AuthProvider.ORCID and user.orcid_id is None:
+                if not await _orcid_id_taken(db, info.subject, exclude_user_id=user.id):
+                    user.orcid_id = info.subject
             return user
+
+    # New user. Set orcid_id from the OAuth subject when signing in with ORCID,
+    # but skip if another user already claimed that iD manually — that's an
+    # account-linking situation we deliberately defer (see plan doc Phase B).
+    orcid_id: str | None = None
+    if provider == AuthProvider.ORCID and not await _orcid_id_taken(db, info.subject):
+        orcid_id = info.subject
 
     user = User(
         name=info.name,
         email=info.email.lower() if info.email else None,
         avatar_url=info.avatar_url,
+        orcid_id=orcid_id,
     )
     db.add(user)
     await db.flush()

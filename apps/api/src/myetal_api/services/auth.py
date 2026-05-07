@@ -31,6 +31,10 @@ class InvalidRefreshToken(AuthError):
     pass
 
 
+class OrcidIdAlreadyClaimed(AuthError):
+    pass
+
+
 async def register_with_password(
     db: AsyncSession,
     email: str,
@@ -136,6 +140,28 @@ async def list_sessions(db: AsyncSession, user_id: uuid.UUID) -> list[RefreshTok
         .order_by(RefreshToken.issued_at.desc())
     )
     return list(rows.all())
+
+
+async def set_user_orcid_id(
+    db: AsyncSession, user_id: uuid.UUID, orcid_id: str | None
+) -> User:
+    """Set or clear ``orcid_id`` for a user. Format is assumed pre-validated
+    by the schema layer. Raises ``OrcidIdAlreadyClaimed`` if the iD is
+    already linked to another user (account linking is deferred to Phase B)."""
+    user = await db.get(User, user_id)
+    if user is None:
+        raise InvalidCredentials
+
+    if orcid_id is not None:
+        clash = await db.scalar(
+            select(User.id).where(User.orcid_id == orcid_id, User.id != user_id)
+        )
+        if clash is not None:
+            raise OrcidIdAlreadyClaimed
+
+    user.orcid_id = orcid_id
+    await db.commit()
+    return user
 
 
 async def revoke_session(db: AsyncSession, user_id: uuid.UUID, session_id: uuid.UUID) -> bool:

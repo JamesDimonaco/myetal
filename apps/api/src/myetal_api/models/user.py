@@ -19,6 +19,7 @@ class User(Base, TimestampMixin):
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    orcid_id: Mapped[str | None] = mapped_column(String(19), nullable=True, unique=True)
 
     auth_identities: Mapped[list["AuthIdentity"]] = relationship(
         back_populates="user",

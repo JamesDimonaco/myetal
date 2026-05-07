@@ -12,7 +12,7 @@ from myetal_api.schemas.auth import (
     SessionResponse,
     TokenPair,
 )
-from myetal_api.schemas.user import UserResponse
+from myetal_api.schemas.user import UpdateMeRequest, UserResponse
 from myetal_api.services import auth as auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -71,6 +71,25 @@ async def logout(body: LogoutRequest, db: DbSession) -> None:
 
 @router.get("/me", response_model=UserResponse)
 async def me(user: CurrentUser) -> UserResponse:
+    return UserResponse.model_validate(user)
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_me(
+    body: UpdateMeRequest, user: CurrentUser, db: DbSession
+) -> UserResponse:
+    """Partial update of the calling user's profile. Currently only
+    ``orcid_id`` is updatable here. Fields omitted from the request body
+    are left unchanged; sending ``null`` (or ``""``) clears the field."""
+    fields = body.model_dump(exclude_unset=True)
+    if "orcid_id" in fields:
+        try:
+            user = await auth_service.set_user_orcid_id(db, user.id, fields["orcid_id"])
+        except auth_service.OrcidIdAlreadyClaimed as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="orcid_id is already linked to another account",
+            ) from exc
     return UserResponse.model_validate(user)
 
 

@@ -66,7 +66,9 @@ def test_start_oauth_builds_orcid_authorize_url(monkeypatch: pytest.MonkeyPatch)
     # override (e.g. LAN IP for testing OAuth from a real phone).
     monkeypatch.setattr(settings, "public_api_url", "http://localhost:8000")
     url = oauth_service.start_oauth(AuthProvider.ORCID, "/dashboard", "web")
-    assert "sandbox.orcid.org/oauth/authorize" in url
+    # Match either prod or sandbox host — the URL is frozen at module import
+    # from settings.orcid_use_sandbox, which the dev .env can flip either way.
+    assert "orcid.org/oauth/authorize" in url
     assert "client_id=test-orcid-client-id" in url
     assert "response_type=code" in url
     assert "scope=openid" in url

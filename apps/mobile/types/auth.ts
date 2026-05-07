@@ -8,6 +8,8 @@ export interface AuthUser {
   name: string | null;
   email: string | null;
   is_admin: boolean;
+  avatar_url: string | null;
+  orcid_id: string | null;
   created_at: string;
 }
 
