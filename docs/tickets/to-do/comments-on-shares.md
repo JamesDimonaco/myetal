@@ -43,6 +43,8 @@ New enum: `share_comment_visibility AS ENUM ('public', 'owner_only')`.
 
 New column on `shares`: `allow_public_comments BOOLEAN NOT NULL DEFAULT true`.
 
+**Toggle semantics:** flipping `allow_public_comments=false` blocks new public comments AND retroactively hides existing public comments from the public viewer. Existing comment rows are NOT deleted — the owner still sees them in the owner inbox. Re-enabling re-surfaces them. The public read endpoint filters on both `visibility='public' AND share.allow_public_comments=true`.
+
 Note: `models/social.py` was deleted in the discovery ticket (D13 — see `done/public-discovery-and-collaboration.md`). Re-introducing comments means a new migration and a fresh model file, not resurrecting the deleted one.
 
 ---

@@ -85,7 +85,16 @@ The web app and mobile clients **don't care** which prod backend they hit, since
   - `myetal-api` from Docker Hub image (`jamesdimonaco/myetal-api:latest`).
   - `myetal-db` Postgres (managed).
 - Wire env vars on the API service. `DATABASE_URL` uses Railway's `${{Postgres.DATABASE_URL}}` reference (resolves to the internal `*.railway.internal` URL).
-- Copy the entire `R2_*`, `ORCID_*`, `SECRET_KEY`, `PUBLIC_API_URL`, `PUBLIC_BASE_URL`, `SENTRY_DSN`, etc. block from the Pi's `.env`.
+- Copy the FULL env block from the Pi's `/home/pi/myetal/.env`. Don't shorthand. Missing any of these = silent feature breakage:
+  - **Core**: `ENV=prod`, `SECRET_KEY` (rotate), `PUBLIC_API_URL=https://api.myetal.app`, `PUBLIC_BASE_URL=https://app.myetal.app`
+  - **R2**: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET=myetal-uploads`, `R2_ENDPOINT`, `R2_PUBLIC_URL`
+  - **ORCID**: `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET`, `ORCID_USE_SANDBOX=false`
+  - **Google OAuth**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+  - **GitHub OAuth**: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+  - **Telegram (feedback flow — silently no-ops without these)**: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+  - **Admin**: `ADMIN_EMAILS` (comma-separated)
+  - **CORS**: `CORS_ORIGINS` (comma-separated; the Vercel preview domain pattern)
+  - **Observability**: `SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE=0.1`
 - Run `alembic upgrade head` against the new Postgres (one-shot, manually via Railway run command or temporary container). Confirms the schema lands clean.
 - Health-check Railway's URL: `curl https://myetal-api-production.up.railway.app/healthz`.
 - Smoke test:
@@ -94,6 +103,7 @@ The web app and mobile clients **don't care** which prod backend they hit, since
 
 ### Phase 2 — Cut over DNS (~30 minutes + TTL wait)
 
+- **24-48 hours BEFORE cutover**: lower the existing `api.myetal.app` DNS TTL to 60 seconds. Without this, propagation after the swap can take hours, not minutes — visitors mid-flight get a stale Pi resolution while we're trying to drain. Revert to a normal TTL (1h+) after cutover stabilises.
 - Add `api.myetal.app` as a custom domain on the Railway API service. Railway auto-issues a Let's Encrypt cert.
 - Update DNS: `api.myetal.app` CNAME → Railway's edge.
 - Update the web app's `API_BASE_URL` env var on Vercel if it's hardcoded (it should already be `https://api.myetal.app`, in which case nothing changes).

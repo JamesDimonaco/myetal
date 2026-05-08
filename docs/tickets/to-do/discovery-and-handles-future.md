@@ -17,6 +17,15 @@ V1 routes owner-name links to `/browse?owner_id={user_id}` — works today, no s
 - Mobile profile screen for own-user already exists; add a per-other-user view.
 - Migration for existing users: optional, can claim a handle later. NULL handles → fall back to `?owner_id=`.
 
+## Backwards compatibility for existing `?owner_id=<uuid>` links
+
+Already-shared links of the form `/browse?owner_id=<uuid>` keep working. They're a **permalink** that nobody bookmarks deliberately, but social embeds + email signatures may carry them.
+
+Behavior once handles ship:
+- `/browse?owner_id=<uuid>` continues to resolve (unchanged).
+- If the resolved owner has a `handle`, the page sets a `<link rel="canonical" href="/u/{handle}">` and a `301` redirect from the dashboard's owner-card link rewrites *new* links to `/u/{handle}`.
+- We do **not** auto-redirect `?owner_id=<uuid>` → `/u/{handle}` server-side (preserves direct-link reliability if a user changes their handle).
+
 ## Triggers to revisit
 
 - > 100 users — directory and discovery starts mattering.

@@ -10,12 +10,27 @@ When a ticket ships, `git mv` it into `done/` so the queue stays clean.
 
 | # | Ticket | Effort | Why this priority | Depends on |
 |---|---|---|---|---|
-| 1 | **[better-auth-migration](to-do/better-auth-migration.md)** | ~3-4 weeks | Foundational. Unblocks account linking, makes comments richer, replaces hand-rolled auth with battle-tested infra. Everything else builds on this. | none |
-| 2 | **[railway-migration-future](to-do/railway-migration-future.md)** | ~5-7 days | Reliability — moves prod off home internet + SD card. Plan recommends *"after Round 2 bakes for 2-4 weeks"*. Pi becomes staging. | Round 2 stable on Pi |
-| 3 | **[comments-on-shares](to-do/comments-on-shares.md)** | ~6 days | Deferred for user testing. Locked decisions (Q11-B, Q12-A, Q13). Pull off the shelf when usage data justifies it. | Better Auth would help (cleaner identity model); not strictly required |
-| 4 | **[email-notifications-future](to-do/email-notifications-future.md)** | ~3-4 days | Comment notifications go in-app first. Email digest only matters once comments are active and noisy. | Comments shipped |
-| 5 | **[pdf-virus-scanning-future](to-do/pdf-virus-scanning-future.md)** | ~1.5 days | Defensive depth. PR-C v1 has MIME magic-bytes + `pdftoppm` timeout — sufficient at our scale. Revisit on first abuse incident or > 100 PDF uploads/month. | none |
-| 6 | **[discovery-and-handles-future](to-do/discovery-and-handles-future.md)** | ~3 days | Needs demand signal. Today: owner-name links route to `/browse?owner_id=` (works, ugly URL). Real `/u/{handle}` profiles wait for > 100 users or branding requests. | none |
+| 1 | **[better-auth-migration](to-do/better-auth-migration.md)** | ~2 weeks | **Foundational + cheap-while-no-real-users.** Replaces hand-rolled auth before the user base matters. Unblocks account linking, makes comments richer, hardens the auth layer. Owner direction: ship before going to "proper prod prod." Fresh-start cutover (test accounts nuked) skips dual-mode complexity. | none |
+| 2 | **[railway-migration-future](to-do/railway-migration-future.md)** | ~5-7 days | Reliability — moves prod off home internet + SD card. Plan recommends *"after Round 2 bakes for 2-4 weeks"*. Pi becomes staging. Better Auth lands first so we're not migrating two foundations at once. | Better Auth shipped |
+| 3 | **[qr-poster-pdf](to-do/qr-poster-pdf.md)** | ~1.5 days | Print-ready A4 PDF download from the share's QR modal. The QR is the bridge from physical → digital; this makes that bridge actually printable. Cheap, on-wedge, ship-on-a-Saturday-afternoon. | none |
+| 4 | **[comments-on-shares](to-do/comments-on-shares.md)** | ~6 days | Deferred for user testing. Locked decisions (Q11-B, Q12-A, Q13). Pull off the shelf when usage data justifies it. | none (Better Auth would help cleaner identity, not strictly required) |
+| 5 | **[email-notifications-future](to-do/email-notifications-future.md)** | ~3-4 days | Comment notifications go in-app first. Email digest only matters once comments are active and noisy. | Comments shipped |
+| 6 | **[pdf-virus-scanning-future](to-do/pdf-virus-scanning-future.md)** | ~1.5 days (Pi) / ~2-3 days (Railway) | Defensive depth. PR-C v1 has MIME magic-bytes + `pdftoppm` timeout — sufficient at our scale. Revisit on first abuse incident or > 100 PDF uploads/month. | none |
+| 7 | **[discovery-and-handles-future](to-do/discovery-and-handles-future.md)** | ~3 days | Needs demand signal. Today: owner-name links route to `/browse?owner_id=` (works, ugly URL). Real `/u/{handle}` profiles wait for > 100 users or branding requests. | none |
+
+---
+
+## Scoped, not yet written up
+
+Ideas surfaced by the new-ticket-scoping pass. All small, all on-wedge, but **none urgent enough to write up as full tickets yet**. Park here so they're remembered without bloating to-do/. Promote to a proper ticket when one becomes urgent.
+
+| Idea | Effort | One-line value |
+|---|---|---|
+| **bulk-doi-paste** | ~1.5-2 days | Paste a list of DOIs once and add them all to a share or library. Fan-out via existing `/papers/lookup`. No new endpoint. Park until someone has 20 papers and complains. |
+| **share-cover-image** | ~2 days | Custom OG/Twitter card image on the public share viewer. Reuses the R2 upload pipeline from PDFs. Park until owners ask for branding. |
+| **duplicate-share** | ~1.5 days | "Duplicate this share" → clone items + tags into a new draft with a fresh `short_code`. Useful for talks/posters/grants. Park until the use case surfaces in feedback. |
+| **share-presenter-mode** | ~1 day | Big-text, swipeable view of a share's items at `/c/{code}/present` for live conference talks. Reuses `PublicShareResponse`. Park; ship and watch analytics if anyone asks. |
+| **drag-to-reorder + inline title rename** | ~1-2 days | Up/down arrow reorder already works on both platforms; this is a UX polish upgrade to drag-and-drop + inline-title editing. Park until someone calls the arrow flow clunky. |
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Status:** Future — deferred from feedback-round-2 (Q12 picks in-app only for v1)
 **Created:** 2026-05-07
-**Depends on:** Comments shipping in feedback-round-2 PR-D (only sender of notifications today)
+**Depends on:** Comments shipping (`comments-on-shares.md`) — only sender of notifications today. Reactions-only path (Q11-C alternative) reshapes this ticket: digest of "X people reacted to your share" instead of per-comment events; cron remains, payload changes.
 
 ## Why this is deferred
 
@@ -20,7 +20,7 @@ The MVP for in-app already gives owners signal that someone commented. Email is 
 
 - Provider integration (recommendation: Resend for simplicity, ~$0/mo at our scale).
 - `notification_preferences` table or JSON column on `users` (immediate / daily / weekly / off, per category).
-- Daily digest cron via `apt install cron` on the Pi (run at 09:00 UTC, batch unread comments per user).
+- Daily digest cron at 09:00 UTC, batching unread comments per user. **Substrate depends on prod target at the time:** Pi → host crontab `apt install cron` calling `docker exec myetal-api ...`; Railway → native Railway cron service. Either way the script lives in `apps/api/scripts/`. If Better Auth migration ships first (it should — see INDEX), the auth provider's email-sender plugin can also be reused for the digest send path.
 - Unsubscribe HMAC-signed URL pattern.
 - One-click unsubscribe header support (RFC 8058).
 

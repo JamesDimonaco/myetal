@@ -14,7 +14,7 @@ V1 PDF upload validates MIME via the `%PDF-` magic-byte sniff (Q3) and bounds fi
 Owner's reasoning at the time of deferral:
 
 - Audience is researchers uploading their own posters / preprints, not anonymous web traffic.
-- Files live on UploadThing's CDN, not on the Pi — they're not executed server-side.
+- Files live on R2's CDN, not on the Pi — they're not executed server-side.
 - ClamAV adds operational complexity (extra container in the compose stack, daily definitions update, restart cadence) for a risk surface that's currently small.
 
 Owner quote: *"document the deferral... but let's really consider this as a problem maybe create a subagent and make a future ticket."* This ticket is the placeholder.
@@ -41,9 +41,9 @@ We don't need to solve this now. We need to be ready to solve it before the fric
 
 ## Options when we revisit
 
-- **A. ClamAV daemon on the Pi.** Open source, free, ~150 MB of definitions updated daily, integrates via `clamd` socket from FastAPI. Adds an extra service to the compose stack. Detection is based on signature DB — catches known malware, weak against zero-day or targeted attacks. Scan happens after the client tells us the upload is done; a positive signature halts the `ShareItem` creation and deletes the file from UploadThing.
+- **A. ClamAV daemon as a sidecar.** Open source, free, ~150 MB of definitions updated daily, integrates via `clamd` socket from FastAPI. On the Pi: an extra service in the compose stack (~1.5 days). On Railway: a separate service in the project (~2-3 days — Railway doesn't do compose-style multi-service-in-one-deploy as cleanly, so the wiring is fiddlier). Detection is based on signature DB — catches known malware, weak against zero-day or targeted attacks. Scan happens after the client tells us the upload is done; a positive signature halts the `ShareItem` creation and deletes the file from R2.
 - **B. Hosted virus-scanning API (VirusTotal, Cloudmersive, etc.).** Cheap per scan, no infra. Costs scale with volume, adds an external dependency in the upload critical path, has rate limits on free tiers. Privacy implication: the file is sent to a third party.
-- **C. Lean on UploadThing's policies.** They have abuse handling but not active virus scanning. Fine if we trust files are CDN-hosted and never executed server-side — but does nothing for the downloader.
+- **C. Lean on R2's policies.** They have abuse handling but not active virus scanning. Fine if we trust files are CDN-hosted and never executed server-side — but does nothing for the downloader.
 
 Recommendation when we get there: **A** (ClamAV) for control + zero per-file cost + audit trail. **B** as a stopgap if we need scanning live in <1 day.
 
@@ -63,7 +63,7 @@ Any one of these flips this ticket to active:
 ## Decision points (for when we revisit)
 
 - Scan synchronously (block the upload-record response on a clean result) or asynchronously (record the item, scan in the background, take it down + email the owner if infected)?
-- On a positive: hard-block (delete from UploadThing, return 422 to the client) or soft-flag (item exists but is hidden from public viewers until reviewed)?
+- On a positive: hard-block (delete from R2, return 422 to the client) or soft-flag (item exists but is hidden from public viewers until reviewed)?
 - Notify the share owner when one of their items is flagged? Required, or opt-in?
 - Notify viewers who already downloaded a now-flagged file? Probably required if we have the analytics to know who they were.
 - Does the admin queue (existing `/admin/reports` surface) get a new "infected uploads" tab, or is this its own surface?
@@ -73,6 +73,6 @@ Any one of these flips this ticket to active:
 
 ## Effort estimate (rough)
 
-- ClamAV path: **~1.5 days**. Add `clamav` service to the compose file, wire the socket into FastAPI, hook the scan into the post-upload record endpoint, infection-handling UX (web + mobile), tests (clean + EICAR test signature). Plus runbook entry for definitions-update failure.
+- ClamAV path on the Pi: **~1.5 days**. Add `clamav` service to the compose file, wire the socket into FastAPI, hook the scan into the post-upload record endpoint, infection-handling UX (web + mobile), tests (clean + EICAR test signature). Plus runbook entry for definitions-update failure. **Add ~1 day if Railway is prod by then** — multi-service deploy is fiddlier.
 - Hosted-API path: **~0.5 day**. Wrapper client, drop into the same hook point, billing alarm, dependency-down handling.
 - Either path adds ~0.5 day for the admin-queue surfacing and the owner-notification email if we want those.
