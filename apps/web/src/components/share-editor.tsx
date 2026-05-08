@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { z } from 'zod';
 
 import {
@@ -40,11 +40,13 @@ const SHARE_TYPES: ShareType[] = [
 ];
 
 // Per-kind validation. Paper only requires title. Repo and link require both
-// title and a URL — that's what makes them useful as a destination.
+// title and a URL — that's what makes them useful as a destination. PDF items
+// require `file_url` (set by the upload flow before the item lands here).
 const itemSchema = z
   .object({
     _key: z.string(),
-    kind: z.enum(['paper', 'repo', 'link']),
+    id: z.string().optional(),
+    kind: z.enum(['paper', 'repo', 'link', 'pdf']),
     title: z.string().trim().min(1, 'Item title required').max(500),
     scholar_url: z.string().trim().max(2000).optional().or(z.literal('')),
     doi: z.string().trim().max(255).optional().or(z.literal('')),
@@ -56,11 +58,22 @@ const itemSchema = z
     url: z.string().trim().max(2000).optional().or(z.literal('')),
     subtitle: z.string().trim().optional().or(z.literal('')),
     image_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    file_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    thumbnail_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    file_size_bytes: z.number().int().positive().optional(),
+    file_mime: z.string().trim().max(64).optional().or(z.literal('')),
   })
-  .refine((it) => it.kind === 'paper' || (it.url && it.url.length > 0), {
-    message: 'URL required for repo/link items',
-    path: ['url'],
-  });
+  .refine(
+    (it) => {
+      if (it.kind === 'paper') return true;
+      if (it.kind === 'pdf') return Boolean(it.file_url && it.file_url.length > 0);
+      return Boolean(it.url && it.url.length > 0);
+    },
+    {
+      message: 'URL required for repo/link/pdf items',
+      path: ['url'],
+    },
+  );
 
 const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
@@ -71,6 +84,11 @@ const shareSchema = z.object({
 
 interface DraftItem {
   _key: string;
+  /** Server-assigned UUID. Present for items hydrated from the response,
+   *  undefined for items the user is adding fresh in this session. Round-tripped
+   *  on PATCH so the backend can merge PDF rows by id (preserves the four
+   *  server-managed PDF columns; client must NOT re-send those itself). */
+  id?: string;
   kind: ShareItemKind;
   title: string;
   scholar_url: string;
@@ -81,6 +99,11 @@ interface DraftItem {
   url: string;
   subtitle: string;
   image_url: string;
+  /** PDF-only fields (PR-C). Empty / 0 on non-PDF items. */
+  file_url: string;
+  thumbnail_url: string;
+  file_size_bytes: number;
+  file_mime: string;
 }
 
 let _itemKeySeed = 0;
@@ -98,12 +121,17 @@ const emptyItem = (): DraftItem => ({
   url: '',
   subtitle: '',
   image_url: '',
+  file_url: '',
+  thumbnail_url: '',
+  file_size_bytes: 0,
+  file_mime: '',
 });
 
 const fromResponseItem = (
   it: ShareResponse['items'][number],
 ): DraftItem => ({
   _key: newKey(),
+  id: it.id,
   kind: it.kind ?? 'paper',
   title: it.title,
   scholar_url: it.scholar_url ?? '',
@@ -114,6 +142,10 @@ const fromResponseItem = (
   url: it.url ?? '',
   subtitle: it.subtitle ?? '',
   image_url: it.image_url ?? '',
+  file_url: it.file_url ?? '',
+  thumbnail_url: it.thumbnail_url ?? '',
+  file_size_bytes: it.file_size_bytes ?? 0,
+  file_mime: it.file_mime ?? '',
 });
 
 const fromPaper = (p: Paper): DraftItem => ({
@@ -128,6 +160,10 @@ const fromPaper = (p: Paper): DraftItem => ({
   url: '',
   subtitle: '',
   image_url: '',
+  file_url: '',
+  thumbnail_url: '',
+  file_size_bytes: 0,
+  file_mime: '',
 });
 
 // Seed from a library entry (PaperOut). Used when the user picks "+ New share
@@ -145,10 +181,36 @@ const fromPaperOut = (p: PaperOut): DraftItem => ({
   url: p.url ?? '',
   subtitle: p.subtitle ?? '',
   image_url: p.image_url ?? '',
+  file_url: '',
+  thumbnail_url: '',
+  file_size_bytes: 0,
+  file_mime: '',
 });
 
 const fromAddPayload = (payload: AddItemPayload): DraftItem => {
   if (payload.kind === 'paper') return fromPaper(payload.paper);
+  if (payload.kind === 'pdf') {
+    // PDF upload already happened — the modal hands us the materialised URLs
+    // and metadata. The editor PATCH/POST below echoes these back so the
+    // ShareItem row carries kind='pdf' + the four PDF fields.
+    return {
+      _key: newKey(),
+      kind: 'pdf',
+      title: payload.title,
+      scholar_url: '',
+      doi: '',
+      authors: '',
+      year: '',
+      notes: '',
+      url: '',
+      subtitle: '',
+      image_url: '',
+      file_url: payload.file_url,
+      thumbnail_url: payload.thumbnail_url,
+      file_size_bytes: payload.file_size_bytes,
+      file_mime: payload.file_mime,
+    };
+  }
   return {
     _key: newKey(),
     kind: payload.kind,
@@ -161,6 +223,10 @@ const fromAddPayload = (payload: AddItemPayload): DraftItem => {
     url: payload.url,
     subtitle: payload.subtitle ?? '',
     image_url: payload.image_url ?? '',
+    file_url: '',
+    thumbnail_url: '',
+    file_size_bytes: 0,
+    file_mime: '',
   };
 };
 
@@ -190,7 +256,13 @@ interface Props {
  */
 export function ShareEditor({ initial, id, initialPaper }: Props) {
   const router = useRouter();
-  const isNew = !id;
+
+  // `effectiveId` mirrors `id` until an auto-save (W1 — PDF tab on a brand-new
+  // share) creates a draft on the server, at which point we flip to PATCH mode
+  // without navigating the URL. `isNew` is derived from `effectiveId` so the
+  // submit button copy and POST/PATCH branching update too.
+  const [effectiveId, setEffectiveId] = useState<string | undefined>(id);
+  const isNew = !effectiveId;
 
   // Seed the TanStack cache with the SSR copy so an invalidate-after-save
   // doesn't cold-load the share. We don't read this back into local form
@@ -198,10 +270,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   // unsaved edits.
   useShare(id, initial);
   const createMutation = useCreateShare();
-  const updateMutation = useUpdateShare(id ?? '');
+  const updateMutation = useUpdateShare(effectiveId ?? '');
   const deleteMutation = useDeleteShare();
-  const publishMutation = usePublishShare(id ?? '');
-  const unpublishMutation = useUnpublishShare(id ?? '');
+  const publishMutation = usePublishShare(effectiveId ?? '');
+  const unpublishMutation = useUnpublishShare(effectiveId ?? '');
 
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -283,18 +355,35 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       return;
     }
 
-    const apiItems: ShareItemInput[] = parsed.data.items.map((it) => ({
-      kind: it.kind,
-      title: it.title,
-      scholar_url: it.scholar_url ? it.scholar_url : null,
-      doi: it.doi ? it.doi : null,
-      authors: it.authors ? it.authors : null,
-      year: it.year ? Number(it.year) : null,
-      notes: it.notes ? it.notes : null,
-      url: it.url ? it.url : null,
-      subtitle: it.subtitle ? it.subtitle : null,
-      image_url: it.image_url ? it.image_url : null,
-    }));
+    const apiItems: ShareItemInput[] = parsed.data.items.map((it) => {
+      // PDF round-trip path: backend rejects `kind=pdf` from clients
+      // (forgery defense). For an existing PDF row we hand the server only
+      // the editable text fields plus `id`; update_share merges by id and
+      // preserves the four server-managed PDF columns (file_url, etc).
+      if (it.kind === 'pdf' && it.id) {
+        return {
+          id: it.id,
+          title: it.title,
+          subtitle: it.subtitle ? it.subtitle : null,
+          notes: it.notes ? it.notes : null,
+        };
+      }
+      // Non-PDF items: serialise as before. Include `id` for existing rows
+      // so the server keeps a stable identity across edits.
+      return {
+        ...(it.id ? { id: it.id } : {}),
+        kind: it.kind,
+        title: it.title,
+        scholar_url: it.scholar_url ? it.scholar_url : null,
+        doi: it.doi ? it.doi : null,
+        authors: it.authors ? it.authors : null,
+        year: it.year ? Number(it.year) : null,
+        notes: it.notes ? it.notes : null,
+        url: it.url ? it.url : null,
+        subtitle: it.subtitle ? it.subtitle : null,
+        image_url: it.image_url ? it.image_url : null,
+      };
+    });
 
     const payload: ShareCreateInput = {
       name: parsed.data.name,
@@ -322,10 +411,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   };
 
   const handleDelete = async () => {
-    if (!id || isNew) return;
+    if (!effectiveId) return;
     setError(null);
     try {
-      await deleteMutation.mutateAsync(id);
+      await deleteMutation.mutateAsync(effectiveId);
       router.push('/dashboard');
       router.refresh();
     } catch (err) {
@@ -333,6 +422,58 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       setConfirmingDelete(false);
     }
   };
+
+  /**
+   * Auto-save a draft share — invoked when the user opens the PDF tab on a
+   * brand-new (unsaved) share. Backend now allows empty `items: []` saves
+   * (PR-C round-2 W1), so we POST whatever the user has typed so far (or
+   * sensible defaults) and flip to PATCH mode for subsequent saves.
+   *
+   * The URL stays at /dashboard/share/new — the editor just knows its own
+   * `effectiveId` now. A "Saving draft…" indicator in the modal covers the
+   * 1-2s round-trip on the Pi. If the network blips, we surface an error
+   * and let the user retry; we never silently leave the picker disabled.
+   *
+   * Side effect: a draft share will appear in the user's dashboard immediately
+   * (since the row exists server-side). That's intentional — they can come
+   * back to it if they close the modal mid-flow.
+   */
+  const autoSaveDraft = useCallback(async (): Promise<string> => {
+    if (effectiveId) return effectiveId;
+    // Backend's ShareCreate requires `name` min_length=1, but at this point
+    // the user has only clicked the PDF tab — they may not have typed a name
+    // yet. Auto-fill 'Untitled share' so the POST doesn't 422; the user can
+    // rename in the editor (manual save still enforces a non-empty name via
+    // the zod schema, so they can't publish without one).
+    const autoSaveName = name.trim() || 'Untitled share';
+    const draft: ShareCreateInput = {
+      name: autoSaveName,
+      description: description.trim() ? description.trim() : null,
+      type: shareType,
+      items: [],
+      tags,
+    };
+    const created = await createMutation.mutateAsync(draft);
+    setEffectiveId(created.id);
+    // Carry over any tags / published_at the server returned (server may
+    // canonicalise tags). Items are empty so nothing to merge there.
+    if (created.tags) setTags(created.tags.map((t) => t.slug));
+    // W-FIX-3 — sync the URL to the new id so refresh doesn't drop the user
+    // back on a fresh /share/new form. router.replace doesn't push history.
+    // The QR-modal "keep editing" flow at closeQrAndKeepEditing also calls
+    // replace, but only when `savedShare` is set — which only happens on
+    // explicit Save, never via this auto-save path — so they don't collide.
+    router.replace(`/dashboard/share/${created.id}`);
+    return created.id;
+  }, [
+    effectiveId,
+    name,
+    description,
+    shareType,
+    tags,
+    createMutation,
+    router,
+  ]);
 
   const closeQrAndGoToDashboard = () => {
     setShowQr(false);
@@ -342,9 +483,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
 
   const closeQrAndKeepEditing = () => {
     setShowQr(false);
-    // If this was a new share, navigate to the edit URL so refreshing
-    // the browser doesn't land on /share/new again.
-    if (isNew && savedShare) {
+    // If this share was created in this session (either via the normal
+    // POST path or the W1 auto-save draft), the URL is still /share/new.
+    // Replace it so a refresh doesn't land back on the create page.
+    if (!id && savedShare) {
       router.replace(`/dashboard/share/${savedShare.id}`);
     }
   };
@@ -547,7 +689,8 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                 </svg>
                 <p className="text-sm font-medium text-ink">No items yet</p>
                 <p className="text-xs text-ink-faint">
-                  Add papers, repos, or links to include in this share.
+                  A bundle gathers papers, repos, and PDFs behind one QR. Start
+                  by adding an item.
                 </p>
                 <button
                   type="button"
@@ -603,6 +746,8 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                     <PaperFields item={it} onChange={(p) => updateItem(it._key, p)} />
                   ) : it.kind === 'repo' ? (
                     <RepoFields item={it} onChange={(p) => updateItem(it._key, p)} />
+                  ) : it.kind === 'pdf' ? (
+                    <PdfFields item={it} onChange={(p) => updateItem(it._key, p)} />
                   ) : (
                     <LinkFields item={it} onChange={(p) => updateItem(it._key, p)} />
                   )}
@@ -669,6 +814,8 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       {showAddItem ? (
         <AddItemModal
           onClose={() => setShowAddItem(false)}
+          shareId={effectiveId}
+          onAutoSaveDraft={autoSaveDraft}
           onPick={(payload) => {
             appendItem(payload);
             setShowAddItem(false);
@@ -872,10 +1019,71 @@ function KindBadge({ kind }: { kind: ShareItemKind }) {
       </span>
     );
   }
+  if (kind === 'pdf') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+        PDF
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
       Paper
     </span>
+  );
+}
+
+function PdfFields({
+  item,
+  onChange,
+}: {
+  item: DraftItem;
+  onChange: (p: Partial<DraftItem>) => void;
+}) {
+  const sizeLabel = item.file_size_bytes
+    ? `${(item.file_size_bytes / (1024 * 1024)).toFixed(1)} MB`
+    : null;
+  return (
+    <>
+      <ItemField
+        label="Title"
+        value={item.title}
+        onChange={(v) => onChange({ title: v })}
+        placeholder="As it'll appear on the share"
+      />
+      {item.thumbnail_url || item.file_url ? (
+        <div className="flex items-start gap-3 rounded-md border border-rule bg-paper p-3">
+          {item.thumbnail_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.thumbnail_url}
+              alt=""
+              width={64}
+              height={84}
+              className="h-20 w-16 flex-shrink-0 rounded border border-rule bg-paper-soft object-cover"
+            />
+          ) : (
+            <div className="flex h-20 w-16 flex-shrink-0 items-center justify-center rounded border border-rule bg-paper-soft text-ink-muted">
+              <span className="text-[9px] font-semibold uppercase">PDF</span>
+            </div>
+          )}
+          <div className="min-w-0 flex-1 text-xs text-ink-muted">
+            <p className="font-medium text-ink">Uploaded</p>
+            {sizeLabel ? <p className="mt-0.5">{sizeLabel}</p> : null}
+            {item.file_url ? (
+              <a
+                href={item.file_url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="mt-1 inline-block text-ink-muted underline-offset-2 hover:underline"
+              >
+                Open file ↗
+              </a>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

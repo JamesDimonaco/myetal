@@ -12,16 +12,26 @@
  * kind without re-deriving the shape.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiError } from '@/lib/api';
+import { clientApi } from '@/lib/client-api';
 import type { RepoInfo } from '@/lib/github';
 import {
   extractDoi,
   useLookupPaper,
   useSearchPapers,
 } from '@/lib/hooks/usePapers';
+import {
+  PDF_COPYRIGHT_LABEL,
+  PDF_GENERIC_ERR,
+  PDF_NETWORK_ERR,
+  PDF_NOT_VALID_MSG,
+  PDF_TOO_LARGE_MSG,
+  PDF_TRUST_NOTE,
+} from '@/lib/pdf-copy';
 import type { Paper, PaperSearchResult } from '@/types/paper';
+import type { PresignResponse, ShareItemOut } from '@/types/share';
 
 type SortOption = 'relevance' | 'newest' | 'oldest' | 'most-cited';
 
@@ -100,7 +110,7 @@ function filterResults(
   return filtered;
 }
 
-type Kind = 'paper' | 'repo' | 'link';
+type Kind = 'paper' | 'repo' | 'link' | 'pdf';
 type PaperMode = 'doi' | 'search' | 'manual';
 
 export type AddItemPaper = { kind: 'paper'; paper: Paper };
@@ -118,18 +128,52 @@ export type AddItemLink = {
   subtitle: string | null;
   image_url: string | null;
 };
-export type AddItemPayload = AddItemPaper | AddItemRepo | AddItemLink;
+/**
+ * PDF payload — the upload + record dance has already happened by the time the
+ * editor sees this; we just hand back the materialised file URLs so the editor
+ * can append a `DraftItem` with `kind: 'pdf'` and the four PDF fields populated.
+ */
+export type AddItemPdf = {
+  kind: 'pdf';
+  title: string;
+  file_url: string;
+  thumbnail_url: string;
+  file_size_bytes: number;
+  file_mime: string;
+};
+export type AddItemPayload =
+  | AddItemPaper
+  | AddItemRepo
+  | AddItemLink
+  | AddItemPdf;
 
 interface Props {
   onClose: () => void;
   onPick: (item: AddItemPayload) => void;
+  /**
+   * The owner's share id. Required for PDF upload — we presign against
+   * `/shares/{id}/...` and the share has to exist server-side before we can
+   * upload. When absent on the PDF tab, we auto-save an empty draft via
+   * `onAutoSaveDraft` so the picker activates without a manual round-trip.
+   */
+  shareId?: string;
+  /**
+   * Auto-save the share as an empty draft and resolve with the new share id.
+   * Called the first time the user opens the PDF tab on an unsaved share
+   * (W1 — backend now allows empty `items: []`). The editor flips to PATCH
+   * mode internally; the URL stays at /dashboard/share/new.
+   */
+  onAutoSaveDraft?: () => Promise<string>;
 }
 
 const KINDS: { id: Kind; label: string }[] = [
   { id: 'paper', label: 'Paper' },
   { id: 'repo', label: 'Repo' },
   { id: 'link', label: 'Link' },
+  { id: 'pdf', label: 'PDF' },
 ];
+
+const MAX_PDF_BYTES = 25 * 1024 * 1024; // 25 MB hard limit (Q2)
 
 const PAPER_MODES: { id: PaperMode; label: string }[] = [
   { id: 'doi', label: 'DOI' },
@@ -139,7 +183,7 @@ const PAPER_MODES: { id: PaperMode; label: string }[] = [
 
 const DEBOUNCE_MS = 300;
 
-export function AddItemModal({ onClose, onPick }: Props) {
+export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft }: Props) {
   const [kind, setKind] = useState<Kind>('paper');
 
   // Lock body scroll + Escape to close — same UX contract as <QrModal>.
@@ -160,6 +204,7 @@ export function AddItemModal({ onClose, onPick }: Props) {
     paper: 'Add paper',
     repo: 'Add repo',
     link: 'Add link',
+    pdf: 'Upload a PDF',
   };
 
   return (
@@ -222,6 +267,13 @@ export function AddItemModal({ onClose, onPick }: Props) {
             {kind === 'paper' ? <PaperKindPane onPick={onPick} /> : null}
             {kind === 'repo' ? <RepoKindPane onPick={onPick} /> : null}
             {kind === 'link' ? <LinkKindPane onPick={onPick} /> : null}
+            {kind === 'pdf' ? (
+              <PdfKindPane
+                onPick={onPick}
+                shareId={shareId}
+                onAutoSaveDraft={onAutoSaveDraft}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -962,6 +1014,493 @@ function LinkKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
       </button>
     </div>
   );
+}
+
+// --------------------------------------------------------------------------
+// PDF — file picker + R2 multipart upload + record-pdf-upload (PR-C)
+//
+// Three-step dance: presign → multipart POST to R2 → record. We use XHR for
+// the POST so we get upload-progress events; fetch's body progress isn't
+// surfaced in browsers yet. Cancel calls xhr.abort() and bumps the local
+// phase back to 'idle' so the user can retry without re-picking the file.
+
+type UploadPhase =
+  | 'idle'
+  | 'requesting-presign'
+  | 'uploading'
+  | 'recording'
+  | 'done'
+  | 'error';
+
+/**
+ * Strip the `.pdf` extension and decide whether the bare filename is a
+ * useful default title. Working-file naming patterns (`final_v3_...`,
+ * `draft_...`) yield poor public titles, so we fall back to the empty
+ * string and let the placeholder prompt the user.
+ *
+ * Earlier revisions also blanked the title when the stripped name had ≥3
+ * underscores — that hit legitimate multi-author papers like
+ * `Doe_Smith_Jones_2024`. The version-marker / status-keyword heuristics
+ * are specific enough on their own.
+ */
+function deriveDefaultTitle(filename: string): string {
+  const stripped = filename.replace(/\.pdf$/i, '');
+  const isJunky =
+    /_v\d+/i.test(stripped) ||
+    /\b(final|draft|copy)\b/i.test(stripped);
+  return isJunky ? '' : stripped;
+}
+
+function PdfKindPane({
+  onPick,
+  shareId,
+  onAutoSaveDraft,
+}: {
+  onPick: (p: AddItemPayload) => void;
+  shareId?: string;
+  onAutoSaveDraft?: () => Promise<string>;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [copyrightAck, setCopyrightAck] = useState(false);
+  const [phase, setPhase] = useState<UploadPhase>('idle');
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  // W6 — flip BEFORE calling `xhr.abort()` so the catch block can distinguish
+  // a user-initiated cancel from a real upload failure. Without this, the
+  // microtask ordering left phase as 'error' with message "Upload cancelled."
+  const cancelledRef = useRef(false);
+
+  // Auto-save draft state (W1) — when the user opens the PDF tab on an unsaved
+  // share, we POST an empty draft so the picker activates immediately. The
+  // editor flips to PATCH mode internally; the URL stays at /share/new.
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const draftAttemptedRef = useRef(false);
+
+  const tryAutoSaveDraft = useCallback(async () => {
+    if (!onAutoSaveDraft) return;
+    setDraftError(null);
+    setDraftSaving(true);
+    try {
+      await onAutoSaveDraft();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.detail
+          : "Couldn't start your share — try again.";
+      setDraftError(message);
+    } finally {
+      setDraftSaving(false);
+    }
+  }, [onAutoSaveDraft]);
+
+  // Kick off the auto-save once when this pane mounts without a shareId.
+  // Mount = the user clicked the PDF tab. Subsequent visits (after the parent
+  // sets `shareId`) skip the effect since `shareId` is now truthy.
+  useEffect(() => {
+    if (shareId) return;
+    if (!onAutoSaveDraft) return;
+    if (draftAttemptedRef.current) return;
+    draftAttemptedRef.current = true;
+    void tryAutoSaveDraft();
+  }, [shareId, onAutoSaveDraft, tryAutoSaveDraft]);
+
+  const fileInputId = 'pdf-file-input';
+
+  const handleFile = (picked: File | null) => {
+    setError(null);
+    if (!picked) {
+      setFile(null);
+      setTitle('');
+      return;
+    }
+    // Belt-and-braces MIME check — the browser sets type from the OS, so this
+    // mostly catches users who renamed `.docx` to `.pdf`. Server still sniffs
+    // the first 8 bytes (Q3).
+    const looksLikePdf =
+      picked.type === 'application/pdf' ||
+      picked.name.toLowerCase().endsWith('.pdf');
+    if (!looksLikePdf) {
+      setError(PDF_NOT_VALID_MSG);
+      setFile(null);
+      return;
+    }
+    if (picked.size > MAX_PDF_BYTES) {
+      setError(PDF_TOO_LARGE_MSG(picked.size));
+      setFile(null);
+      return;
+    }
+    setFile(picked);
+    // W2 — default title via heuristic. Junky-looking working filenames
+    // (`final_v3_…`, lots of `_`) leave the field blank so the placeholder
+    // prompts the user for a real title.
+    setTitle(deriveDefaultTitle(picked.name));
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    setTitle('');
+    setError(null);
+    setPhase('idle');
+    setProgress(0);
+  };
+
+  const cancel = () => {
+    // W6 — set the flag BEFORE abort() so the rejection handler can route to
+    // 'idle' instead of 'error'. Order matters: xhr.abort() fires onabort
+    // synchronously which schedules the rejection microtask.
+    cancelledRef.current = true;
+    xhrRef.current?.abort();
+    xhrRef.current = null;
+    setPhase('idle');
+    setProgress(0);
+  };
+
+  const canUpload =
+    !!file &&
+    !!shareId &&
+    title.trim().length > 0 &&
+    copyrightAck &&
+    phase === 'idle';
+
+  const handleUpload = async () => {
+    if (!file || !shareId) return;
+    setError(null);
+    cancelledRef.current = false;
+    setPhase('requesting-presign');
+    setProgress(0);
+
+    try {
+      // 1. Presign
+      const presign = await clientApi<PresignResponse>(
+        `/shares/${shareId}/items/upload-url`,
+        {
+          method: 'POST',
+          json: {
+            filename: file.name,
+            mime_type: 'application/pdf',
+            size_bytes: file.size,
+          },
+        },
+      );
+
+      // 2. Multipart POST to R2 (XHR for progress events)
+      setPhase('uploading');
+      await new Promise<void>((resolve, reject) => {
+        const formData = new FormData();
+        for (const [k, v] of Object.entries(presign.fields)) {
+          formData.append(k, v);
+        }
+        formData.append('file', file);
+
+        const xhr = new XMLHttpRequest();
+        xhrRef.current = xhr;
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            setProgress(ev.loaded / ev.total);
+          }
+        };
+        xhr.onload = () => {
+          xhrRef.current = null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed (${xhr.status}).`));
+          }
+        };
+        xhr.onerror = () => {
+          xhrRef.current = null;
+          reject(new Error(PDF_NETWORK_ERR));
+        };
+        xhr.onabort = () => {
+          xhrRef.current = null;
+          reject(new Error('Upload cancelled.'));
+        };
+        xhr.open('POST', presign.upload_url);
+        xhr.send(formData);
+      });
+
+      // 3. Record
+      setPhase('recording');
+      const item = await clientApi<ShareItemOut>(
+        `/shares/${shareId}/items/record-pdf-upload`,
+        {
+          method: 'POST',
+          json: {
+            file_key: presign.file_key,
+            copyright_ack: true,
+            title: title.trim(),
+          },
+        },
+      );
+
+      setPhase('done');
+      onPick({
+        kind: 'pdf',
+        title: item.title,
+        file_url: item.file_url ?? '',
+        thumbnail_url: item.thumbnail_url ?? '',
+        file_size_bytes: item.file_size_bytes ?? file.size,
+        file_mime: item.file_mime ?? 'application/pdf',
+      });
+    } catch (err) {
+      // W6 — user-initiated cancels land in 'idle' (cancel() already set
+      // phase / progress); other errors surface as 'error'.
+      if (cancelledRef.current) {
+        cancelledRef.current = false;
+        setPhase('idle');
+        setProgress(0);
+        return;
+      }
+      setPhase('error');
+      const message =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : PDF_GENERIC_ERR;
+      setError(message);
+    }
+  };
+
+  // W1 — auto-save in flight on a brand-new share. Show inline progress so
+  // the user knows the picker is about to activate.
+  if (!shareId && draftSaving) {
+    return (
+      <div className="grid gap-3">
+        <p className="text-xs text-ink-faint">
+          Upload a PDF (poster, slide deck, preprint) and we&apos;ll attach it
+          to this share.
+        </p>
+        <LoadingRow text="Saving draft…" />
+      </div>
+    );
+  }
+
+  // W1 — auto-save failed. Surface the error with a Retry button rather than
+  // pretending the picker works.
+  if (!shareId && draftError) {
+    return (
+      <div className="grid gap-3">
+        <div className="rounded-md border border-danger/30 bg-danger/5 px-4 py-3">
+          <p className="text-sm font-semibold text-danger">{draftError}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void tryAutoSaveDraft()}
+          className="self-start rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // No share yet AND no auto-save handler — surface the legacy hint. Should
+  // not happen in the editor flow (the parent always passes onAutoSaveDraft).
+  if (!shareId) {
+    return (
+      <div className="grid gap-3">
+        <p className="text-xs text-ink-faint">
+          Upload a PDF (poster, slide deck, preprint) and we&apos;ll attach it
+          to this share.
+        </p>
+        <LoadingRow text="Saving draft…" />
+      </div>
+    );
+  }
+
+  const busy = phase === 'requesting-presign' || phase === 'uploading' || phase === 'recording';
+
+  return (
+    <div className="grid gap-4">
+      <p className="text-xs text-ink-faint">
+        Upload a PDF (poster, slide deck, preprint). Up to 25 MB.
+      </p>
+
+      {/* File picker / preview */}
+      {!file ? (
+        <label
+          htmlFor={fileInputId}
+          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-rule bg-paper-soft px-6 py-10 text-center transition hover:border-accent hover:bg-paper"
+        >
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+            className="text-ink-muted"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14 2v6h6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <p className="text-sm font-semibold text-ink">Choose a PDF</p>
+          <p className="text-xs text-ink-muted">Click to browse — 25 MB max</p>
+          <input
+            id={fileInputId}
+            type="file"
+            accept="application/pdf,.pdf"
+            className="sr-only"
+            onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      ) : (
+        // W7 — keep filename + size visible above the progress card during
+        // upload so the user always knows which file is in flight. Remove
+        // disables while busy.
+        <div className="flex items-start gap-3 rounded-md border border-rule bg-paper-soft p-4">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-rule bg-paper text-ink-muted">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M14 2v6h6"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-sm text-ink">{file.name}</p>
+            <p className="mt-0.5 text-xs text-ink-faint">
+              {formatBytes(file.size)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={removeFile}
+            disabled={busy}
+            className="text-xs font-medium text-ink-muted transition hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+
+      {/* W5 — trust signal near the picker, ORCID-style. */}
+      {!file ? (
+        <p className="text-xs text-ink-faint">{PDF_TRUST_NOTE}</p>
+      ) : null}
+
+      {/* Title — required, defaults to filename via heuristic (W2). */}
+      {file ? (
+        <label className="grid gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+            Title (required)
+          </span>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Smith et al. 2024 — ICML poster"
+            disabled={busy}
+            className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent disabled:opacity-60"
+          />
+        </label>
+      ) : null}
+
+      {/* W4 — longer copyright copy. Gates the upload button. */}
+      {file ? (
+        <label className="flex cursor-pointer items-start gap-2 rounded-md border border-rule bg-paper-soft p-3">
+          <input
+            type="checkbox"
+            checked={copyrightAck}
+            onChange={(e) => setCopyrightAck(e.target.checked)}
+            disabled={busy}
+            className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded border-rule accent-accent"
+          />
+          <span className="text-xs text-ink">{PDF_COPYRIGHT_LABEL}</span>
+        </label>
+      ) : null}
+
+      {/* Progress */}
+      {phase === 'uploading' ? (
+        <div className="grid gap-2 rounded-md border border-rule bg-paper-soft p-3">
+          <div className="flex items-center justify-between text-xs text-ink-muted">
+            <span>Uploading…</span>
+            <span className="tabular-nums">{Math.round(progress * 100)}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-rule">
+            <div
+              className="h-full bg-ink transition-[width] duration-150"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={cancel}
+            className="self-start text-xs font-medium text-ink-muted transition hover:text-ink"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
+      {phase === 'requesting-presign' ? (
+        <LoadingRow text="Preparing upload…" />
+      ) : null}
+
+      {/* W8 — "Finishing up…" is honest about what the recording step does
+          (validate bytes, persist DB row, generate thumbnail). Subtitle
+          hints at the 3-8s on the Pi so the user doesn't think it's stuck. */}
+      {phase === 'recording' ? (
+        <LoadingRow text="Finishing up… (this can take a few seconds)" />
+      ) : null}
+
+      {/* Inline error */}
+      {error ? (
+        <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2">
+          <p className="text-xs text-danger">{error}</p>
+        </div>
+      ) : null}
+
+      {/* Upload button — only shown when ready, hidden during in-flight phases */}
+      {file && phase !== 'uploading' && phase !== 'recording' && phase !== 'requesting-presign' ? (
+        <button
+          type="button"
+          onClick={handleUpload}
+          disabled={!canUpload}
+          className="rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+        >
+          {phase === 'error' ? 'Retry upload' : 'Upload PDF'}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // --------------------------------------------------------------------------

@@ -11,7 +11,7 @@ export type ShareType =
   | 'grant'
   | 'project';
 
-export type ShareItemKind = 'paper' | 'repo' | 'link';
+export type ShareItemKind = 'paper' | 'repo' | 'link' | 'pdf';
 
 /**
  * A topical tag attached to a share. `slug` is the canonical lowercased,
@@ -38,6 +38,11 @@ export interface ShareItem {
   url: string | null;
   subtitle: string | null;
   image_url: string | null;
+  /** PDF-only fields (PR-C). Null on non-PDF items. */
+  file_url?: string | null;
+  thumbnail_url?: string | null;
+  file_size_bytes?: number | null;
+  file_mime?: string | null;
 }
 
 /** A share that has at least one paper in common with the viewed share (D8). */
@@ -90,6 +95,11 @@ export interface ShareResponse {
  *  to `'paper'` server-side for back-compat, so existing single-paper / paper
  *  collection clients keep working unchanged. */
 export interface ShareItemInput {
+  /** Server-assigned UUID for items that already exist on a share. Sent on
+   *  PATCH so the backend's update_share merge logic can identify existing
+   *  rows (notably PDFs, whose file fields are server-managed and must not
+   *  be re-sent from the bulk path). New items omit this. */
+  id?: string;
   kind?: ShareItemKind;
   title: string;
   scholar_url?: string | null;
@@ -100,6 +110,11 @@ export interface ShareItemInput {
   url?: string | null;
   subtitle?: string | null;
   image_url?: string | null;
+  /** PDF-only fields (PR-C). Echoed back from a successful record-pdf-upload. */
+  file_url?: string | null;
+  thumbnail_url?: string | null;
+  file_size_bytes?: number | null;
+  file_mime?: string | null;
 }
 
 export interface ShareCreateInput {
@@ -121,6 +136,35 @@ export interface ShareUpdateInput {
   items?: ShareItemInput[];
   /** Replaces the share's tag set atomically (slugs only, max 5). */
   tags?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// PDF upload (PR-C §1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returned by `POST /shares/{share_id}/items/upload-url`. The client posts
+ * `multipart/form-data` to `upload_url` with all `fields` plus a `file` field;
+ * R2 responds 204 on success. Then the client calls `record-pdf-upload` with
+ * `file_key` to materialise the ShareItem.
+ */
+export interface PresignResponse {
+  upload_url: string;
+  fields: Record<string, string>;
+  file_key: string;
+  expires_at: string;
+}
+
+/**
+ * Returned by `POST /shares/{share_id}/items/record-pdf-upload`. Mirrors
+ * `ShareItem` plus the four PDF-specific fields, all populated.
+ */
+export interface ShareItemOut extends ShareItem {
+  kind: ShareItemKind;
+  file_url: string | null;
+  thumbnail_url: string | null;
+  file_size_bytes: number | null;
+  file_mime: string | null;
 }
 
 // ---------------------------------------------------------------------------

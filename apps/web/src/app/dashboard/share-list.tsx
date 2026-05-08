@@ -12,7 +12,7 @@ import type { ShareItemKind, ShareResponse } from '@/types/share';
 
 function kindSummary(items: ShareResponse['items']): string {
   if (items.length === 0) return '0 items';
-  const counts: Record<ShareItemKind, number> = { paper: 0, repo: 0, link: 0 };
+  const counts: Record<ShareItemKind, number> = { paper: 0, repo: 0, link: 0, pdf: 0 };
   for (const it of items) {
     const k = (it.kind ?? 'paper') as ShareItemKind;
     counts[k] += 1;
@@ -21,6 +21,7 @@ function kindSummary(items: ShareResponse['items']): string {
   if (counts.paper) parts.push(`${counts.paper} ${counts.paper === 1 ? 'paper' : 'papers'}`);
   if (counts.repo) parts.push(`${counts.repo} ${counts.repo === 1 ? 'repo' : 'repos'}`);
   if (counts.link) parts.push(`${counts.link} ${counts.link === 1 ? 'link' : 'links'}`);
+  if (counts.pdf) parts.push(`${counts.pdf} ${counts.pdf === 1 ? 'PDF' : 'PDFs'}`);
   return parts.join(', ');
 }
 
@@ -133,9 +134,37 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
     }, 1800);
   };
 
-  const shares = data ?? [];
+  const allShares = data ?? [];
+  // W-FIX-5 (Option B) — hide item-less shares from the listing. The PDF
+  // auto-save (W1) creates an empty 'Untitled share' draft on the server the
+  // moment the user opens the PDF tab; if they close the modal without
+  // uploading, that draft would otherwise linger here. We don't auto-DELETE
+  // it (Option A) because the user may have typed a name into the editor and
+  // expect the draft to persist. The share is still reachable via its direct
+  // URL — only hidden from the dashboard grid.
+  const shares = allShares.filter((s) => s.items.length > 0);
+  const hiddenDraftCount = allShares.length - shares.length;
 
   if (shares.length === 0) {
+    // E5 — every share is item-less (only drafts in flight). Surface a small
+    // note instead of the generic empty state, so the user understands why
+    // their dashboard looks empty even though they remember starting a share.
+    if (hiddenDraftCount > 0) {
+      return (
+        <div className="rounded-lg border border-rule bg-paper-soft p-12 text-center">
+          <h2 className="font-serif text-xl text-ink">No shares yet</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted">
+            Drafts in progress will appear here once you add an item.
+          </p>
+          <Link
+            href="/dashboard/share/new"
+            className="mt-6 inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+          >
+            Create a share
+          </Link>
+        </div>
+      );
+    }
     // E3 — has papers but no shares. Different copy that nudges the user
     // toward the library-driven flow rather than starting from scratch.
     if (libraryCount > 0) {

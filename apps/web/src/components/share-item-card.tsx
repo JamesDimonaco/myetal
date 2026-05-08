@@ -27,6 +27,7 @@ export function ShareItemCard({
 }) {
   if (item.kind === 'repo') return <RepoCard item={item} repo={repo ?? null} />;
   if (item.kind === 'link') return <LinkCard item={item} />;
+  if (item.kind === 'pdf') return <PdfCard item={item} />;
   return <PaperCard item={item} oa={oa ?? null} />;
 }
 
@@ -181,6 +182,123 @@ function RepoCard({
           </a>
         </div>
       ) : null}
+    </article>
+  );
+}
+
+// --------------------------------------------------------------------------
+
+function formatSize(bytes: number | null | undefined): string | null {
+  if (!bytes || bytes <= 0) return null;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * PDF item card. Q5-B locked: thumbnail + download only — no inline preview /
+ * PDF.js. Tapping anywhere on the card opens the file in a new tab and the
+ * browser's native PDF viewer handles the rest. Falls back to a generic PDF
+ * icon when `thumbnail_url` is missing (legacy data; ordinary PDFs always
+ * have a thumb).
+ */
+function PdfCard({ item }: { item: ShareItem }) {
+  const href = item.file_url ?? null;
+  const sizeLabel = formatSize(item.file_size_bytes);
+
+  const meta = [item.authors, item.year ? String(item.year) : null, sizeLabel]
+    .filter(Boolean)
+    .join(' · ');
+
+  const titleNode = href ? (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
+    >
+      {item.title}
+      <span aria-hidden className="ml-1 text-ink-faint">↗</span>
+    </a>
+  ) : (
+    <span className="font-serif text-lg leading-snug text-ink">{item.title}</span>
+  );
+
+  return (
+    <article className="flex gap-4 border-t border-rule py-5 first:border-t-0 sm:gap-5">
+      {item.thumbnail_url ? (
+        href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="block flex-shrink-0"
+            aria-label={`Open ${item.title}`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.thumbnail_url}
+              alt=""
+              className="h-auto max-h-72 w-[140px] rounded-md border border-rule bg-paper-soft object-cover sm:w-[180px]"
+            />
+          </a>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.thumbnail_url}
+            alt=""
+            className="h-auto max-h-72 w-[140px] flex-shrink-0 rounded-md border border-rule bg-paper-soft object-cover sm:w-[180px]"
+          />
+        )
+      ) : (
+        // Generic PDF icon placeholder for legacy / missing-thumbnail rows.
+        <div
+          aria-hidden
+          className="flex h-[180px] w-[140px] flex-shrink-0 flex-col items-center justify-center gap-2 rounded-md border border-rule bg-paper-soft text-ink-muted sm:w-[180px]"
+        >
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14 2v6h6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="text-[10px] font-semibold uppercase tracking-wider">
+            PDF
+          </span>
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        {titleNode}
+        {meta ? <p className="mt-1 text-sm text-ink-muted">{meta}</p> : null}
+        {item.subtitle ? (
+          <p className="mt-1 text-sm text-ink-muted">{item.subtitle}</p>
+        ) : null}
+        {item.notes ? (
+          <p className="mt-3 text-sm leading-relaxed text-ink">{item.notes}</p>
+        ) : null}
+
+        {href ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+            >
+              Download PDF <span aria-hidden>↗</span>
+            </a>
+          </div>
+        ) : null}
+      </div>
     </article>
   );
 }
