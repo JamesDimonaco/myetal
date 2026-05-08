@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +25,7 @@ import type {
   BrowseShareResult,
   ShareSearchResult,
   ShareType,
+  UserPublicOut,
 } from '@/types/share';
 
 const TYPE_FILTERS: { label: string; value: ShareType }[] = [
@@ -67,6 +69,11 @@ export default function SearchScreen() {
       ? data.results.filter((r) => activeTypes.has(r.type))
       : data?.results ?? [];
 
+  const userResults = data?.users ?? [];
+  const hasShares = filteredResults.length > 0;
+  const hasUsers = userResults.length > 0;
+  const hasResults = hasShares || hasUsers;
+
   const toggleType = useCallback((type: ShareType) => {
     setActiveTypes((prev) => {
       const next = new Set(prev);
@@ -80,6 +87,10 @@ export default function SearchScreen() {
     setInputValue('');
     setDebouncedQuery('');
     inputRef.current?.focus();
+  }, []);
+
+  const browseAll = useCallback(() => {
+    router.replace('/(authed)/discover');
   }, []);
 
   const renderItem = useCallback(
@@ -123,7 +134,7 @@ export default function SearchScreen() {
               ref={inputRef}
               value={inputValue}
               onChangeText={setInputValue}
-              placeholder="Search by title, author, or topic..."
+              placeholder="Search collections or people..."
               placeholderTextColor={c.textSubtle}
               style={[styles.input, { color: c.text }]}
               autoFocus
@@ -131,7 +142,7 @@ export default function SearchScreen() {
               autoCorrect={false}
               returnKeyType="search"
               accessibilityRole="search"
-              accessibilityLabel="Search published collections"
+              accessibilityLabel="Search published collections or people"
             />
             {inputValue.length > 0 && (
               <Pressable
@@ -147,8 +158,8 @@ export default function SearchScreen() {
           </View>
         </View>
 
-        {/* Type filter pills — shown when there are results */}
-        {hasQuery && data?.results && data.results.length > 0 && (
+        {/* Type filter pills — shown when there are share results */}
+        {hasQuery && filteredResults.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -188,9 +199,31 @@ export default function SearchScreen() {
 
         {/* Content area */}
         {!hasQuery ? (
-          /* Browse sections — before the user types */
+          /* E11 — search initial state. Render trending+recent with a quiet
+              "browse all" prompt above. */
           browseData ? (
-            <BrowseSections data={browseData} colors={c} />
+            <ScrollView
+              contentContainerStyle={styles.browseContent}
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.initialPromptRow}>
+                <Text style={[styles.initialPromptText, { color: c.textMuted }]}>
+                  Public collections — search above or
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Browse all collections"
+                  onPress={browseAll}
+                  hitSlop={6}
+                >
+                  <Text style={[styles.initialPromptLink, { color: c.accent }]}>
+                    browse all →
+                  </Text>
+                </Pressable>
+              </View>
+              <BrowseSections data={browseData} colors={c} />
+            </ScrollView>
           ) : (
             <Animated.View
               entering={FadeIn.duration(300)}
@@ -202,10 +235,17 @@ export default function SearchScreen() {
                 <Ionicons name="search" size={24} color={c.accent} />
               </View>
               <Text style={[styles.emptyTitle, { color: c.text }]}>
-                Discover collections
+                Search collections or people
               </Text>
               <Text style={[styles.emptyBody, { color: c.textMuted }]}>
-                Search for published collections by title, author, or topic.
+                Type to search, or{' '}
+                <Text
+                  onPress={browseAll}
+                  style={{ color: c.accent, fontWeight: '600' }}
+                  accessibilityRole="link"
+                >
+                  browse all →
+                </Text>
               </Text>
             </Animated.View>
           )
@@ -214,8 +254,8 @@ export default function SearchScreen() {
           <View style={styles.centered}>
             <ActivityIndicator color={c.accent} size="small" />
           </View>
-        ) : filteredResults.length === 0 ? (
-          /* No results */
+        ) : !hasResults ? (
+          /* E5 — combined empty state: nothing matched in either bucket. */
           <Animated.View
             entering={FadeIn.duration(300)}
             style={styles.emptyWrap}
@@ -226,15 +266,35 @@ export default function SearchScreen() {
               <Ionicons name="document-text-outline" size={24} color={c.accent} />
             </View>
             <Text style={[styles.emptyTitle, { color: c.text }]}>
-              No collections matched
+              No matches
             </Text>
             <Text style={[styles.emptyBody, { color: c.textMuted }]}>
-              Try different keywords, check for typos, or search for an author
-              name.
+              No collections or people matched &apos;{trimmed}&apos;.
             </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Browse all collections"
+              onPress={browseAll}
+              style={({ pressed }) => [
+                styles.browseAllBtn,
+                {
+                  borderColor: c.accent,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.browseAllBtnText, { color: c.accent }]}>
+                Browse all
+              </Text>
+            </Pressable>
           </Animated.View>
         ) : (
-          /* Results list */
+          /* Results — split per result type per E5 spec.
+             - shares=0 && users>0 → "No collections matched 'q'." line above
+               the People block.
+             - users=0 && shares>0 → "No people matched 'q'." line below the
+               shares list.
+             - both>0 → no empty messaging, just both blocks. */
           <FlatList
             data={filteredResults}
             renderItem={renderItem}
@@ -242,6 +302,33 @@ export default function SearchScreen() {
             contentContainerStyle={styles.listContent}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
+            ListHeaderComponent={
+              <>
+                {!hasShares && hasUsers ? (
+                  <Text
+                    style={[styles.inlineEmpty, { color: c.textMuted }]}
+                  >
+                    No collections matched &apos;{trimmed}&apos;.
+                  </Text>
+                ) : null}
+                {hasUsers ? (
+                  <PeopleBlock
+                    users={userResults}
+                    colors={c}
+                    showCollectionsHeader={hasShares}
+                  />
+                ) : null}
+              </>
+            }
+            ListFooterComponent={
+              hasShares && !hasUsers ? (
+                <Text
+                  style={[styles.inlineEmptyFooter, { color: c.textSubtle }]}
+                >
+                  No people matched &apos;{trimmed}&apos;.
+                </Text>
+              ) : null
+            }
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: c.border }]} />
             )}
@@ -249,6 +336,99 @@ export default function SearchScreen() {
         )}
       </View>
     </>
+  );
+}
+
+/* ──────────────────────── People block (M3) ──────────────────────── */
+
+function PeopleBlock({
+  users,
+  colors: c,
+  showCollectionsHeader,
+}: {
+  users: UserPublicOut[];
+  colors: typeof Colors.light;
+  /** When false, the trailing "Collections" header + separator are
+   *  suppressed (no shares matched, so no list follows). */
+  showCollectionsHeader: boolean;
+}) {
+  const visible = users.slice(0, 5);
+  return (
+    <View style={styles.peopleBlock}>
+      <Text style={[styles.peopleHeader, { color: c.textSubtle }]}>People</Text>
+      {visible.map((u, i) => (
+        <View key={u.id}>
+          {i > 0 ? (
+            <View style={[styles.separator, { backgroundColor: c.border }]} />
+          ) : null}
+          <PersonRow user={u} colors={c} />
+        </View>
+      ))}
+      {showCollectionsHeader ? (
+        <>
+          <View
+            style={[styles.peopleSeparator, { backgroundColor: c.border }]}
+            accessibilityElementsHidden
+          />
+          <Text style={[styles.peopleHeader, { color: c.textSubtle }]}>
+            Collections
+          </Text>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+function PersonRow({
+  user,
+  colors: c,
+}: {
+  user: UserPublicOut;
+  colors: typeof Colors.light;
+}) {
+  const name = user.name ?? 'Anonymous';
+  const handlePress = () => {
+    router.push({
+      pathname: '/(authed)/discover',
+      params: { owner_id: user.id },
+    });
+  };
+  return (
+    <Pressable
+      onPress={handlePress}
+      accessibilityRole="link"
+      accessibilityLabel={`View ${name}'s collections`}
+      style={({ pressed }) => [styles.personRow, { opacity: pressed ? 0.7 : 1 }]}
+    >
+      {user.avatar_url ? (
+        <Image
+          source={{ uri: user.avatar_url }}
+          style={styles.personAvatar}
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <View
+          style={[
+            styles.personAvatarFallback,
+            { backgroundColor: c.accentSoft },
+          ]}
+        >
+          <Text style={[styles.personInitials, { color: c.accent }]}>
+            {name.slice(0, 1).toUpperCase()}
+          </Text>
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.personName, { color: c.text }]} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={[styles.personMeta, { color: c.textSubtle }]}>
+          {user.share_count}{' '}
+          {user.share_count === 1 ? 'collection' : 'collections'}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={c.textSubtle} />
+    </Pressable>
   );
 }
 
@@ -284,55 +464,49 @@ function BrowseSections({
 
   return (
     <Animated.View entering={FadeIn.duration(300)}>
-      <ScrollView
-        contentContainerStyle={styles.browseContent}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-      >
-        {showTrending ? (
-          <>
-            <Text style={[styles.sectionHeader, { color: c.textSubtle }]}>
-              Trending this week
-            </Text>
-            {trending.map((item, i) => (
-              <View key={item.short_code}>
-                {i > 0 && (
-                  <View
-                    style={[styles.separator, { backgroundColor: c.border }]}
-                  />
-                )}
-                <BrowseCard item={item} colors={c} showViews />
-              </View>
-            ))}
-          </>
-        ) : null}
-
-        <Text
-          style={[
-            styles.sectionHeader,
-            { color: c.textSubtle },
-            showTrending ? { marginTop: Spacing.xl } : undefined,
-          ]}
-        >
-          Recently published
-        </Text>
-        {recent.map((item, i) => (
-          <View key={item.short_code}>
-            {i > 0 && (
-              <View
-                style={[styles.separator, { backgroundColor: c.border }]}
-              />
-            )}
-            <BrowseCard item={item} colors={c} />
-          </View>
-        ))}
-
-        {total_published >= 5 ? (
-          <Text style={[styles.browseTotal, { color: c.textSubtle }]}>
-            Browse {total_published} collections
+      {showTrending ? (
+        <>
+          <Text style={[styles.sectionHeader, { color: c.textSubtle }]}>
+            Trending this week
           </Text>
-        ) : null}
-      </ScrollView>
+          {trending.map((item, i) => (
+            <View key={item.short_code}>
+              {i > 0 && (
+                <View
+                  style={[styles.separator, { backgroundColor: c.border }]}
+                />
+              )}
+              <BrowseCard item={item} colors={c} showViews />
+            </View>
+          ))}
+        </>
+      ) : null}
+
+      <Text
+        style={[
+          styles.sectionHeader,
+          { color: c.textSubtle },
+          showTrending ? { marginTop: Spacing.xl } : undefined,
+        ]}
+      >
+        Recently published
+      </Text>
+      {recent.map((item, i) => (
+        <View key={item.short_code}>
+          {i > 0 && (
+            <View
+              style={[styles.separator, { backgroundColor: c.border }]}
+            />
+          )}
+          <BrowseCard item={item} colors={c} />
+        </View>
+      ))}
+
+      {total_published >= 5 ? (
+        <Text style={[styles.browseTotal, { color: c.textSubtle }]}>
+          Browse {total_published} collections
+        </Text>
+      ) : null}
     </Animated.View>
   );
 }
@@ -379,7 +553,7 @@ function BrowseCard({
               {item.owner_name}
             </Text>
             <Text style={[styles.metaDot, { color: c.textSubtle }]}>
-              {'\u00B7'}
+              {'·'}
             </Text>
           </>
         ) : null}
@@ -389,13 +563,13 @@ function BrowseCard({
           </Text>
         </View>
         <Text style={[styles.metaDot, { color: c.textSubtle }]}>
-          {'\u00B7'}
+          {'·'}
         </Text>
         <Text style={[styles.metaText, { color: c.textSubtle }]}>
           {item.item_count} {item.item_count === 1 ? 'item' : 'items'}
         </Text>
         <Text style={[styles.metaDot, { color: c.textSubtle }]}>
-          {'\u00B7'}
+          {'·'}
         </Text>
         <Text style={[styles.metaText, { color: c.textSubtle }]}>
           {showViews && item.view_count != null
@@ -412,7 +586,7 @@ function BrowseCard({
           Contains: {item.preview_items.join(', ')}
         </Text>
       )}
-      <TagChips tags={item.tags} max={2} />
+      <TagChips tags={item.tags} max={2} linkPattern="browse" />
     </Pressable>
   );
 }
@@ -464,7 +638,7 @@ function ResultCard({
             <Text style={[styles.metaText, { color: c.textSubtle }]}>
               {item.owner_name}
             </Text>
-            <Text style={[styles.metaDot, { color: c.textSubtle }]}>{'\u00B7'}</Text>
+            <Text style={[styles.metaDot, { color: c.textSubtle }]}>{'·'}</Text>
           </>
         ) : null}
         <View style={[styles.typePill, { backgroundColor: c.accentSoft }]}>
@@ -472,11 +646,11 @@ function ResultCard({
             {typeLabel}
           </Text>
         </View>
-        <Text style={[styles.metaDot, { color: c.textSubtle }]}>{'\u00B7'}</Text>
+        <Text style={[styles.metaDot, { color: c.textSubtle }]}>{'·'}</Text>
         <Text style={[styles.metaText, { color: c.textSubtle }]}>
           {item.item_count} {item.item_count === 1 ? 'item' : 'items'}
         </Text>
-        <Text style={[styles.metaDot, { color: c.textSubtle }]}>{'\u00B7'}</Text>
+        <Text style={[styles.metaDot, { color: c.textSubtle }]}>{'·'}</Text>
         <Text style={[styles.metaText, { color: c.textSubtle }]}>
           {formatRelativeTime(item.published_at)}
         </Text>
@@ -491,7 +665,7 @@ function ResultCard({
           Contains: {item.preview_items.join(', ')}
         </Text>
       )}
-      <TagChips tags={item.tags} max={2} />
+      <TagChips tags={item.tags} max={2} linkPattern="browse" />
     </Pressable>
   );
 }
@@ -564,6 +738,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xxl,
+    gap: Spacing.md,
   },
   emptyIconWrap: {
     width: 56,
@@ -584,12 +759,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlign: 'center',
-    maxWidth: 300,
+    maxWidth: 320,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  browseAllBtn: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    marginTop: Spacing.sm,
+  },
+  browseAllBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  /* Initial-state prompt */
+  initialPromptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  initialPromptText: {
+    fontSize: 13,
+  },
+  initialPromptLink: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   /* Browse sections */
@@ -611,10 +814,68 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xl,
   },
 
+  /* People block */
+  peopleBlock: {
+    marginBottom: Spacing.md,
+  },
+  peopleHeader: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  peopleSeparator: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  personRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  personAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  personAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personInitials: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  personName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  personMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
   /* Results list */
   listContent: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xxl,
+  },
+  inlineEmpty: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  inlineEmptyFooter: {
+    fontSize: 12,
+    marginTop: Spacing.lg,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

@@ -233,7 +233,7 @@ export default function DashboardScreen() {
                 {' · '}
                 <Text style={styles.typeTag}>{item.type}</Text>
               </Text>
-              <TagChips tags={item.tags} max={2} />
+              <TagChips tags={item.tags} max={2} linkPattern="browse" />
             </View>
             <View style={styles.actionsRow}>
               <Pressable
