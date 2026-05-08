@@ -386,6 +386,107 @@ docker exec -i myetal-db-1 pg_restore --clean --if-exists -U myetal -d myetal < 
 
 ---
 
+## 9a. Better Auth migration cutover
+
+The Phase 1 Alembic migration (`0016_better_auth_cutover.py`) is
+**destructive** — it truncates `users` and every table that FKs to it,
+drops `auth_identities` + `refresh_tokens`, and creates Better Auth's
+core tables. Plan accordingly.
+
+### Pre-cutover checklist
+
+- [ ] Comms email sent **7 days** before merge — every test address
+  (the small set in `auth_identities WHERE provider='password'` plus
+  ORCID-only sign-ins). Include the cutover date and the link to
+  `myetal.app/sign-up` for re-registration.
+- [ ] Reminder comms **24h** before. Same list.
+- [ ] Admin allowlist documented for re-grant. After cutover
+  `users.is_admin` is `false` for everyone — set the desired admins
+  by hand once they've re-signed-up. (Owner usually = James + ops.)
+- [ ] Resend account live and DNS DKIM/SPF records published on
+  `myetal.app`. Without this `RESEND_API_KEY` is set but no mail
+  delivers.
+- [ ] Vercel project (web) has `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
+  `RESEND_API_KEY`, `EMAIL_FROM`, `DATABASE_URL` pointing at the same
+  Pi Postgres.
+
+### New env vars on the Pi
+
+Append to `/home/pi/myetal/.env`:
+
+```env
+# Better Auth — must match the value set on Vercel for the web app
+BETTER_AUTH_SECRET=<openssl rand -base64 32>
+BETTER_AUTH_URL=https://myetal.app
+# BETTER_AUTH_JWKS_URL / BETTER_AUTH_ISSUER auto-derive from BETTER_AUTH_URL.
+# Override only if running BA behind a path-rewriting proxy.
+
+# Resend — https://resend.com → API Keys
+RESEND_API_KEY=re_...
+EMAIL_FROM="MyEtAl <noreply@myetal.app>"
+
+# Already present, double-check:
+ORCID_USE_SANDBOX=false
+```
+
+### Deploy command sequence
+
+```bash
+ssh pi
+cd /home/pi/myetal
+
+# Fresh DB dump first — destructive migration ahead.
+sudo /usr/local/bin/myetal-backup.sh
+
+docker compose pull
+docker compose down
+# `up -d` runs `alembic upgrade head` as part of the API container's
+# startup command. Watch the logs to confirm 0016 applied:
+docker compose up -d
+docker compose logs -f api
+```
+
+You should see `INFO  [alembic.runtime.migration] Running upgrade
+0015 -> 0016, better auth cutover — fresh-start, single revision`
+followed by the uvicorn boot.
+
+### Verification
+
+```bash
+# JWKS doc serves (signed-key set Better Auth manages):
+curl -s https://myetal.app/api/ba-auth/jwks | jq '.keys | length'
+# expect: 1 (or more after rotations)
+
+# Fetch a JWT for an authenticated session, then verify cross-stack:
+JWT="<paste the token from the cookie / token endpoint>"
+curl -s https://api.myetal.app/healthz/ba-auth \
+  -H "Authorization: Bearer $JWT" | jq .
+# expect: { ok: true, claims: { sub, email, is_admin: false, ... } }
+```
+
+### Rollback
+
+If the deploy fails or sign-up is broken in ways we can't hot-fix:
+
+```bash
+# Web side — revert the cutover commit on main and let Vercel redeploy.
+git revert <cutover commit SHA>
+git push
+
+# API side — pin to the previous SHA, pull, restart, downgrade.
+sed -i 's/^API_TAG=.*/API_TAG=<previous SHA>/' /home/pi/myetal/.env
+docker compose pull
+docker compose down
+docker compose run --rm api uv run alembic downgrade -1
+docker compose up -d
+```
+
+The downgrade recreates `auth_identities` and `refresh_tokens` empty.
+Test users will need to sign up a third time once we redeploy forward
+— accept this; rolling back data is out of scope.
+
+---
+
 ## 10. Things still to wire up
 
 - **Auto-deploy** — Watchtower (§5) is the simplest answer. Adopt when you
