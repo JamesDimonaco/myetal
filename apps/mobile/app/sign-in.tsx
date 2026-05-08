@@ -22,6 +22,55 @@ import { ApiError } from '@/lib/api';
 
 type Mode = 'signin' | 'signup';
 
+/**
+ * Map raw error codes / messages to a friendly sentence — mirrors
+ * ``apps/web/src/app/sign-in/page.tsx::describeError`` so the sign-in
+ * UX is consistent across web and mobile. Unknown codes fall through
+ * to the raw message (better than silent).
+ *
+ * Sources of error strings we encounter:
+ * * ``ApiError.detail`` from ``readBetterAuthError`` (BA REST body
+ *   ``message``/``code``) — see ``hooks/useAuth.ts``.
+ * * ``Error.message`` thrown from ``runOAuthFlow`` for OAuth flows;
+ *   the bounce page passes ``?error=<code>`` through which becomes
+ *   the message.
+ */
+const ORCID_HIJACK_ERROR_CODES = new Set([
+  'orcid_already_linked',
+  'OrcidIdAlreadyLinkedError',
+]);
+
+function describeAuthError(raw: string): string {
+  const code = raw.trim();
+  if (!code) return 'Something went wrong — try again.';
+  if (ORCID_HIJACK_ERROR_CODES.has(code)) {
+    return 'This ORCID iD is already linked to another account. Sign in with that account instead.';
+  }
+  switch (code) {
+    case 'invalid_credentials':
+    case 'INVALID_EMAIL_OR_PASSWORD':
+      return 'Email or password is incorrect.';
+    case 'user_already_exists':
+    case 'USER_ALREADY_EXISTS':
+    case 'email_already_exists':
+      return 'An account with that email already exists.';
+    case 'account_not_linked':
+    case 'ACCOUNT_NOT_LINKED':
+      return 'That email is already in use under a different sign-in method.';
+    case 'no_session':
+      return "We couldn't complete sign-in — please try again.";
+    case 'jwt_unavailable':
+      return 'Sign-in succeeded but the session token was unavailable. Try again.';
+    case 'unknown_error':
+      return 'Something went wrong — try again.';
+    default:
+      // BA's snake_case codes read poorly raw; humanise lightly.
+      // Anything that already looks like a sentence (has a space)
+      // passes through untouched.
+      return code.includes(' ') ? code : code.replace(/_/g, ' ');
+  }
+}
+
 const signInSchema = z.object({
   email: z.string().trim().email('Enter a valid email'),
   password: z.string().min(1, 'Password required'),
@@ -88,7 +137,7 @@ export default function SignInScreen() {
       goToDashboard();
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.detail);
+        setError(describeAuthError(err.detail));
       } else {
         setError('Network error — try again');
       }
@@ -109,7 +158,7 @@ export default function SignInScreen() {
       const msg = err instanceof Error ? err.message : `${providerLabel} sign-in failed`;
       // Cancel/dismiss is intentional user action — stay quiet.
       if (msg.endsWith('_oauth_cancel') || msg.endsWith('_oauth_dismiss')) return;
-      setError(msg);
+      setError(describeAuthError(msg));
     }
   };
 
