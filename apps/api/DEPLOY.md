@@ -255,9 +255,17 @@ which already replaces containers when the image changes.)
 ```bash
 curl -fsS https://api.myetal.app/healthz                          # liveness
 curl -fsS https://api.myetal.app/readyz                           # DB reachable
-curl -fsS -o /dev/null -w '%{http_code}\n' \
-  'https://api.myetal.app/auth/orcid/start?platform=web&return_to=/'   # → 302
+
+# Better Auth JWKS reachable from FastAPI's vantage point — every
+# authenticated request goes through this. ``keys`` should be a
+# non-empty array.
+curl -fsS https://myetal.app/api/auth/jwks | jq '.keys | length'  # → 1+
 ```
+
+(The legacy ORCID smoke against ``/auth/orcid/start`` was deleted in
+Phase 2 — that route lives on the Next.js side now via Better Auth's
+genericOAuth plugin. The post-cutover smoke matrix for the OAuth flows
+themselves lives in §9a "Post-cutover ORCID smoke (deploy gate)".)
 
 ---
 
@@ -299,20 +307,17 @@ slowapi backend, not more workers.
 
 ---
 
-## 7. Refresh-token cleanup (cron)
+## 7. Session cleanup
 
-The `refresh_tokens` table grows monotonically. Run the cleanup script
-nightly via cron on the Pi:
+Better Auth owns the ``session`` table (replaces the legacy
+``refresh_tokens``). It expires sessions automatically based on the
+``expiresIn`` config in ``apps/web/src/lib/auth.ts``; no nightly cron
+job is required on the API side.
 
-```cron
-@daily root docker exec myetal-api-1 python -m scripts.cleanup_refresh_tokens >> /var/log/myetal-cleanup.log 2>&1
-```
-
-(The container name is `myetal-api-1` under compose's default naming. Adjust
-if you rename the project with `COMPOSE_PROJECT_NAME` or a `name:` directive.)
-
-The script deletes rows where `revoked=True` OR `expires_at < now()` and
-prints the row count to stdout.
+The Phase 2 cutover dropped both ``refresh_tokens`` and the
+``scripts/cleanup_refresh_tokens.py`` helper that paired with it. Any
+crontab entry referencing that script should be removed when this
+deploys — see Alembic 0016 for the table drop.
 
 ---
 
