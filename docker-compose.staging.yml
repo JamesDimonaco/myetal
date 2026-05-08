@@ -1,0 +1,70 @@
+# ============================================================
+# docker-compose.staging.yml — Pi-hosted staging stack
+# ============================================================
+# Separate from docker-compose.yml so staging can run alongside dev/prod
+# on the same Pi without colliding. Use a distinct project name when
+# bringing it up:
+#
+#   docker compose -p myetal-staging -f docker-compose.staging.yml --env-file .env.staging up -d
+#
+# Reverse-proxy on the Pi (Caddy / Nginx) routes:
+#   staging-api.myetal.app → 127.0.0.1:8001  (this stack)
+#   api.myetal.app         → 127.0.0.1:8000  (the existing prod stack)
+#
+# DB is co-resident on the same Pi but a SEPARATE Postgres container so
+# staging migrations / truncates can never touch prod data.
+
+# Pinned project name — even without `-p`, this stack can't collide with
+# the prod compose project (which defaults to `myetal`).
+name: myetal-staging
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Bind to 127.0.0.1 only — staging Postgres should not be reachable
+    # from anywhere except the Pi itself + the API container in this stack.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - myetal_staging_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    image: jamesdimonaco/myetal-api:staging
+    pull_policy: always   # `docker compose pull` always grabs the latest :staging tag
+    ports:
+      - "127.0.0.1:8001:8000"
+    env_file:
+      - .env.staging
+    environment:
+      ENV: staging
+      # Override the env-file's host-targeted DB URL — inside the compose
+      # network, the API talks to the `db` service by service name.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Apply pending migrations, then start uvicorn (no --reload — this is
+    # a real deploy, not dev mode).
+    command: >
+      sh -c "alembic upgrade head && uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --log-level info"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  myetal_staging_pgdata:
