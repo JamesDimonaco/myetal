@@ -473,11 +473,15 @@ If the deploy fails or sign-up is broken in ways we can't hot-fix:
 git revert <cutover commit SHA>
 git push
 
-# API side — pin to the previous SHA, pull, restart, downgrade.
+# API side — IMPORTANT: run `alembic downgrade -1` while still on the
+# NEW image (the one that contains revision 0016 in its alembic chain).
+# Running downgrade against the old image walks 0015→0014 because 0016
+# isn't known there.
+docker compose run --rm api uv run alembic downgrade -1
+
+# Now re-pin to the previous SHA and bring the old image up.
 sed -i 's/^API_TAG=.*/API_TAG=<previous SHA>/' /home/pi/myetal/.env
 docker compose pull
-docker compose down
-docker compose run --rm api uv run alembic downgrade -1
 docker compose up -d
 ```
 

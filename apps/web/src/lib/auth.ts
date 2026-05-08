@@ -28,7 +28,11 @@ const argon2: typeof import('argon2') = require('argon2');
 
 const ARGON2_PARAMS = {
   type: argon2.argon2id,
-  memoryCost: 19_456, // 19 MiB — matches passlib's default and our API-side argon2-cffi config
+  // OWASP-recommended argon2id params; only the web side hashes post-cutover.
+  // (Phase 2 deletes the API-side passlib/argon2-cffi hasher entirely, so the
+  // values no longer need to match anything on the API side — they only need
+  // to satisfy current OWASP guidance and Vercel cold-start budget.)
+  memoryCost: 19_456, // 19 MiB
   timeCost: 2,
   parallelism: 1,
 } as const;

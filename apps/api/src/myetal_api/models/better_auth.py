@@ -64,7 +64,12 @@ class User(Base):
     # Better Auth core columns ------------------------------------------------
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    email: Mapped[str | None] = mapped_column(String(320), nullable=True, unique=True)
+    # NOTE: column-level ``unique=True`` is deliberately NOT set here —
+    # the named unique constraint lives in the Alembic 0016 migration
+    # (``uq_users_email``). Keeping it only there is the source of truth
+    # and avoids an ad-hoc SQLAlchemy-emitted unique that drifts from
+    # the migration-managed constraint name.
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     # New since cutover: BA tracks email-verification state.
     email_verified: Mapped[bool] = mapped_column(
         Boolean, server_default="false", default=False, nullable=False
