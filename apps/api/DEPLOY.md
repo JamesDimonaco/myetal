@@ -471,9 +471,11 @@ curl -s https://myetal.app/api/auth/jwks | jq '.keys | length'
 
 # Fetch a JWT for an authenticated session, then verify cross-stack:
 JWT="<paste the token from the cookie / token endpoint>"
-curl -s https://api.myetal.app/healthz/ba-auth \
+curl -s https://api.myetal.app/me \
   -H "Authorization: Bearer $JWT" | jq .
-# expect: { ok: true, claims: { sub, email, is_admin: false, ... } }
+# expect: { id: "...", email: "...", name: "...", ... } — the calling user.
+# 401 = JWT didn't verify (issuer mismatch, wrong key, expired). Check the
+# API logs for the specific reason; the wire response is intentionally generic.
 ```
 
 ### OAuth provider allow-lists for mobile (Phase 4)

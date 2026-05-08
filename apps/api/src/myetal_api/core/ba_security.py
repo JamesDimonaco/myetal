@@ -2,9 +2,9 @@
 
 Verifies an Ed25519-signed JWT minted by Better Auth's JWT plugin
 against the JWKS document at ``settings.better_auth_jwks_url``. The
-single consumer right now is the ``/healthz/ba-auth`` smoke route;
-Phase 2 wires this into ``api/deps.py::get_current_user`` and the spike
-route is deleted.
+canonical consumer is ``api/deps.py::get_current_user`` (Phase 2); the
+Phase 0 ``/healthz/ba-auth`` smoke route was deleted in Phase 2 once
+``/me`` covered the cross-stack identity check.
 
 Security posture (Phase 1 hardening — see ticket):
 

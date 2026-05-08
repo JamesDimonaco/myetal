@@ -16,9 +16,10 @@ The token is read from EITHER:
 Both paths are accepted; the Bearer header wins on tie. This mirrors
 the legacy dual-source behaviour minus the bespoke HS256 decode.
 
-Authorization (admin gating) re-reads ``User.is_admin`` from the DB
-row, never the JWT claim. The JWT carries ``is_admin`` as
-informational only — see ``require_admin`` below.
+Authorization (admin gating) checks ``user.email`` against
+``settings.admin_emails`` (env-var allowlist), never the JWT claim. The
+JWT carries ``is_admin`` as informational only — see ``require_admin``
+below.
 
 Generic 401 message: ``"Invalid or expired session"`` regardless of
 which JWT-verification check fired. The verifier already records the
@@ -151,17 +152,26 @@ async def require_admin(
 ) -> User:
     """Gate the /admin/* endpoints behind an email allowlist.
 
-    ``settings.admin_emails`` is a comma-separated env var. Match is
-    case-insensitive on email, so ``James@Example.com`` granted via env
-    matches ``james@example.com`` on the user row. Returns 403 (not 401)
-    when authenticated but not on the list — auth is fine, authz isn't.
+    ``settings.admin_emails`` is a comma-separated env var of allowlisted
+    emails. Match is case-insensitive on the user's row email, so
+    ``James@Example.com`` granted via env matches ``james@example.com`` on
+    the row. Returns 403 (not 401) when authenticated but not on the list
+    — auth is fine, authz isn't.
 
-    SECURITY: this dep deliberately re-reads ``user.is_admin`` and the
-    email allowlist from the DB row, NEVER the JWT ``is_admin`` claim.
-    The JWT carries ``is_admin`` for the web app's UI hints only; trusting
-    it for authorization would let a stale JWT (admin downgraded
-    server-side, JWT still in client storage) keep elevated rights for
-    up to the JWT TTL. Always read authorization from the source of truth.
+    SECURITY: this dep checks ``user.email`` against ``settings.admin_emails``,
+    NEVER the JWT ``is_admin`` claim. The JWT carries ``is_admin`` for the
+    web app's UI hints only; trusting it for authorization would let a
+    stale JWT (admin downgraded server-side, JWT still in client storage)
+    keep elevated rights for up to the JWT TTL. Always read authorization
+    from the source of truth.
+
+    NOTE: the ``User.is_admin`` DB column exists (Better Auth additionalField)
+    but is NOT consulted here yet — the env-var allowlist is the v1 contract
+    because it's set per-deploy and changes require a redeploy, which is the
+    same change-control envelope as toggling who's allowed in. If we ever
+    want admin to be a runtime-grantable property (e.g. promote a user via
+    SQL without a deploy), switch this dep to ``return user if user.is_admin
+    else raise HTTPException(...)`` and stop reading ``settings.admin_emails``.
     """
     from myetal_api.core.config import settings
 

@@ -111,7 +111,7 @@ def _patch_jwks(monkeypatch: pytest.MonkeyPatch, jwks_doc: dict[str, Any]) -> Ma
 def _isolate_settings_and_caches(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set deterministic JWKS URL / issuer and reset caches between tests."""
     monkeypatch.setattr(
-        settings, "better_auth_jwks_url", "http://localhost:3000/api/ba-auth/jwks"
+        settings, "better_auth_jwks_url", "http://localhost:3000/api/auth/jwks"
     )
     monkeypatch.setattr(settings, "better_auth_url", "http://localhost:3000")
     monkeypatch.setattr(settings, "better_auth_issuer", "http://localhost:3000")
@@ -187,8 +187,11 @@ def test_alg_none_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_alg_hs256_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     # PyJWT will happily encode HS256 if we hand it a string secret. The
-    # verifier must refuse before even trying to verify.
-    token = jwt.encode(_claims(), "shared-secret", algorithm="HS256",
+    # verifier must refuse before even trying to verify. Use a 32-byte
+    # secret so PyJWT does not emit InsecureKeyLengthWarning at encode time
+    # (the bytes are irrelevant — the verifier rejects on alg, never reaches
+    # the signature check).
+    token = jwt.encode(_claims(), "x" * 32, algorithm="HS256",
                        headers={"kid": "anything"})
     _patch_jwks(monkeypatch, {"keys": []})
 
@@ -329,7 +332,7 @@ def test_jwks_fails_after_stale_grace(
     verify_better_auth_jwt(token)  # warm cache
 
     # Backdate the last-known-good fetch to before the grace window.
-    url = "http://localhost:3000/api/ba-auth/jwks"
+    url = "http://localhost:3000/api/auth/jwks"
     ba_security._jwks_fresh.clear()
     ba_security._jwks_last_fetched_at[url] = (
         time.monotonic() - (ba_security._JWKS_STALE_GRACE_SECONDS + 60)

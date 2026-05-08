@@ -34,7 +34,7 @@ import uuid
 os.environ.setdefault("BETTER_AUTH_URL", "http://test")
 os.environ.setdefault("BETTER_AUTH_ISSUER", "http://test")
 os.environ.setdefault(
-    "BETTER_AUTH_JWKS_URL", "http://test/api/ba-auth/jwks"
+    "BETTER_AUTH_JWKS_URL", "http://test/api/auth/jwks"
 )
 # ORCID public-API credentials — services/orcid_client.py reads these.
 # Only ORCID matters post-cutover (Google/GitHub OAuth move to BA on
@@ -211,7 +211,7 @@ def _patch_jwks_globally(monkeypatch: pytest.MonkeyPatch) -> None:
     # regardless of ``.env`` overrides on a developer's machine.
     from myetal_api.core.config import settings
 
-    monkeypatch.setattr(settings, "better_auth_jwks_url", "http://test/api/ba-auth/jwks")
+    monkeypatch.setattr(settings, "better_auth_jwks_url", "http://test/api/auth/jwks")
     monkeypatch.setattr(settings, "better_auth_url", _TEST_ISSUER)
     monkeypatch.setattr(settings, "better_auth_issuer", _TEST_ISSUER)
     ba_security._reset_jwks_caches_for_tests()
