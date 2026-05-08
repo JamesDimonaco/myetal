@@ -4,9 +4,9 @@
  * Mirrors the shape of apps/mobile/lib/api.ts so the patterns line up. Two
  * extra things vs. mobile:
  *
- *  1. Server components (RSC) never have access to localStorage; they pull the
- *     bearer token out of the httpOnly `myetal_access` cookie via Next's
- *     `cookies()` helper. See `serverFetch` below.
+ *  1. Server components (RSC) never have access to localStorage; they read the
+ *     httpOnly `myetal_session` cookie via Next's `cookies()` helper and
+ *     forward it as a Cookie header. See `serverFetch` below.
  *  2. Public endpoints (the `/c/{code}` viewer) call `api()` directly without
  *     an `auth` token — the wrapper just hits the backend with no Authorization
  *     header. We pass `next: { revalidate: 300 }` from the call site to opt

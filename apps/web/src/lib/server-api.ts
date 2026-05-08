@@ -1,45 +1,50 @@
 /**
- * Server-side wrapper around `api()` that pulls the bearer token from the
- * httpOnly `myetal_access` cookie set by /api/auth/login (or the OAuth finish
- * route). Use this from server components, server actions, and route handlers
- * — never from client components (cookies() is a server-only API).
+ * Server-side wrapper around `api()` that forwards the Better Auth
+ * session cookie (``myetal_session``) to FastAPI. Use from server
+ * components, server actions, and route handlers — never from client
+ * components (cookies() is a server-only API).
  *
- * Token refresh is handled by the middleware (for page navigations) and the
- * proxy route handler (for client-side fetches). We do NOT attempt to refresh
- * here because `cookies().set()` is silently ignored during Server Component
- * rendering — the new tokens would never reach the browser, and the consumed
- * refresh token would lock the user out.
+ * Phase 3 rewrite: BA's cookie carries identity end-to-end. The API's
+ * ``get_current_user`` accepts EITHER ``Authorization: Bearer <jwt>``
+ * OR the ``myetal_session`` cookie (see Phase 2 schema). We forward
+ * the cookie directly — no extraction, no refresh dance.
  *
- * TODO Phase 3: cookie name moves to `myetal_session` (BA's JWT plugin), the
- * refresh dance goes away (BA owns it), and all `/auth/me*` URLs in callers
- * repoint to `/me` / `/me/orcid` (FastAPI side, see apps/api routes/me.py).
+ * Refresh: BA's session row owns refresh; the middleware checks
+ * ``auth.api.getSession()`` per request and lets BA mint a fresh
+ * cookie. Server-fetch never refreshes — if the cookie is invalid the
+ * 401 propagates and the layout redirects to /sign-in.
  */
 
 import { cookies } from 'next/headers';
 import { api, type RequestOptions } from './api';
-import {
-  ACCESS_COOKIE,
-  REFRESH_COOKIE,
-} from './auth-cookies';
 
-export async function getAccessToken(): Promise<string | undefined> {
+export const SESSION_COOKIE = 'myetal_session';
+
+export async function getSessionCookie(): Promise<string | undefined> {
   const store = await cookies();
-  return store.get(ACCESS_COOKIE)?.value;
+  return store.get(SESSION_COOKIE)?.value;
 }
 
-export async function getRefreshToken(): Promise<string | undefined> {
-  const store = await cookies();
-  return store.get(REFRESH_COOKIE)?.value;
-}
-
-/** Fetch as the currently signed-in user.
+/** Fetch as the currently signed-in user via the BA session cookie.
  *
- *  The middleware ensures a fresh access token for page requests, so 401s
- *  here indicate a genuinely revoked session — we let them propagate.  */
+ *  401s here indicate a genuinely revoked / expired session — let them
+ *  propagate so the calling page can redirect to /sign-in.
+ */
 export async function serverFetch<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const auth = await getAccessToken();
-  return api<T>(path, { ...options, auth: auth ?? options.auth });
+  const sessionValue = await getSessionCookie();
+  const cookieHeader = sessionValue
+    ? `${SESSION_COOKIE}=${sessionValue}`
+    : undefined;
+
+  const headers: Record<string, string> = {
+    ...(options.headers ?? {}),
+  };
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader;
+  }
+
+  return api<T>(path, { ...options, headers });
 }
