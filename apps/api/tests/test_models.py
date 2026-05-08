@@ -27,6 +27,11 @@ from myetal_api.models import (
 
 
 def test_all_tables_registered_on_metadata() -> None:
+    # Phase 1 of the Better Auth migration adds ``session``, ``account``,
+    # ``verification`` and ``jwks``. ``auth_identities`` and
+    # ``refresh_tokens`` still appear in metadata at this phase because
+    # the legacy SQLAlchemy models stay (Phase 2 deletes them); the
+    # Alembic 0016 migration drops the underlying tables in Postgres.
     assert set(Base.metadata.tables.keys()) == {
         "users",
         "auth_identities",
@@ -44,6 +49,10 @@ def test_all_tables_registered_on_metadata() -> None:
         "feedback",
         "tags",
         "share_tags",
+        "session",
+        "account",
+        "verification",
+        "jwks",
     }
 
 
