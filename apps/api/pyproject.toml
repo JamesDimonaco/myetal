@@ -19,6 +19,12 @@ dependencies = [
     "structlog>=24.4.0",
     "slowapi>=0.1.9",
     "cachetools>=5.5.0",
+    # Compatible-release (~=) so `uv sync` between deploys pulls patch /
+    # minor updates within the floor's compat range without yanking in a
+    # breaking major. Pillow especially — has had RCEs in past releases.
+    "boto3~=1.35",
+    "pdf2image~=1.17",
+    "Pillow~=11.0",
 ]
 
 [dependency-groups]

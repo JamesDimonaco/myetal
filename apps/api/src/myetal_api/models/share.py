@@ -26,6 +26,10 @@ class ItemKind(enum.StrEnum):
     PAPER = "paper"
     REPO = "repo"
     LINK = "link"
+    # User-uploaded PDF stored on Cloudflare R2 (feedback-round-2 §1, PR-C).
+    # The `file_*` and `thumbnail_url` columns on `ShareItem` are populated
+    # only for this kind; everything else stays null for backwards compat.
+    PDF = "pdf"
 
 
 class Share(Base, TimestampMixin):
@@ -110,5 +114,22 @@ class ShareItem(Base, TimestampMixin):
     authors: Mapped[str | None] = mapped_column(Text, nullable=True)
     year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # PDF-upload columns (feedback-round-2 §1, PR-C). All nullable so
+    # paper / repo / link items keep working unchanged. Populated only
+    # when ``kind == ItemKind.PDF``.
+    file_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    # Audit column (PR-C fix-up): timestamp at which the uploader
+    # acknowledged the copyright disclaimer (Q6 — "I have the right to
+    # make this file public."). Populated server-side by
+    # ``record_pdf_upload`` for every PDF row; NULL for paper / repo /
+    # link kinds. Required for takedown defensibility.
+    copyright_ack_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     share: Mapped["Share"] = relationship(back_populates="items")

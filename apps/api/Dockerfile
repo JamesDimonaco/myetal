@@ -21,6 +21,15 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# poppler-utils provides `pdftoppm`, the binary `pdf2image` shells out to
+# when rasterising the first page of an uploaded PDF for the share-item
+# thumbnail (feedback-round-2 §1, PR-C). Required at runtime; the Python
+# `pdf2image` package is just a wrapper. `--no-install-recommends` keeps
+# the image slim (~10 MB delta).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 # Non-root runtime user. Renamed from quire -> myetal to match the project rename.
 RUN groupadd -r myetal && useradd -r -g myetal myetal
 

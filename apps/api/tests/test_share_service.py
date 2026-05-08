@@ -75,6 +75,8 @@ async def test_public_share_resolution(db_session: AsyncSession) -> None:
     private = await share_service.create_share(
         db_session, user.id, ShareCreate(name="private", is_public=False)
     )
+    # K3 fix-up: public viewer requires published_at IS NOT NULL.
+    await share_service.publish_share(db_session, public)
 
     assert (await share_service.get_public_share(db_session, public.short_code)) is not None
     assert (await share_service.get_public_share(db_session, private.short_code)) is None
@@ -198,6 +200,9 @@ async def test_public_share_response_includes_new_fields(
         ),
     )
 
+    # K3 fix-up: public viewer requires published_at IS NOT NULL.
+    await share_service.publish_share(db_session, share)
+
     r = api_client.get(f"/public/c/{share.short_code}")
     assert r.status_code == 200
     body = r.json()
@@ -247,6 +252,8 @@ async def test_get_public_share_excludes_tombstoned(db_session: AsyncSession) ->
         user.id,
         ShareCreate(name="x", items=[ShareItemCreate(title="a")]),
     )
+    # K3 fix-up: public viewer requires published_at IS NOT NULL.
+    await share_service.publish_share(db_session, share)
     short_code = share.short_code
 
     # Live share resolves.
@@ -437,3 +444,170 @@ async def test_list_user_shares_excludes_tombstoned_by_default(
 
     all_including = await share_service.list_user_shares(db_session, user.id, include_deleted=True)
     assert {s.name for s in all_including} == {"a", "b"}
+
+
+# ---------- PR-C fix-up tests ----------
+
+
+async def test_share_item_create_rejects_pdf_kind() -> None:
+    """K1 fix-up: ShareItemCreate must reject ``kind=pdf`` so a malicious
+    PATCH /shares/{id} payload can't forge a PDF item pointing at any URL.
+
+    Pydantic raises ValidationError on the model_validator; route layer
+    surfaces this as 422.
+    """
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as ei:
+        ShareItemCreate(kind=ItemKind.PDF, title="forged")
+    msg = str(ei.value)
+    assert "record-pdf-upload" in msg
+
+
+async def test_patch_share_with_pdf_kind_in_items_returns_422(
+    api_client: TestClient, db_session: AsyncSession
+) -> None:
+    """K1: PATCH /shares/{id} with ``kind=pdf`` items in the body must
+    fail at validation (422) before any DB write."""
+    # Register + login.
+    r = api_client.post(
+        "/auth/register",
+        json={"email": "k1@example.com", "password": "hunter22", "name": "K1"},
+    )
+    assert r.status_code in (200, 201)
+    token = r.json().get("access_token") or r.json().get("token")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = api_client.post("/shares", json={"name": "x"}, headers=headers)
+    assert r.status_code == 201
+    share_id = r.json()["id"]
+
+    # Forged PDF item — schema rejects it.
+    r = api_client.patch(
+        f"/shares/{share_id}",
+        json={
+            "items": [
+                {
+                    "kind": "pdf",
+                    "title": "Evil",
+                    "file_url": "https://attacker.com/evil.exe",
+                }
+            ]
+        },
+        headers=headers,
+    )
+    assert r.status_code == 422
+
+
+async def test_patch_share_round_trips_existing_pdf_item(
+    db_session: AsyncSession,
+) -> None:
+    """K1: when the editor PATCHes the full items array, an existing PDF
+    item identified by id is preserved (server-managed PDF fields are
+    NOT overwritten with client-supplied values — they aren't accepted
+    on input at all)."""
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="x", items=[ShareItemCreate(title="non-pdf")]),
+    )
+
+    # Seed a PDF row directly (mimics what record_pdf_upload would
+    # produce). Bypassing the route keeps the test focused on the
+    # service-layer round-trip semantics.
+    from datetime import UTC, datetime
+
+    from myetal_api.models import ShareItem
+
+    pdf_row = ShareItem(
+        share_id=share.id,
+        position=1,
+        kind=ItemKind.PDF,
+        title="My poster",
+        file_url="https://r2.example/shares/x/items/pdf-uuid.pdf",
+        file_size_bytes=12345,
+        file_mime="application/pdf",
+        thumbnail_url="https://r2.example/shares/x/items/pdf-uuid-thumb.jpg",
+        copyright_ack_at=datetime.now(UTC),
+    )
+    db_session.add(pdf_row)
+    await db_session.commit()
+    pdf_id = pdf_row.id
+
+    # Async session caches the items collection from the original
+    # ``create_share`` call. ``await session.refresh`` reloads it
+    # without triggering lazy IO.
+    await db_session.refresh(share, ["items"])
+    assert any(i.kind == ItemKind.PDF for i in share.items)
+
+    # Editor PATCH: round-trip both items, but the PDF entry omits the
+    # PDF-only fields (which aren't on ShareItemCreate). The id is the
+    # only signal the service uses to recognise an existing PDF row.
+    payload = ShareUpdate(
+        items=[
+            ShareItemCreate(title="non-pdf", id=share.items[0].id),
+            ShareItemCreate(id=pdf_id, title="My poster (renamed)"),
+        ]
+    )
+    updated = await share_service.update_share(db_session, share, payload)
+
+    pdf_after = next(i for i in updated.items if i.id == pdf_id)
+    assert pdf_after.kind == ItemKind.PDF
+    assert pdf_after.title == "My poster (renamed)"
+    # Server-managed fields preserved.
+    assert pdf_after.file_url == "https://r2.example/shares/x/items/pdf-uuid.pdf"
+    assert pdf_after.file_size_bytes == 12345
+    assert pdf_after.file_mime == "application/pdf"
+    assert pdf_after.thumbnail_url == ("https://r2.example/shares/x/items/pdf-uuid-thumb.jpg")
+    assert pdf_after.copyright_ack_at is not None
+
+
+async def test_unpublished_public_share_not_resolvable_via_short_code(
+    api_client: TestClient, db_session: AsyncSession
+) -> None:
+    """K3: ``/c/{short_code}`` must 404 for an ``is_public=True`` share
+    that hasn't been published — drafts must not leak via the public
+    viewer (e.g. uploaded PDFs visible to anonymous visitors).
+    """
+    user = await _make_user(db_session)
+    share = await share_service.create_share(
+        db_session,
+        user.id,
+        ShareCreate(name="draft", is_public=True),
+    )
+    # Don't publish.
+    r = api_client.get(f"/public/c/{share.short_code}")
+    assert r.status_code == 404
+
+    # After publishing, the same code resolves.
+    await share_service.publish_share(db_session, share)
+    r = api_client.get(f"/public/c/{share.short_code}")
+    assert r.status_code == 200
+
+
+async def test_post_share_with_empty_items_succeeds(
+    api_client: TestClient,
+) -> None:
+    """Empty share save (Option A): the editor needs to be able to save a
+    share before any items are attached so the PDF-upload tab can run with
+    a real share_id. POST /shares with ``items=[]`` returns 201.
+    """
+    r = api_client.post(
+        "/auth/register",
+        json={"email": "empty@example.com", "password": "hunter22", "name": "Empty"},
+    )
+    assert r.status_code in (200, 201)
+    token = r.json().get("access_token") or r.json().get("token")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    r = api_client.post(
+        "/shares",
+        json={"name": "Untitled", "items": []},
+        headers=headers,
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["id"]
+    assert body["items"] == []

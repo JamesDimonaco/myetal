@@ -6,7 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from myetal_api.core.security import generate_short_code
-from myetal_api.models import Share, ShareItem, SharePaper, ShareSimilar, ShareView, Tag, User
+from myetal_api.models import (
+    ItemKind,
+    Share,
+    ShareItem,
+    SharePaper,
+    ShareSimilar,
+    ShareView,
+    Tag,
+    User,
+)
 from myetal_api.schemas.share import (
     BrowseShareResult,
     DailyViewCount,
@@ -109,6 +118,11 @@ async def get_share_for_owner(
 
 async def get_public_share(db: AsyncSession, short_code: str) -> Share | None:
     """Public read of a share by short_code. Tombstoned shares are EXCLUDED.
+    Unpublished shares are also EXCLUDED (K3 fix-up): a draft with
+    ``is_public=True`` but ``published_at IS NULL`` is link-private —
+    only the owner sees it from their dashboard. The public viewer
+    requires both flags so a draft (which may include uploaded PDFs and
+    other binaries) is never served to anonymous visitors.
 
     Routes that need to distinguish 404 (never existed) from 410 (was
     tombstoned) should use `get_public_share_with_tombstone` instead.
@@ -121,6 +135,7 @@ async def get_public_share(db: AsyncSession, short_code: str) -> Share | None:
             Share.short_code == short_code,
             Share.is_public.is_(True),
             Share.deleted_at.is_(None),
+            Share.published_at.is_not(None),
         )
     )
 
@@ -133,10 +148,15 @@ async def get_public_share_with_tombstone(
     - (Share, False) → live share, render normally.
     - (None,  True)  → a share existed under this short_code but is tombstoned;
                        caller returns 410 Gone.
-    - (None,  False) → no share has ever had this short_code; caller returns 404.
+    - (None,  False) → no share has ever had this short_code OR the
+                       share exists but is unpublished (a draft must
+                       not leak via the public viewer — K3 fix-up);
+                       caller returns 404.
 
     Per D-BL2 + D14. Used by routes that want to give search engines a clean
-    "this URL is gone" signal rather than a misleading 404.
+    "this URL is gone" signal rather than a misleading 404. Unpublished
+    drafts return plain 404 (not 410) — they were never publicly visible
+    so a search engine never indexed them; there's nothing to retract.
     """
     share = await db.scalar(
         select(Share)
@@ -147,6 +167,10 @@ async def get_public_share_with_tombstone(
         return None, False
     if share.deleted_at is not None:
         return None, True
+    if share.published_at is None:
+        # K3 fix-up: an is_public=True draft is NOT publicly viewable.
+        # Treat it as 404 (never existed publicly) rather than 410.
+        return None, False
     return share, False
 
 
@@ -172,11 +196,38 @@ async def update_share(db: AsyncSession, share: Share, payload: ShareUpdate) -> 
         share.is_public = payload.is_public
 
     if payload.items is not None:
-        # Replace strategy: clear the collection (delete-orphan cascade will
-        # remove the existing rows on flush), then append the new items.
+        # K1 (PR-C fix-up): PDF items must NOT be re-created from a
+        # client-supplied payload — the schema already rejects
+        # ``kind=pdf`` in ShareItemCreate, but the editor round-trips
+        # existing PDF items by id when it PATCHes the full items list.
+        # Strategy: lift the existing PDF rows out before clearing, then
+        # for each incoming item with a matching id pointing at an
+        # existing PDF row, re-attach the existing row (preserving its
+        # server-managed file_url / thumbnail_url / file_size_bytes /
+        # file_mime / copyright_ack_at) at the requested position with
+        # editable fields (title, subtitle, notes) updated. Items
+        # without a matching id are inserted as fresh non-PDF rows via
+        # ``_make_item``.
+        existing_pdf_by_id: dict[uuid.UUID, ShareItem] = {
+            it.id: it for it in share.items if it.kind == ItemKind.PDF
+        }
+        # Detach all rows; we'll re-add the kept PDFs and the new items
+        # below. Rows that aren't re-added are removed by delete-orphan.
         share.items.clear()
         for index, item in enumerate(payload.items):
-            share.items.append(_make_item(index, item))
+            if item.id is not None and item.id in existing_pdf_by_id:
+                # Round-trip an existing PDF: preserve all server-managed
+                # PDF fields, update only the position + editable text.
+                existing = existing_pdf_by_id[item.id]
+                existing.position = index
+                existing.title = item.title
+                existing.subtitle = item.subtitle
+                existing.notes = item.notes
+                share.items.append(existing)
+            else:
+                # Fresh non-PDF item (the schema already rejected
+                # ``kind=pdf`` so this can't smuggle a PDF row in).
+                share.items.append(_make_item(index, item))
 
     # Flush items to the session so they're visible inside this transaction
     # without committing yet — set_share_tags below participates in the same
@@ -963,6 +1014,12 @@ async def _allocate_short_code(db: AsyncSession) -> str:
 
 
 def _make_item(position: int, payload: ShareItemCreate) -> ShareItem:
+    # K1 (PR-C fix-up): the four PDF-only columns (file_url,
+    # file_size_bytes, file_mime, thumbnail_url) are NEVER written from
+    # a bulk-create / bulk-update payload. They're populated server-side
+    # by ``record_pdf_upload`` after the R2 bytes have been validated.
+    # The schema also rejects ``kind=pdf`` in ShareItemCreate so this
+    # function only ever sees paper / repo / link kinds.
     return ShareItem(
         position=position,
         kind=payload.kind,

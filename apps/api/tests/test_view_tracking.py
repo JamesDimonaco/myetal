@@ -22,9 +22,15 @@ async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
 
 
 async def _make_share(db: AsyncSession, user) -> Share:
-    return await share_service.create_share(
+    share = await share_service.create_share(
         db, user.id, ShareCreate(name="x", items=[ShareItemCreate(title="a")])
     )
+    # K3 fix-up: ``/public/c/{short_code}`` now requires
+    # ``published_at IS NOT NULL`` so a draft can't leak. View-tracking
+    # tests target the published path; publish here so the existing
+    # assertions still hold.
+    await share_service.publish_share(db, share)
+    return share
 
 
 async def _count_views(db: AsyncSession, share_id) -> int:

@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
+    # Cloudflare R2 — S3-compatible object storage for PDF uploads (PR-C,
+    # feedback-round-2 §1). Empty defaults so the test env doesn't need
+    # them; the r2_client fails fast at first use if a real call is
+    # attempted without credentials.
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: SecretStr = SecretStr("")
+    r2_bucket: str = "myetal-uploads"
+    r2_endpoint: str = ""
+    r2_public_url: str = ""
+
     @field_validator("cors_origins", "admin_emails", mode="before")
     @classmethod
     def _split_csv_origins(cls, v: object) -> object:

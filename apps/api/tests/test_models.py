@@ -62,7 +62,9 @@ def test_share_type_values() -> None:
 
 
 def test_item_kind_values() -> None:
-    assert {k.value for k in ItemKind} == {"paper", "repo", "link"}
+    # ``pdf`` was added in 0014 alongside the R2 upload pipeline (PR-C,
+    # feedback-round-2 §1).
+    assert {k.value for k in ItemKind} == {"paper", "repo", "link", "pdf"}
 
 
 def test_paper_source_values() -> None:
