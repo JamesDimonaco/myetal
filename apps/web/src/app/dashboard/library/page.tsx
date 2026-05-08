@@ -16,7 +16,7 @@ export default async function LibraryPage() {
   try {
     [works, user] = await Promise.all([
       serverFetch<WorkResponse[]>('/me/works', { cache: 'no-store' }),
-      serverFetch<UserResponse>('/auth/me', { cache: 'no-store' }),
+      serverFetch<UserResponse>('/me', { cache: 'no-store' }),
     ]);
   } catch (err) {
     if (err instanceof ApiError && (err.isUnauthorized || err.isForbidden)) {

@@ -51,7 +51,7 @@ export function OrcidSection({ initialOrcidId }: Props) {
           : 'save';
 
   async function patch(body: { orcid_id: string | null }): Promise<UserResponse> {
-    return clientApi<UserResponse>('/auth/me', {
+    return clientApi<UserResponse>('/me/orcid', {
       method: 'PATCH',
       json: body,
     });

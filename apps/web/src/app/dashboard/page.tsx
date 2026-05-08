@@ -35,7 +35,7 @@ export default async function DashboardPage() {
     // the dashboard down — fall back to 0.
     const [sharesRes, userRes, worksRes] = await Promise.all([
       serverFetch<ShareResponse[]>('/shares', { cache: 'no-store' }),
-      serverFetch<UserResponse>('/auth/me', { cache: 'no-store' }),
+      serverFetch<UserResponse>('/me', { cache: 'no-store' }),
       serverFetch<WorkResponse[]>('/me/works', { cache: 'no-store' }).catch(
         () => [] as WorkResponse[],
       ),

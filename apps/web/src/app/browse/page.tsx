@@ -89,7 +89,7 @@ async function fetchPopularTags(): Promise<Tag[]> {
 
 async function getCurrentUser(): Promise<UserResponse | null> {
   try {
-    return await serverFetch<UserResponse>('/auth/me', { cache: 'no-store' });
+    return await serverFetch<UserResponse>('/me', { cache: 'no-store' });
   } catch {
     // 401/403 = anonymous viewer. /browse is public.
     return null;
