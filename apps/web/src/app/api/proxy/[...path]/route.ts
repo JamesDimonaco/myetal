@@ -4,14 +4,13 @@
  * Why this exists: the BA session cookie is httpOnly, so client
  * components cannot send it on a cross-origin fetch to FastAPI. The
  * browser hits this same-origin route (cookie attached automatically),
- * the route reads the cookie server-side, and forwards the request to
- * the API with the same ``myetal_session=...`` Cookie header.
+ * the route reads the BA session server-side, mints a short-lived JWT
+ * via ``auth.api.getToken``, and forwards the request to FastAPI with
+ * ``Authorization: Bearer <jwt>``.
  *
- * Phase 3 rewrite:
- *   * No more Bearer extraction — FastAPI's ``get_current_user`` accepts
- *     the cookie directly.
- *   * No refresh-on-401 — Better Auth's middleware refreshes the session
- *     cookie before requests reach this route.
+ * The cookie is NOT forwarded to FastAPI — BA's session cookie is a
+ * signed ``<token>.<hmac>`` pair, not a JWT. FastAPI's
+ * ``get_current_user`` is Bearer-only post-fix.
  *
  * Server components MUST NOT use this — they should call ``serverFetch``
  * directly, which is one network hop instead of two.
@@ -20,11 +19,31 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { API_BASE_URL } from '@/lib/api';
-import { SESSION_COOKIE, getSessionCookie } from '@/lib/server-api';
+import { auth } from '@/lib/auth';
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 const FORWARDED_HEADERS = new Set(['content-type', 'accept']);
+
+async function mintBearerToken(request: NextRequest): Promise<string | null> {
+  try {
+    // ``auth.api.getToken`` is the server-side equivalent of BA's
+    // public ``/api/auth/token`` endpoint; it reads the session cookie
+    // off the incoming request headers and mints a 15-min JWT bound to
+    // that session. Same shape used by ``serverFetch`` and the
+    // mobile-bounce page.
+    const result = (await auth.api.getToken({ headers: request.headers })) as
+      | { token?: string }
+      | string
+      | null;
+    if (!result) return null;
+    if (typeof result === 'string') return result || null;
+    return result.token ?? null;
+  } catch (err) {
+    console.info('[proxy] auth.api.getToken returned no token', err);
+    return null;
+  }
+}
 
 async function handle(request: NextRequest, ctx: RouteContext) {
   const { path } = await ctx.params;
@@ -39,10 +58,14 @@ async function handle(request: NextRequest, ctx: RouteContext) {
     }
   });
 
-  const sessionValue = await getSessionCookie();
-  if (sessionValue) {
-    headers.Cookie = `${SESSION_COOKIE}=${sessionValue}`;
+  const token = await mintBearerToken(request);
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
+  // If there's no token we still forward the request — FastAPI will
+  // 401 cleanly and the client surfaces the same shape it would for a
+  // session expiry mid-request. Don't pre-emptively short-circuit; some
+  // routes (public share view tracking, take-down reports) accept anon.
 
   let body: ArrayBuffer | undefined;
   if (request.method !== 'GET' && request.method !== 'HEAD') {
