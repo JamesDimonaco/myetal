@@ -113,11 +113,10 @@ export default function PrivacyPage() {
           <h2 className="font-serif text-xl text-ink">Cookies</h2>
           <p className="mt-2">
             MyEtAl sets <strong>no tracking cookies</strong> on public pages.
-            When you sign in, we set two strictly necessary httpOnly cookies
-            (<code className="text-sm">myetal_access</code> and{' '}
-            <code className="text-sm">myetal_refresh</code>) to manage your
-            authenticated session. These are exempt from consent requirements
-            under PECR as they are essential for the service to function.
+            When you sign in, we set a strictly necessary httpOnly cookie
+            (<code className="text-sm">myetal_session</code>) to manage your
+            authenticated session. It is exempt from consent requirements
+            under PECR as it is essential for the service to function.
           </p>
           <p className="mt-2">
             We do not use third-party analytics, trackers, or advertising SDKs.

@@ -393,6 +393,18 @@ The Phase 1 Alembic migration (`0016_better_auth_cutover.py`) is
 drops `auth_identities` + `refresh_tokens`, and creates Better Auth's
 core tables. Plan accordingly.
 
+> **Phase 3 path collapse:** the Better Auth catch-all moved from
+> `/api/ba-auth/*` (Phase 0 safety mount) to `/api/auth/*` in Phase 3.
+> Update any pinned `BETTER_AUTH_JWKS_URL` env var on the Pi /
+> Vercel — the auto-derived default also changed and will pick up
+> `${BETTER_AUTH_URL}/api/auth/jwks` on next boot.
+
+> **Resend DNS warning:** before this deploys, set up DKIM + SPF
+> records on the `myetal.app` domain inside Resend's dashboard.
+> Without verified DNS, `RESEND_API_KEY` is set but password-reset and
+> email-verification mail bounces silently. Verify by sending a test
+> message via the Resend dashboard *before* flipping prod traffic.
+
 ### Pre-cutover checklist
 
 - [ ] Comms email sent **7 days** before merge — every test address
@@ -454,7 +466,7 @@ followed by the uvicorn boot.
 
 ```bash
 # JWKS doc serves (signed-key set Better Auth manages):
-curl -s https://myetal.app/api/ba-auth/jwks | jq '.keys | length'
+curl -s https://myetal.app/api/auth/jwks | jq '.keys | length'
 # expect: 1 (or more after rotations)
 
 # Fetch a JWT for an authenticated session, then verify cross-stack:
@@ -463,6 +475,24 @@ curl -s https://api.myetal.app/healthz/ba-auth \
   -H "Authorization: Bearer $JWT" | jq .
 # expect: { ok: true, claims: { sub, email, is_admin: false, ... } }
 ```
+
+### Re-granting admin after cutover
+
+After the destructive migration `users.is_admin` is `false` for
+every account. Once the desired admins have re-signed-up (their
+fresh sign-in lands them in the new `users` table), grant by
+email from a psql session on the Pi:
+
+```sql
+UPDATE users
+SET is_admin = true
+WHERE email = ANY(ARRAY['james@example.com', 'ops@example.com']);
+```
+
+`is_admin` is a Better-Auth `additionalField` (column lives on
+`users` directly); the next session-mint picks the new value into
+the JWT payload, so the user must sign out and back in once before
+the API's `require_admin` dep starts treating them as admin.
 
 ### Rollback
 

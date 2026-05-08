@@ -4,6 +4,8 @@
 **Date:** 2026-05-08
 **Scope:** non-destructive proof of cross-stack identity. Nothing else.
 
+> **Phase 3 update:** every `/api/ba-auth/...` reference below moved to `/api/auth/...` when Phase 3 collapsed the safety mount. The legacy hand-rolled handlers under `/api/auth/{login,logout,register,...}` were deleted in the same phase.
+
 ---
 
 ## What was done

@@ -61,10 +61,9 @@ class Settings(BaseSettings):
     better_auth_secret: SecretStr = SecretStr("")
 
     # JWKS endpoint URL. Empty default = computed from `better_auth_url`
-    # (`{better_auth_url}/api/ba-auth/jwks` until Phase 3 collapses the
-    # mount path to `/api/auth/jwks`). The verifier reads
-    # `settings.better_auth_jwks_url` directly so the override path is
-    # explicit-set wins.
+    # (`{better_auth_url}/api/auth/jwks`, post-Phase-3). The verifier
+    # reads `settings.better_auth_jwks_url` directly so the override path
+    # is explicit-set wins.
     better_auth_jwks_url: str = ""
 
     # Expected `iss` claim on Better Auth JWTs. Empty default = use
@@ -118,11 +117,10 @@ class Settings(BaseSettings):
         common case; explicit JWKS / issuer overrides still win.
         """
         if not self.better_auth_jwks_url and self.better_auth_url:
-            # Mount path is currently `/api/ba-auth` (Phase 1 → Phase 3
-            # collapses to `/api/auth`). Override BETTER_AUTH_JWKS_URL
-            # in env if you need to pin elsewhere.
+            # Mount path is `/api/auth` post-Phase-3. Override
+            # BETTER_AUTH_JWKS_URL in env if you need to pin elsewhere.
             self.better_auth_jwks_url = (
-                self.better_auth_url.rstrip("/") + "/api/ba-auth/jwks"
+                self.better_auth_url.rstrip("/") + "/api/auth/jwks"
             )
         if not self.better_auth_issuer and self.better_auth_url:
             self.better_auth_issuer = self.better_auth_url
