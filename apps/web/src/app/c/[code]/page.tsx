@@ -261,9 +261,12 @@ export default async function PublicSharePage({ params }: PageProps) {
         {share.tags && share.tags.length > 0 ? (
           <div className="mt-4">
             {/* All tags shown on the detail view; each chip links to the
-                browse list filtered by that tag. The /browse route ships in
-                PR-B — until then the hrefs are inert. */}
-            <TagChips tags={share.tags} max={share.tags.length} />
+                /browse list filtered by that tag (PR-B route). */}
+            <TagChips
+              tags={share.tags}
+              max={share.tags.length}
+              linkPattern="browse"
+            />
           </div>
         ) : null}
       </header>

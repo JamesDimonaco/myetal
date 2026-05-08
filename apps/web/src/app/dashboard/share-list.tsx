@@ -250,7 +250,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
               </p>
               {share.tags && share.tags.length > 0 ? (
                 <div className="mt-2">
-                  <TagChips tags={share.tags} max={2} />
+                  <TagChips tags={share.tags} max={2} linkPattern="browse" />
                 </div>
               ) : null}
             </div>

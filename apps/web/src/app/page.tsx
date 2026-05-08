@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { HomeBrowseSection } from '@/components/home-browse-section';
 import { SavedSharesSection } from '@/components/saved-shares-section';
 import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
@@ -117,18 +118,18 @@ export default async function LandingPage() {
               >
                 Try the demo
               </Link>
-              <Link
-                href="/dashboard/search"
-                className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
-              >
-                Search collections
-              </Link>
+              {/* "Search collections" CTA dropped (W-FIX-7) — it deep-linked
+                  to /dashboard/search which 401-redirects unauthed users.
+                  The <HomeBrowseSection /> below already gives discovery
+                  affordances. */}
             </>
           )}
         </div>
 
         <SavedSharesSection />
       </section>
+
+      <HomeBrowseSection />
 
       <section className="mt-24 grid gap-8 sm:mt-32 sm:grid-cols-3">
         <Feature

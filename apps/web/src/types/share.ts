@@ -143,6 +143,8 @@ export interface ShareSearchResult {
 export interface ShareSearchResponse {
   results: ShareSearchResult[];
   has_more: boolean;
+  /** Top-N users (≥1 published share) matching `q`. Added in PR-B. */
+  users?: UserPublicOut[];
 }
 
 // ---------------------------------------------------------------------------
@@ -167,4 +169,23 @@ export interface BrowseResponse {
   trending: BrowseShareResult[];
   recent: BrowseShareResult[];
   total_published: number;
+  /** Populated only when `?owner_id=` is set on the request (PR-B §5). */
+  owner?: UserPublicOut | null;
+}
+
+// ---------------------------------------------------------------------------
+// Public users (PR-B §5 — discovery)
+// ---------------------------------------------------------------------------
+
+/**
+ * The slim, public-safe representation of a user. Surfaced by
+ * `/public/search` (top users matching `q`) and `/public/browse?owner_id=`
+ * (the owner header on a per-user browse page). Privacy default: only users
+ * with at least one published share are returned.
+ */
+export interface UserPublicOut {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  share_count: number;
 }
