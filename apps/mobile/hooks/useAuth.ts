@@ -20,8 +20,15 @@ const ME_KEY = ['auth', 'me'] as const;
  *
  * Token shape: a single short-lived (15 min) Ed25519-signed JWT minted by
  * BA's JWT plugin. There is no refresh token on mobile — the cookie BA
- * also sets is irrelevant outside the browser. On 401 the api client
- * clears the stored token and the (authed) layout bounces to /sign-in.
+ * also sets is used only to mint the next JWT (when this one expires).
+ * On 401 the api client clears the stored token and the (authed) layout
+ * bounces to /sign-in.
+ *
+ * **Email sign-in/sign-up gotcha:** BA's ``/sign-in/email`` and
+ * ``/sign-up/email`` responses include a top-level ``token`` field —
+ * this is the **session id**, NOT a JWT. ``liftJwtFromBaResponse``
+ * deliberately ignores it and follows up with ``/api/auth/get-session``
+ * (header path) or ``/api/auth/token`` (body path) to get a real JWT.
  *
  * OAuth flow: WebBrowser.openAuthSessionAsync to BA's social-OAuth start
  * URLs with ``callbackURL`` pointing at the web app's
@@ -68,9 +75,15 @@ export function useAuth() {
 
   /**
    * Hit Better Auth's JWT-plugin endpoint to mint a fresh JWT for the
-   * current session. Called immediately after sign-in/sign-up succeeds
-   * (BA returns a session cookie/`set-cookie-token` header but we ignore
-   * cookies — only the JWT matters on mobile).
+   * current session.
+   *
+   * Forwards an explicit ``Cookie`` header when ``sessionCookie`` is
+   * provided (the value parsed off the prior sign-in's
+   * ``set-cookie``), and ALSO sets ``credentials: 'include'`` so RN's
+   * native cookie jar contributes whatever it has. Belt-and-braces
+   * because RN cookie continuity varies by platform — some Android
+   * builds drop them between fetches, iOS keeps them. Forcing the
+   * header explicitly removes that variance.
    */
   const fetchJwt = useCallback(async (sessionCookie: string | null): Promise<string> => {
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -110,42 +123,60 @@ export function useAuth() {
   );
 
   /**
-   * Email + password sign-in. Calls BA directly (cross-origin from native is
-   * fine — BA's trustedOrigins config covers `myetal://`). The response sets
-   * cookies in the fetch's CookieJar but we don't use them; we re-call
-   * /api/auth/token with the same credentials-included fetch context to lift
-   * the JWT.
+   * Lift the BA-minted JWT for an email sign-in / sign-up response.
    *
-   * Note on cookies in RN: React Native's fetch does maintain cookies between
-   * calls within the same JS runtime via the platform's HTTP stack on most
-   * builds. If that's not reliable in your environment, prefer the OAuth
-   * deep-link bounce flow which doesn't rely on cookie continuity.
-   */
-  /**
-   * Lift the BA-minted JWT out of an email sign-in / sign-up response.
+   * IMPORTANT: ``data.token`` from ``/sign-in/email`` and
+   * ``/sign-up/email`` is **NOT a JWT** — BA returns
+   * ``token: session.token``, the random session id used to look up
+   * the session row server-side. Feeding it to FastAPI as a Bearer
+   * 401s every time. (This was the round-2 mobile blocker bug.)
    *
-   * Better Auth's email handlers expose the JWT in three places, in order
-   * of preference:
-   *   1. ``data.token`` in the parsed body (set when the JWT plugin is
-   *      configured — our case).
-   *   2. ``set-auth-jwt`` response header (also set by the JWT plugin).
-   *   3. A separate ``/api/auth/token`` call using the session cookie BA
-   *      set on this response (the React Native fetch CookieJar carries
-   *      it across calls in the same JS runtime).
+   * The JWT lives in two real places:
    *
-   * Falling all the way through to (3) is the slow path; (1) hits in
-   * practice. Extracted so signIn and signUp share one implementation.
+   *   1. ``set-auth-jwt`` response header — emitted by the JWT plugin
+   *      ONLY on ``/get-session``. So we follow up the sign-in with a
+   *      ``GET /api/auth/get-session`` (forwarding the session cookie
+   *      from the sign-in response) and read the header off that.
+   *   2. ``GET /api/auth/token`` — the explicit JWT-mint endpoint,
+   *      returns ``{ token: <jwt> }``. Used as a fallback for the
+   *      (rare) case where step 1 doesn't surface the header (e.g.
+   *      RN platform that strips response headers we don't expose).
+   *
+   * Both are session-cookie-bound: we pass the ``Cookie`` header
+   * explicitly to remove dependence on RN's native cookie jar
+   * (which is unreliable across platforms).
+   *
+   * Throws ``no_jwt`` if BOTH paths fail — sign-in fails cleanly
+   * rather than persisting a broken token.
    */
   const liftJwtFromBaResponse = useCallback(
-    async (
-      response: Response,
-      data: { token?: string },
-    ): Promise<string> => {
-      const fromBody = data.token ?? null;
-      if (fromBody) return fromBody;
-      const fromHeader = response.headers.get('set-auth-jwt');
-      if (fromHeader) return fromHeader;
-      return fetchJwt(response.headers.get('set-cookie'));
+    async (response: Response): Promise<string> => {
+      // The session cookie BA just set on the sign-in response. We
+      // forward it explicitly on the follow-up calls so we don't
+      // depend on RN's CookieJar carrying it.
+      const sessionCookie = response.headers.get('set-cookie');
+
+      // Step 1: GET /api/auth/get-session — JWT plugin emits the JWT
+      // in the ``set-auth-jwt`` response header on this exact route.
+      try {
+        const headers: Record<string, string> = { Accept: 'application/json' };
+        if (sessionCookie) headers.Cookie = sessionCookie;
+        const sessionResp = await fetch(`${WEB_BASE_URL}/api/auth/get-session`, {
+          method: 'GET',
+          headers,
+          credentials: 'include',
+        });
+        if (sessionResp.ok) {
+          const fromHeader = sessionResp.headers.get('set-auth-jwt');
+          if (fromHeader) return fromHeader;
+        }
+      } catch {
+        // Fall through to step 2.
+      }
+
+      // Step 2: GET /api/auth/token — explicit JWT-mint endpoint.
+      // Returns ``{ token: <jwt> }``.
+      return fetchJwt(sessionCookie);
     },
     [fetchJwt],
   );
@@ -166,10 +197,11 @@ export function useAuth() {
         throw new ApiError(response.status, detail);
       }
       const data = (await response.json()) as {
-        token?: string;
+        // ``token`` here is BA's session id, NOT a JWT — intentionally
+        // not destructured/used. See ``liftJwtFromBaResponse`` docstring.
         user?: { id: string; email: string };
       };
-      const jwt = await liftJwtFromBaResponse(response, data);
+      const jwt = await liftJwtFromBaResponse(response);
       return persistJwtAndRefreshUser(jwt, data.user);
     },
   });
@@ -197,10 +229,11 @@ export function useAuth() {
         throw new ApiError(response.status, detail);
       }
       const data = (await response.json()) as {
-        token?: string;
+        // ``token`` here is BA's session id, NOT a JWT — see
+        // ``liftJwtFromBaResponse``.
         user?: { id: string; email: string };
       };
-      const jwt = await liftJwtFromBaResponse(response, data);
+      const jwt = await liftJwtFromBaResponse(response);
       // Soft email-verification: BA fires the verification mail (configured
       // in apps/web/src/lib/auth.ts) but we do NOT block — the user lands
       // signed-in immediately, banner reminds them on the home screen.
