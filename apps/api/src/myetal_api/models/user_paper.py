@@ -28,7 +28,7 @@ from myetal_api.models.base import Base
 
 if TYPE_CHECKING:
     from myetal_api.models.paper import Paper
-    from myetal_api.models.user import User
+    from myetal_api.models.better_auth import User
 
 
 class UserPaperAddedVia(enum.StrEnum):

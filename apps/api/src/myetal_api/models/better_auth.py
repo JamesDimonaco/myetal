@@ -21,9 +21,9 @@ Tables:
   on top of BA's core via Better Auth's ``additionalFields`` config.
 * ``session``, ``account``, ``verification``, ``jwks`` — straight BA core.
 
-The User model **replaces** ``apps/api/src/myetal_api/models/user.py``;
-``models/__init__.py`` re-exports ``User`` from here so call-sites stay
-unchanged.
+The User model is the canonical user row; legacy ``models/user.py``
+(a one-line shim) was removed in Phase 2. ``models/__init__.py``
+re-exports ``User`` from here.
 """
 
 from __future__ import annotations
@@ -38,7 +38,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from myetal_api.models.base import Base
 
 if TYPE_CHECKING:
-    from myetal_api.models.auth_identity import AuthIdentity
     from myetal_api.models.share import Share
 
 
@@ -101,14 +100,12 @@ class User(Base):
     )
 
     # Relationships -----------------------------------------------------------
-    # ``auth_identities`` is a Phase-1 holdover — Phase 2 deletes the
-    # legacy AuthIdentity model (and this relationship). Kept now so the
-    # back_populates on the legacy model still resolves at mapper-config
-    # time and the existing test suite imports cleanly.
-    auth_identities: Mapped[list[AuthIdentity]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan",
-    )
+    # Federated identities + password rows live in Better Auth's
+    # ``account`` table. We don't expose a SQLAlchemy back_populates for
+    # it because nothing on the Python side reads them — sign-in is BA's
+    # job, and FastAPI only sees the post-sign-in JWT. If a future
+    # admin-side feature needs to read accounts, add an Account
+    # relationship here at that point.
     shares: Mapped[list[Share]] = relationship(
         back_populates="owner",
         cascade="all, delete-orphan",

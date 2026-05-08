@@ -11,7 +11,7 @@ from myetal_api.models.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from myetal_api.models.share_paper import SharePaper
     from myetal_api.models.tag import Tag
-    from myetal_api.models.user import User
+    from myetal_api.models.better_auth import User
 
 
 class ShareType(enum.StrEnum):

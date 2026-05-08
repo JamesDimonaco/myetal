@@ -28,7 +28,7 @@ from myetal_api.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from myetal_api.models.share import Share
-    from myetal_api.models.user import User
+    from myetal_api.models.better_auth import User
 
 
 class ShareReportReason(enum.StrEnum):
