@@ -200,6 +200,34 @@ export const auth = betterAuth({
       createdAt: 'created_at',
       updatedAt: 'updated_at',
     },
+    // Security posture (Phase 5 — locked decision in the migration
+    // ticket): we do NOT auto-link OAuth providers to existing user
+    // rows by email. Today's behaviour (legacy ``services/oauth.py``)
+    // also refused implicit linking; preserve that contract.
+    //
+    // Without this, BA's default ``handleOAuthUserInfo`` will silently
+    // attach an ORCID/Google/GitHub account to any existing user with
+    // the same email when the provider returns ``email_verified=true``.
+    // That is a UX-friendly default for many apps but for MyEtAl it
+    // breaks the "ORCID iD is the only trusted identifier" property —
+    // an ORCID account whose email happens to match a MyEtAl user
+    // could otherwise grab their account by signing in via ORCID.
+    //
+    // Effect on UX: a fresh ORCID/Google/GitHub sign-in attempt for an
+    // email that already exists under a different sign-in method
+    // returns the BA error code ``account_not_linked`` and lands on
+    // ``/sign-in?error=account_not_linked``. The user must sign in
+    // with their existing method first, then add the second method
+    // from a profile screen (a future ticket — see Phase 6 prereqs in
+    // ``done/better-auth-orcid-flow.md``).
+    accountLinking: {
+      enabled: true,
+      // Allow EXPLICIT linking via authenticated /oauth2/link calls
+      // (a profile-screen feature we may build later) but disable
+      // IMPLICIT linking on plain sign-in. ``handleOAuthUserInfo``
+      // checks both flags; this one shuts the auto-link path.
+      disableImplicitLinking: true,
+    },
   },
   verification: {
     fields: {
