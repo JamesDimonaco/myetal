@@ -509,6 +509,28 @@ to the app's dashboard. If the browser stays open on ``mobile-bounce``
 the deep-link target is wrong (check ``app.json``'s ``scheme`` and the
 ``trustedOrigins`` list in ``apps/web/src/lib/auth.ts``).
 
+### Post-cutover ORCID smoke (deploy gate)
+
+After the cutover migration applies, before declaring the deploy
+green, run a quick ORCID end-to-end against a known-good iD on the
+*sandbox* environment. Both auto-sync and manual flows must work:
+
+1. **OAuth path.** Sign in via "Continue with ORCID" using a sandbox
+   iD you control. Confirm the resulting `users` row has the iD
+   populated and `last_orcid_sync_at IS NULL`.
+2. **Public-API sync.** Hit `POST /me/works/sync-orcid`. Confirm the
+   response lists imported papers and that `last_orcid_sync_at` is
+   stamped to `now()`.
+3. **Manual entry.** As a different user (no ORCID), `PATCH /me/orcid`
+   with another sandbox iD. Confirm 200 + iD set + `last_orcid_sync_at
+   IS NULL`.
+4. **Hijack guard.** Try to sign in via ORCID using the iD already on
+   user (1)'s row from a fresh browser/session. Expect a redirect to
+   `/sign-in?error=orcid_already_linked` and NO duplicate user row.
+
+The full Phase 5 smoke matrix lives in
+`docs/tickets/done/better-auth-orcid-flow.md`.
+
 ### Re-granting admin after cutover
 
 After the destructive migration `users.is_admin` is `false` for
