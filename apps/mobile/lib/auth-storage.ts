@@ -23,6 +23,15 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 const STORAGE_KEY = 'myetal.session.v2';
+/**
+ * Pre-cutover key that may still hold a stale access/refresh-token blob in
+ * Keychain / Keystore from before the Better Auth migration. We wipe it once
+ * per process to keep secure-store tidy — no functional impact (the v1 blob
+ * has the wrong shape and would be ignored anyway), purely Keychain hygiene
+ * so the OS doesn't accumulate dead entries across reinstalls.
+ */
+const LEGACY_V1_STORAGE_KEY = 'myetal.session';
+let legacyKeyWiped = false;
 
 export interface StoredSession {
   /** Better Auth Ed25519-signed access JWT. */
@@ -62,10 +71,29 @@ const nativeStorage: Storage = {
 
 const storage: Storage = Platform.OS === 'web' ? webStorage : nativeStorage;
 
+async function wipeLegacyKeyOnce(): Promise<void> {
+  if (legacyKeyWiped) return;
+  legacyKeyWiped = true;
+  // expo-secure-store has no web implementation, so skip on web — the legacy
+  // path used localStorage there and the v2 key shadows it cleanly.
+  if (Platform.OS === 'web') return;
+  try {
+    await SecureStore.deleteItemAsync(LEGACY_V1_STORAGE_KEY);
+  } catch {
+    // Best-effort — Keychain gripes are non-fatal.
+  }
+}
+
 export async function getSession(): Promise<StoredSession | null> {
   try {
     const raw = await storage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    if (!raw) {
+      // First read miss is the safest moment to garbage-collect the legacy
+      // v1 Keychain entry: there's nothing useful to find anyway, and any
+      // process that DOES have a v2 session never enters this branch.
+      void wipeLegacyKeyOnce();
+      return null;
+    }
     const parsed = JSON.parse(raw) as Partial<StoredSession>;
     if (typeof parsed.token !== 'string' || parsed.token.length === 0) {
       return null;

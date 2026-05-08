@@ -121,6 +121,35 @@ export function useAuth() {
    * builds. If that's not reliable in your environment, prefer the OAuth
    * deep-link bounce flow which doesn't rely on cookie continuity.
    */
+  /**
+   * Lift the BA-minted JWT out of an email sign-in / sign-up response.
+   *
+   * Better Auth's email handlers expose the JWT in three places, in order
+   * of preference:
+   *   1. ``data.token`` in the parsed body (set when the JWT plugin is
+   *      configured — our case).
+   *   2. ``set-auth-jwt`` response header (also set by the JWT plugin).
+   *   3. A separate ``/api/auth/token`` call using the session cookie BA
+   *      set on this response (the React Native fetch CookieJar carries
+   *      it across calls in the same JS runtime).
+   *
+   * Falling all the way through to (3) is the slow path; (1) hits in
+   * practice. Extracted so signIn and signUp share one implementation.
+   */
+  const liftJwtFromBaResponse = useCallback(
+    async (
+      response: Response,
+      data: { token?: string },
+    ): Promise<string> => {
+      const fromBody = data.token ?? null;
+      if (fromBody) return fromBody;
+      const fromHeader = response.headers.get('set-auth-jwt');
+      if (fromHeader) return fromHeader;
+      return fetchJwt(response.headers.get('set-cookie'));
+    },
+    [fetchJwt],
+  );
+
   const signInMutation = useMutation({
     mutationFn: async (input: { email: string; password: string }) => {
       const response = await fetch(`${WEB_BASE_URL}/api/auth/sign-in/email`, {
@@ -140,13 +169,7 @@ export function useAuth() {
         token?: string;
         user?: { id: string; email: string };
       };
-      // BA's `/sign-in/email` returns the JWT directly via the JWT plugin's
-      // ``set-auth-jwt`` response header AND embeds ``token`` in the body
-      // when the JWT plugin is configured. Prefer the body, fall back to
-      // the header, then to a separate /api/auth/token call.
-      const fromBody = data.token ?? null;
-      const fromHeader = response.headers.get('set-auth-jwt');
-      const jwt = fromBody ?? fromHeader ?? (await fetchJwt(response.headers.get('set-cookie')));
+      const jwt = await liftJwtFromBaResponse(response, data);
       return persistJwtAndRefreshUser(jwt, data.user);
     },
   });
@@ -177,9 +200,7 @@ export function useAuth() {
         token?: string;
         user?: { id: string; email: string };
       };
-      const fromBody = data.token ?? null;
-      const fromHeader = response.headers.get('set-auth-jwt');
-      const jwt = fromBody ?? fromHeader ?? (await fetchJwt(response.headers.get('set-cookie')));
+      const jwt = await liftJwtFromBaResponse(response, data);
       // Soft email-verification: BA fires the verification mail (configured
       // in apps/web/src/lib/auth.ts) but we do NOT block — the user lands
       // signed-in immediately, banner reminds them on the home screen.
