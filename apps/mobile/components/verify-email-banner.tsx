@@ -22,8 +22,8 @@ const DISMISS_KEY = 'myetal.verify-email-banner.dismissed-for-email';
  *
  * Tapping "Resend" hits Better Auth's
  * ``/api/auth/send-verification-email`` endpoint with the current Bearer
- * token. Failure surfaces as a swallowed log — the banner is non-blocking
- * by design.
+ * token (BA requires an authenticated session — Bearer is accepted via the
+ * JWT plugin). Failure surfaces as a non-blocking error message.
  */
 export function VerifyEmailBanner() {
   const c = Colors[useColorScheme() ?? 'light'];
@@ -69,18 +69,20 @@ export function VerifyEmailBanner() {
     setResending(true);
     setResendStatus(null);
     try {
-      // Better Auth's send-verification-email endpoint. Public + cookie-
-      // authenticated on web; on mobile we hit it un-authenticated with the
-      // email in the body — BA sends the mail if the address has an
-      // unverified user. The `WEB_BASE_URL` import is intentionally inline
-      // to keep this component self-contained.
       const { WEB_BASE_URL } = await import('@/lib/api');
+      const { getAccessToken } = await import('@/lib/auth-storage');
+      const token = await getAccessToken();
+      if (!token) {
+        setResendStatus('error');
+        return;
+      }
       const response = await fetch(
         `${WEB_BASE_URL}/api/auth/send-verification-email`,
         {
           method: 'POST',
           headers: {
             Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ email: user.email }),
