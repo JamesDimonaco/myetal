@@ -30,7 +30,7 @@ async def get_me(user: CurrentUser) -> UserResponse:
     """Return the calling user's profile.
 
     Same JSON shape as the legacy ``GET /auth/me``. Auth via the BA
-    JWT (cookie or Bearer); see ``api/deps.py::get_current_user``.
+    JWT in ``Authorization: Bearer``; see ``api/deps.py::get_current_user``.
     """
     return UserResponse.model_validate(user)
 

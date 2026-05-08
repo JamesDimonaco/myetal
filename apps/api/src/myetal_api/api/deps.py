@@ -6,15 +6,19 @@ issued by the Next.js side and signed with the active key in the
 issuer pinned, fail-closed on missing kid, stale-if-error JWKS cache,
 algorithm pinned to EdDSA.
 
-The token is read from EITHER:
+**The contract is Bearer-only.** JWT identity must arrive as
+``Authorization: Bearer <jwt>``.
 
-* ``Authorization: Bearer <jwt>`` — the contract the mobile client
-  uses (token in expo-secure-store, sent on every request).
-* ``myetal_session`` cookie — the contract the web app uses (BA's
-  JWT plugin sets it on sign-in / OAuth completion).
-
-Both paths are accepted; the Bearer header wins on tie. This mirrors
-the legacy dual-source behaviour minus the bespoke HS256 decode.
+The ``myetal_session`` cookie is set by Better Auth for its own
+session management on the Next.js side (it is a signed
+``<token>.<hmac>`` pair, NOT a JWT) and cannot be used for FastAPI
+auth. An earlier iteration of this dep accepted the cookie value and
+fed it to PyJWT, which always failed with "malformed token" — every
+request 401'd regardless of validity. The web layer mints a real JWT
+via ``auth.api.getToken`` server-side and forwards it as Bearer (see
+``apps/web/src/lib/server-api.ts`` and the
+``app/api/proxy/[...path]/route.ts`` handler); the mobile layer sends
+its stored JWT as Bearer directly.
 
 Authorization (admin gating) checks ``user.email`` against
 ``settings.admin_emails`` (env-var allowlist), never the JWT claim. The
@@ -46,32 +50,22 @@ from myetal_api.models import User
 
 _bearer = HTTPBearer(auto_error=False)
 
-# Cookie name pinned by ticket. The legacy cookie was ``myetal_access``;
-# the rename was deliberate so any straggler middleware that reads the
-# old name fails cleanly rather than silently mixing schemes.
-_SESSION_COOKIE_NAME = "myetal_session"
-
 # Generic message — every verification failure reduces to "you need to
 # sign in again". The verifier logs the specific reason internally.
 _INVALID_SESSION_DETAIL = "Invalid or expired session"
 
 
-def _extract_token(
-    request: Request, credentials: HTTPAuthorizationCredentials | None
-) -> str | None:
-    """Return the BA JWT from the Bearer header or the session cookie.
+def _extract_token(credentials: HTTPAuthorizationCredentials | None) -> str | None:
+    """Return the BA JWT from the ``Authorization: Bearer`` header.
 
-    Bearer header wins if both are set (mobile + web should never both
-    apply on the same request, but if they do the explicit Authorization
-    header is the more deliberate signal).
+    Bearer is the only accepted source. The ``myetal_session`` cookie
+    BA sets is NOT a JWT and is intentionally ignored here (see module
+    docstring).
     """
     if credentials is not None:
         token = credentials.credentials.strip()
         if token:
             return token
-    cookie_token = request.cookies.get(_SESSION_COOKIE_NAME)
-    if cookie_token:
-        return cookie_token.strip() or None
     return None
 
 
@@ -91,7 +85,7 @@ async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
-    token = _extract_token(request, credentials)
+    token = _extract_token(credentials)
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -125,7 +119,6 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User | None:
@@ -136,7 +129,7 @@ async def get_current_user_optional(
     surfaces. The presence of a verifiable BA JWT resolves to the user;
     anything missing/invalid resolves to None silently.
     """
-    token = _extract_token(request, credentials)
+    token = _extract_token(credentials)
     if token is None:
         return None
     try:
