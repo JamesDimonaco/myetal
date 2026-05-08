@@ -28,7 +28,9 @@ type SyncBanner =
   | { kind: 'error'; message: string }
   | { kind: 'needs-orcid'; message: string };
 
-type AddedToast = { paperTitle: string; shareName: string };
+type AddedToast =
+  | { kind: 'added'; paperTitle: string; shareName: string }
+  | { kind: 'duplicate'; paperTitle: string; shareName: string };
 
 export function LibraryList({
   initialWorks,
@@ -221,11 +223,12 @@ export function LibraryList({
       });
       return { share: updated, alreadyPresent: false };
     },
-    onSuccess: ({ share }, vars) => {
+    onSuccess: ({ share, alreadyPresent }, vars) => {
       queryClient.setQueryData(shareKey(share.id), share);
       queryClient.invalidateQueries({ queryKey: SHARES_KEY });
       if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
       setAddedToast({
+        kind: alreadyPresent ? 'duplicate' : 'added',
         paperTitle: vars.paper.title,
         shareName: share.name,
       });
@@ -233,6 +236,14 @@ export function LibraryList({
         setAddedToast(null);
         addedTimerRef.current = null;
       }, 4000);
+    },
+    onError: (err, vars) => {
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+      const detail =
+        err instanceof ApiError
+          ? err.detail || `Could not add to share (${err.status}).`
+          : `Could not add "${vars.paper.title}" to a share. Try again.`;
+      setBanner({ kind: 'error', message: detail });
     },
   });
 
@@ -250,18 +261,22 @@ export function LibraryList({
         <SyncBannerView banner={banner} onDismiss={() => setBanner(null)} />
       ) : null}
 
-      {/* "Added to share" toast */}
+      {/* "Added to share" / "Already in share" toast */}
       {addedToast ? (
         <div
           role="status"
           className="mb-4 flex items-start justify-between gap-3 rounded-md border border-accent/40 bg-accent-soft px-4 py-3 text-sm text-ink"
         >
           <span>
-            Added{' '}
-            <span className="font-medium">
-              &ldquo;{addedToast.paperTitle}&rdquo;
-            </span>{' '}
-            to{' '}
+            {addedToast.kind === 'duplicate' ? 'Already in ' : 'Added '}
+            {addedToast.kind === 'added' ? (
+              <>
+                <span className="font-medium">
+                  &ldquo;{addedToast.paperTitle}&rdquo;
+                </span>{' '}
+                to{' '}
+              </>
+            ) : null}
             <span className="font-medium">
               &ldquo;{addedToast.shareName}&rdquo;
             </span>
@@ -573,6 +588,7 @@ function WorkCard({
           {!isHidden ? (
             <div className="mt-3">
               <AddToShareMenu
+                paperId={work.paper.id}
                 onPick={onAddToShare}
                 isAdding={isAddingToShare}
               />
@@ -638,21 +654,27 @@ function OrcidProvenanceBadge({ orcidId }: { orcidId: string | null }) {
  * documented fallback rather than building a query-param hack.
  */
 function AddToShareMenu({
+  paperId,
   onPick,
   isAdding,
 }: {
+  paperId: string;
   onPick: (share: ShareResponse) => void;
   isAdding: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { data: shares, isLoading } = useQuery({
+  const { data: shares, isLoading, isError, refetch } = useQuery({
     queryKey: SHARES_KEY,
     queryFn: () => clientApi<ShareResponse[]>('/shares'),
     enabled: open,
     staleTime: 30_000,
   });
+
+  // Pre-attach this paper when the user clicks "+ New share". The new-share
+  // page reads ?paper_id and seeds the editor's first item from /me/works.
+  const newShareHref = `/dashboard/share/new?paper_id=${encodeURIComponent(paperId)}`;
 
   // Click-outside + Escape to close.
   useEffect(() => {
@@ -697,9 +719,35 @@ function AddToShareMenu({
             <div className="px-3 py-2 text-xs text-ink-muted">
               Loading shares…
             </div>
+          ) : isError ? (
+            <div className="px-3 py-3 text-xs text-ink">
+              <p>Couldn&apos;t load your shares.</p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="mt-2 rounded-md border border-ink/20 px-2 py-1 text-[11px] font-medium text-ink transition hover:border-ink/40"
+              >
+                Try again
+              </button>
+            </div>
           ) : !shares || shares.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-ink-muted">
-              You don&apos;t have any shares yet.
+            // 0-share empty state — make it a clear CTA, not a quiet line.
+            // The bottom "+ New share" entry below is still there, but the
+            // primary action when you have no shares is to create one.
+            <div className="px-3 py-3">
+              <p className="text-sm font-medium text-ink">
+                You don&apos;t have any shares yet.
+              </p>
+              <p className="mt-1 text-xs text-ink-muted">
+                Create your first share with this paper attached.
+              </p>
+              <Link
+                href={newShareHref}
+                onClick={() => setOpen(false)}
+                className="mt-3 inline-flex items-center justify-center rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+              >
+                Create share with this paper
+              </Link>
             </div>
           ) : (
             <ul className="max-h-64 overflow-y-auto py-1">
@@ -724,12 +772,18 @@ function AddToShareMenu({
               ))}
             </ul>
           )}
-          <Link
-            href="/dashboard/share/new"
-            className="block border-t border-rule px-3 py-2 text-xs font-medium text-ink transition hover:bg-paper-soft"
-          >
-            + New share
-          </Link>
+          {/* "+ New share with this paper" — passes paper_id so the new-share
+              page seeds the editor with this paper as the first item. Hidden
+              when the empty-state CTA above already fills the role. */}
+          {shares && shares.length > 0 ? (
+            <Link
+              href={newShareHref}
+              onClick={() => setOpen(false)}
+              className="block border-t border-rule px-3 py-2 text-xs font-medium text-ink transition hover:bg-paper-soft"
+            >
+              + New share with this paper
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -29,6 +29,7 @@ import type {
   ShareResponse,
   ShareType,
 } from '@/types/share';
+import type { PaperOut } from '@/types/works';
 
 const SHARE_TYPES: ShareType[] = [
   'paper',
@@ -129,6 +130,23 @@ const fromPaper = (p: Paper): DraftItem => ({
   image_url: '',
 });
 
+// Seed from a library entry (PaperOut). Used when the user picks "+ New share
+// with this paper" on the library Add-to-share popover — we land on the
+// new-share page with the paper already filled in as the first item.
+const fromPaperOut = (p: PaperOut): DraftItem => ({
+  _key: newKey(),
+  kind: 'paper',
+  title: p.title,
+  scholar_url: '',
+  doi: p.doi ?? '',
+  authors: p.authors ?? '',
+  year: p.year != null ? String(p.year) : '',
+  notes: '',
+  url: p.url ?? '',
+  subtitle: p.subtitle ?? '',
+  image_url: p.image_url ?? '',
+});
+
 const fromAddPayload = (payload: AddItemPayload): DraftItem => {
   if (payload.kind === 'paper') return fromPaper(payload.paper);
   return {
@@ -151,6 +169,12 @@ interface Props {
   initial?: ShareResponse;
   /** Share id (only used in edit mode). */
   id?: string;
+  /**
+   * Pre-attach a paper as the first item in CREATE mode. Used by the
+   * "+ New share with this paper" path from the library Add-to-share
+   * popover. Ignored in edit mode (`initial` takes precedence).
+   */
+  initialPaper?: PaperOut;
 }
 
 /**
@@ -164,7 +188,7 @@ interface Props {
  * After a successful save we surface the QR via <QrModal>. Closing it bounces
  * back to /dashboard so the new share appears in the list.
  */
-export function ShareEditor({ initial, id }: Props) {
+export function ShareEditor({ initial, id, initialPaper }: Props) {
   const router = useRouter();
   const isNew = !id;
 
@@ -188,7 +212,9 @@ export function ShareEditor({ initial, id }: Props) {
   const [items, setItems] = useState<DraftItem[]>(
     initial && initial.items.length
       ? initial.items.map(fromResponseItem)
-      : [],
+      : initialPaper && !initial
+        ? [fromPaperOut(initialPaper)]
+        : [],
   );
   const [tags, setTags] = useState<string[]>(
     initial?.tags?.map((t) => t.slug) ?? [],
