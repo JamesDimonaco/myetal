@@ -145,9 +145,37 @@ class ShareSearchResult(BaseModel):
     tags: list[TagOut] = Field(default_factory=list)
 
 
+class UserPublicOut(BaseModel):
+    """Public-safe view of a user, used by:
+
+    * ``/public/browse?owner_id=...`` (owner card on the response when the
+      caller filters by owner — Q15-C punts ``/u/{handle}`` profile pages
+      and routes owner-name links to ``/browse?owner_id=...`` instead).
+    * ``/public/search`` user-search block (per feedback-round-2 §5).
+
+    ``share_count`` is the number of currently-published, public,
+    non-tombstoned shares — matches the privacy filter on user search
+    (a user with zero published shares is never surfaced via search).
+    """
+
+    id: uuid.UUID
+    name: str | None
+    avatar_url: str | None
+    share_count: int
+
+
+# Alias for the user-search block — the shape is identical to
+# ``UserPublicOut`` but the name documents intent at the call site.
+UserSearchResult = UserPublicOut
+
+
 class ShareSearchResponse(BaseModel):
     results: list[ShareSearchResult]
     has_more: bool
+    # Per feedback-round-2 §5 (PR-B): user-search block. Only users with
+    # at least one published share appear here (privacy default). Capped
+    # at 5 best matches.
+    users: list[UserSearchResult] = Field(default_factory=list)
 
 
 class BrowseShareResult(BaseModel):
@@ -170,6 +198,11 @@ class BrowseResponse(BaseModel):
     trending: list[BrowseShareResult]
     recent: list[BrowseShareResult]
     total_published: int
+    # Populated only when the caller passed ``?owner_id=...`` (PR-B / Q15-C).
+    # The frontend uses this to render an "owner card" header on the browse
+    # page so the empty-state copy can still say "Alice has no published
+    # shares yet" rather than just "no results".
+    owner: UserPublicOut | None = None
 
 
 class DailyViewCount(BaseModel):

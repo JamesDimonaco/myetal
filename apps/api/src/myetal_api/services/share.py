@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from myetal_api.core.security import generate_short_code
-from myetal_api.models import Share, ShareItem, SharePaper, ShareSimilar, ShareView, Tag
+from myetal_api.models import Share, ShareItem, SharePaper, ShareSimilar, ShareView, Tag, User
 from myetal_api.schemas.share import (
     BrowseShareResult,
     DailyViewCount,
@@ -18,6 +18,8 @@ from myetal_api.schemas.share import (
     ShareUpdate,
     SimilarShareOut,
     TagOut,
+    UserPublicOut,
+    UserSearchResult,
 )
 from myetal_api.services import tags as tags_service
 
@@ -521,6 +523,7 @@ async def browse_published_shares(
     *,
     tags: list[str] | None = None,
     sort: str = "recent",
+    owner_id: uuid.UUID | None = None,
 ) -> tuple[list[BrowseShareResult], list[BrowseShareResult], int]:
     """Returns (trending, recent, total_count) for the browse page.
 
@@ -528,7 +531,8 @@ async def browse_published_shares(
     Recent:   last 5 (or 10 if trending < 3) by ``published_at DESC``.
     Total:    COUNT of all published, public, non-deleted shares.
 
-    Optional filters (per feedback-round-2 §2 / §4, Q14-A):
+    Optional filters (per feedback-round-2 §2 / §4, Q14-A; §5 PR-B for
+    ``owner_id``):
 
     * ``tags`` — list of tag slugs. When non-empty, results are
       restricted to shares whose tag set intersects (OR semantics —
@@ -541,13 +545,17 @@ async def browse_published_shares(
       ``trending_shares.score`` with a ``COALESCE(..., 0)`` fallback so
       shares with no recorded views still appear, just at the bottom).
       The trending block itself is always ``score DESC``.
+    * ``owner_id`` — restrict to shares owned by this user (Q15-C). All
+      filters stack: ``?tags=virology&owner_id=...&sort=popular`` is
+      "Alice's published virology shares, popular first."
 
     Cache-key implication: the route uses these params in the URL, so
-    the CDN edge cache fragments per (tags, sort) combination — fine
-    for the high-traffic combos (no params, single popular tag,
+    the CDN edge cache fragments per (tags, sort, owner_id) combination
+    — fine for the high-traffic combos (no params, single popular tag,
     ``sort=recent``) which dominate.
     """
     has_tag_filter = bool(tags)
+    has_owner_filter = owner_id is not None
 
     # Reusable WHERE-fragment + params.  Tag filter uses an EXISTS
     # subquery against share_tags + tags so a share matching ANY of
@@ -565,6 +573,10 @@ async def browse_published_shares(
         if has_tag_filter
         else ""
     )
+
+    # Owner filter — straightforward equality on the indexed FK column.
+    # Stacks with the tag and sort filters above.
+    owner_clause = " AND s.owner_user_id = :owner_id" if has_owner_filter else ""
 
     # ── Trending ────────────────────────────────────────────────────────
     # ``tag_join`` is a hardcoded SQL fragment (no user input); the tag
@@ -591,6 +603,7 @@ async def browse_published_shares(
           AND s.published_at IS NOT NULL
           AND s.deleted_at IS NULL
           {tag_join}
+          {owner_clause}
         GROUP BY ts.share_id, ts.score, ts.view_count_7d,
                  s.short_code, s.name, s.description, s.type,
                  s.published_at, s.updated_at, u.name
@@ -598,8 +611,13 @@ async def browse_published_shares(
         LIMIT 5
     """  # noqa: S608
     trending_sql = text(trending_sql_str)
+    trending_params: dict[str, object] = {}
     if has_tag_filter:
-        trending_sql = trending_sql.bindparams(tag_slugs=tags)
+        trending_params["tag_slugs"] = tags
+    if has_owner_filter:
+        trending_params["owner_id"] = owner_id
+    if trending_params:
+        trending_sql = trending_sql.bindparams(**trending_params)
     trending_rows = (await db.execute(trending_sql)).all()
 
     # ── Recent ──────────────────────────────────────────────────────────
@@ -634,6 +652,7 @@ async def browse_published_shares(
           AND s.published_at IS NOT NULL
           AND s.deleted_at IS NULL
           {tag_join}
+          {owner_clause}
         GROUP BY s.id, s.short_code, s.name, s.description, s.type,
                  s.published_at, s.updated_at, u.name, ts.score
         {sort_order}
@@ -643,6 +662,8 @@ async def browse_published_shares(
     recent_params: dict[str, object] = {"recent_limit": recent_limit}
     if has_tag_filter:
         recent_params["tag_slugs"] = tags
+    if has_owner_filter:
+        recent_params["owner_id"] = owner_id
     recent_sql = recent_sql.bindparams(**recent_params)
     recent_rows = (await db.execute(recent_sql)).all()
 
@@ -653,10 +674,16 @@ async def browse_published_shares(
           AND s.published_at IS NOT NULL
           AND s.deleted_at IS NULL
           {tag_join}
+          {owner_clause}
     """  # noqa: S608
     count_sql = text(count_sql_str)
+    count_params: dict[str, object] = {}
     if has_tag_filter:
-        count_sql = count_sql.bindparams(tag_slugs=tags)
+        count_params["tag_slugs"] = tags
+    if has_owner_filter:
+        count_params["owner_id"] = owner_id
+    if count_params:
+        count_sql = count_sql.bindparams(**count_params)
     total_published = (await db.execute(count_sql)).scalar_one()
 
     # ── Preview items (batch for both sets) ─────────────────────────────
@@ -756,6 +783,171 @@ async def _fetch_tags_for_shares(
             TagOut(id=r.id, slug=r.slug, label=r.label, usage_count=r.usage_count)
         )
     return out
+
+
+async def get_user_public_card(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+) -> UserPublicOut | None:
+    """Public-safe view of a user, with their published-share count.
+
+    Returns None when no user with this id exists. The route uses this
+    to distinguish 404 (no such user) from 200-with-empty-shares (user
+    exists but has nothing published yet — Q15-C empty-state).
+
+    The ``share_count`` is computed in a single query via a correlated
+    scalar subquery rather than per-user (avoid N+1) — caller only
+    fetches one user, so the cost is one round trip.
+    """
+    # Scalar subquery for the published-share count — matches the same
+    # privacy filter as user search (only public + published + alive).
+    count_subq = (
+        select(func.count(Share.id))
+        .where(
+            Share.owner_user_id == User.id,
+            Share.is_public.is_(True),
+            Share.published_at.is_not(None),
+            Share.deleted_at.is_(None),
+        )
+        .scalar_subquery()
+    )
+    row = (
+        await db.execute(
+            select(
+                User.id,
+                User.name,
+                User.avatar_url,
+                count_subq.label("share_count"),
+            ).where(User.id == user_id)
+        )
+    ).first()
+    if row is None:
+        return None
+    return UserPublicOut(
+        id=row.id,
+        name=row.name,
+        avatar_url=row.avatar_url,
+        share_count=row.share_count,
+    )
+
+
+async def search_published_users(
+    db: AsyncSession,
+    query: str,
+    limit: int = 5,
+) -> list[UserSearchResult]:
+    """Top-N users matching ``query`` who have at least one published share.
+
+    Per feedback-round-2 §5 (PR-B): search returns matching users
+    alongside matching shares + paper authors. Privacy default — a user
+    with only drafts / private shares is never surfaced via search.
+
+    Postgres path uses ``pg_trgm`` similarity on ``users.name`` (typo-
+    tolerant, GIN-indexed via migration 0013). SQLite test path falls
+    back to a case-insensitive substring match — same semantics, no
+    similarity scoring (the in-memory test harness can't run pg_trgm).
+
+    The ``share_count`` for each matching user is computed inline as a
+    single window expression rather than per-user round-trips (avoid
+    N+1).
+    """
+    q_norm = query.strip()
+    if len(q_norm) < 2:
+        return []
+
+    dialect = db.bind.dialect.name if db.bind is not None else "postgresql"
+
+    # Privacy filter — a user is only visible to search when they own
+    # at least one currently-public, currently-published, non-tombstoned
+    # share. The same EXISTS subquery doubles as the share_count source
+    # via a correlated scalar subquery.
+    if dialect == "postgresql":
+        # pg_trgm path — index-backed, typo-tolerant.
+        sql = text(
+            """
+            SELECT
+                u.id,
+                u.name,
+                u.avatar_url,
+                (
+                    SELECT COUNT(*) FROM shares s
+                    WHERE s.owner_user_id = u.id
+                      AND s.is_public = true
+                      AND s.published_at IS NOT NULL
+                      AND s.deleted_at IS NULL
+                ) AS share_count
+            FROM users u
+            WHERE u.name %% :q
+              AND EXISTS (
+                  SELECT 1 FROM shares s2
+                  WHERE s2.owner_user_id = u.id
+                    AND s2.is_public = true
+                    AND s2.published_at IS NOT NULL
+                    AND s2.deleted_at IS NULL
+              )
+            ORDER BY similarity(u.name, :q) DESC, u.name
+            LIMIT :limit
+            """
+        ).bindparams(q=q_norm, limit=limit)
+        rows = (await db.execute(sql)).all()
+        return [
+            UserSearchResult(
+                id=r.id,
+                name=r.name,
+                avatar_url=r.avatar_url,
+                share_count=r.share_count,
+            )
+            for r in rows
+        ]
+
+    # SQLite test fallback: case-insensitive substring match. The
+    # share_count subquery is identical; ordering is by name so the
+    # results are deterministic without similarity scoring.
+    count_subq = (
+        select(func.count(Share.id))
+        .where(
+            Share.owner_user_id == User.id,
+            Share.is_public.is_(True),
+            Share.published_at.is_not(None),
+            Share.deleted_at.is_(None),
+        )
+        .scalar_subquery()
+    )
+    exists_clause = (
+        select(Share.id)
+        .where(
+            Share.owner_user_id == User.id,
+            Share.is_public.is_(True),
+            Share.published_at.is_not(None),
+            Share.deleted_at.is_(None),
+        )
+        .exists()
+    )
+    stmt = (
+        select(
+            User.id,
+            User.name,
+            User.avatar_url,
+            count_subq.label("share_count"),
+        )
+        .where(
+            User.name.is_not(None),
+            User.name.ilike(f"%{q_norm}%"),
+            exists_clause,
+        )
+        .order_by(User.name)
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [
+        UserSearchResult(
+            id=r.id,
+            name=r.name,
+            avatar_url=r.avatar_url,
+            share_count=r.share_count,
+        )
+        for r in rows
+    ]
 
 
 # ---------- internals ----------

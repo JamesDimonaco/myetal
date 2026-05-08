@@ -10,8 +10,9 @@ starts typing.
 """
 
 import logging
+import uuid
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlalchemy.exc import OperationalError
 
 from myetal_api.api.deps import DbSession
@@ -52,6 +53,16 @@ async def browse_shares(
         default="recent",
         description="Sort order for the recent block: 'recent' or 'popular'.",
     ),
+    owner_id: uuid.UUID | None = Query(
+        default=None,
+        description=(
+            "Filter to shares owned by this user. When set, the response "
+            "also includes an ``owner`` card with the user's public-safe "
+            "profile fields. Returns 404 if no user has this id. Per "
+            "Q15-C — owner-name links route to /browse?owner_id=<uuid> "
+            "until /u/{handle} profile pages ship in a future ticket."
+        ),
+    ),
 ) -> BrowseResponse:
     """Browse trending and recently-published collections.
 
@@ -62,6 +73,13 @@ async def browse_shares(
     Optional filters per Q14-A: ``tags`` (comma-list, OR semantics) and
     ``sort`` (``recent`` or ``popular``).  Cache key naturally includes
     these query params.
+
+    Per Q15-C (PR-B): ``owner_id`` filter — when set, the result is
+    restricted to that user's published shares and the response carries
+    an ``owner`` card so the frontend can render an owner-context
+    header. A non-existent owner_id returns 404 (vs 200 with
+    ``owner=null``) so stale links surface as a real not-found state
+    rather than a confusing empty browse page.
     """
     response.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=3600"
 
@@ -88,14 +106,28 @@ async def browse_shares(
         if not tag_slugs:
             tag_slugs = None
 
+    owner_card = None
+    if owner_id is not None:
+        owner_card = await share_service.get_user_public_card(db, owner_id)
+        if owner_card is None:
+            # 404 (not 200 + owner=null) so stale ``/browse?owner_id=``
+            # links surface clearly. The empty-state-with-owner-card
+            # case is handled by the share_count=0 path (user exists,
+            # has no published shares).
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
     trending, recent, total_published = await share_service.browse_published_shares(
-        db, tags=tag_slugs, sort=sort
+        db, tags=tag_slugs, sort=sort, owner_id=owner_id
     )
 
     return BrowseResponse(
         trending=trending,
         recent=recent,
         total_published=total_published,
+        owner=owner_card,
     )
 
 
@@ -147,12 +179,17 @@ async def search_shares(
     Uses PostgreSQL ``pg_trgm`` trigram similarity — handles typos,
     partial matches, and diacritics.  Results are sorted by relevance
     then recency.  No authentication required.
+
+    Per feedback-round-2 §5 (PR-B): the response also includes a
+    ``users`` block with up to 5 users matching ``q`` who have at least
+    one published share. Privacy default — users with only drafts /
+    private shares are never surfaced via search.
     """
     q = q.strip()
 
     # After stripping, re-check minimum length
     if len(q) < 2:
-        return ShareSearchResponse(results=[], has_more=False)
+        return ShareSearchResponse(results=[], has_more=False, users=[])
 
     # Dynamic results should not be cached by shared proxies
     response.headers["Cache-Control"] = "no-store"
@@ -165,6 +202,18 @@ async def search_shares(
         # Likely a statement_timeout — return 503 so the client can retry
         # with a shorter/different query.
         logger.warning("search query timed out for q=%r", q, exc_info=True)
-        return ShareSearchResponse(results=[], has_more=False)
+        return ShareSearchResponse(results=[], has_more=False, users=[])
 
-    return ShareSearchResponse(results=results, has_more=has_more)
+    # User-search block (§5). Capped at 5 best matches; the privacy
+    # filter (only users with ≥1 published share) lives in the service.
+    # Run after the share search so a service-level timeout on shares
+    # short-circuits before we pay the second round-trip.
+    try:
+        users = await share_service.search_published_users(db, q, limit=5)
+    except OperationalError:
+        # User-search timing out shouldn't kill the share results — log
+        # and degrade gracefully to no users.
+        logger.warning("user search timed out for q=%r", q, exc_info=True)
+        users = []
+
+    return ShareSearchResponse(results=results, has_more=has_more, users=users)
