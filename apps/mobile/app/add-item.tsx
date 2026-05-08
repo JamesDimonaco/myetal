@@ -14,8 +14,9 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -37,19 +38,38 @@ import { Colors, Radius, Shadows, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHaptics } from '@/hooks/useHaptics';
 import { extractDoi, useLookupPaper, useSearchPapers } from '@/hooks/usePapers';
-import { ApiError } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
+import {
+  PDF_COPYRIGHT_LABEL,
+  PDF_TOO_LARGE_MSG,
+  PDF_TRUST_NOTE,
+} from '@/lib/pdf-copy';
+import {
+  formatFileSize,
+  PDF_MAX_BYTES,
+  runPdfUpload,
+  type UploadHandle,
+  type UploadProgress,
+} from '@/lib/pdf-upload';
 import { setPendingItem, type PendingItem } from '@/lib/pending-item';
+import {
+  clearPendingShareDraft,
+  peekPendingShareDraft,
+  setShareCreatedFromDraft,
+} from '@/lib/pending-share-draft';
 import type { Paper, PaperSearchResult } from '@/types/paper';
+import type { ShareResponse } from '@/types/share';
 
 // =========================================================================
 // Top-level kind picker
 // =========================================================================
 
-type ItemKind = 'paper' | 'repo' | 'link';
+type ItemKind = 'paper' | 'repo' | 'link' | 'pdf';
 const KINDS: { id: ItemKind; label: string }[] = [
   { id: 'paper', label: 'Paper' },
   { id: 'repo', label: 'Repo' },
   { id: 'link', label: 'Link' },
+  { id: 'pdf', label: 'PDF' },
 ];
 
 type PaperMode = 'doi' | 'search' | 'manual';
@@ -64,6 +84,11 @@ const DEBOUNCE_MS = 300;
 export default function AddItemScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
   const haptics = useHaptics();
+  // Optional `shareId` query param — only set when the modal was opened from
+  // an existing share (not when creating). Required for PDF uploads (the
+  // R2 presign endpoint is share-scoped); the PDF pane gates on it.
+  const { shareId: shareIdParam } = useLocalSearchParams<{ shareId?: string }>();
+  const shareId = typeof shareIdParam === 'string' && shareIdParam.length > 0 ? shareIdParam : null;
 
   const [kind, setKind] = useState<ItemKind>('paper');
 
@@ -128,6 +153,7 @@ export default function AddItemScreen() {
         {kind === 'paper' ? <PaperKindPane /> : null}
         {kind === 'repo' ? <RepoKindPane /> : null}
         {kind === 'link' ? <LinkKindPane /> : null}
+        {kind === 'pdf' ? <PdfKindPane shareId={shareId} /> : null}
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -984,7 +1010,7 @@ function RepoKindPane() {
         >
           <Ionicons name="alert-circle-outline" size={22} color={c.text} style={{ marginRight: Spacing.sm }} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.errorTitle, { color: c.text }]}>Couldn't fetch</Text>
+            <Text style={[styles.errorTitle, { color: c.text }]}>Couldn&apos;t fetch</Text>
             <Text style={[styles.errorBody, { color: c.textMuted }]}>{error}</Text>
           </View>
         </Animated.View>
@@ -1110,6 +1136,509 @@ function LinkKindPane() {
         icon="add"
         onPress={handleAdd}
         disabled={!canSave}
+      />
+    </ScrollView>
+  );
+}
+
+// =========================================================================
+// PDF kind (PR-C — file picker → R2 presigned upload → record)
+// =========================================================================
+
+interface PickedDoc {
+  uri: string;
+  name: string;
+  size: number;
+  mimeType: string | null;
+}
+
+/**
+ * Default-title heuristic. Filenames like `final_v3_Smith_2024.pdf` are
+ * almost always file-system clutter, not the public-facing title — return
+ * '' for those so the placeholder kicks in. Mirrors web (M2).
+ */
+function deriveDefaultTitle(filename: string): string {
+  const stripped = filename.replace(/\.pdf$/i, '');
+  const isJunky =
+    /_v\d+/i.test(stripped) ||
+    /\b(final|draft|copy)\b/i.test(stripped);
+  return isJunky ? '' : stripped;
+}
+
+function PdfKindPane({ shareId: initialShareId }: { shareId: string | null }) {
+  const c = Colors[useColorScheme() ?? 'light'];
+  const haptics = useHaptics();
+
+  // Local copy of shareId so we can flip from null → newly-created-id once
+  // the auto-save POST /shares completes (M1). The route param is updated
+  // alongside via router.setParams so a re-render of the modal observes the
+  // same value.
+  const [shareId, setShareId] = useState<string | null>(initialShareId);
+
+  // Auto-save lifecycle for the "open PDF tab from a brand-new share" path.
+  // 'idle' before the user opens the tab; 'saving' while the POST is in
+  // flight; 'error' if it failed (with a Retry button); once we have a
+  // shareId we render the picker normally.
+  type DraftSaveState =
+    | { status: 'idle' }
+    | { status: 'saving' }
+    | { status: 'error'; message: string };
+  const [draftSave, setDraftSave] = useState<DraftSaveState>({ status: 'idle' });
+
+  const [picked, setPicked] = useState<PickedDoc | null>(null);
+  const [title, setTitle] = useState('');
+  const [copyrightAck, setCopyrightAck] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress>({ status: 'idle' });
+  const handleRef = useRef<UploadHandle | null>(null);
+
+  // Local validation: file size (mirrors the server-enforced 25 MB cap).
+  const sizeError =
+    picked && picked.size > PDF_MAX_BYTES ? PDF_TOO_LARGE_MSG(picked.size) : null;
+
+  const titleError =
+    picked && title.trim().length === 0 ? 'Add a title.' : null;
+
+  const canUpload =
+    Boolean(picked) &&
+    !sizeError &&
+    !titleError &&
+    copyrightAck &&
+    progress.status !== 'uploading' &&
+    progress.status !== 'requesting-presign' &&
+    progress.status !== 'recording';
+
+  const isBusy =
+    progress.status === 'uploading' ||
+    progress.status === 'requesting-presign' ||
+    progress.status === 'recording';
+
+  // Pick a PDF. expo-document-picker's iOS UTI for PDF is `com.adobe.pdf`;
+  // Android uses the MIME `application/pdf`. The picker library accepts the
+  // MIME on both platforms (it handles the iOS UTI translation internally).
+  const handlePick = async () => {
+    haptics.tap();
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset) return;
+
+      const next: PickedDoc = {
+        uri: asset.uri,
+        name: asset.name,
+        // Some platforms occasionally return null/undefined size for
+        // cloud-provider URIs; default to 0 and let the pre-upload guard
+        // catch it (size ≤ 25 MB always passes for 0, but the server-side
+        // recheck rejects empty files at record time).
+        size: typeof asset.size === 'number' ? asset.size : 0,
+        mimeType: asset.mimeType ?? null,
+      };
+      setPicked(next);
+      // M2: heuristic skips junky filenames like `final_v3_Smith_2024.pdf`.
+      // When it returns '' the placeholder takes over and the user is
+      // gently nudged to type a public-facing title.
+      setTitle((prev) => {
+        if (prev.trim()) return prev;
+        const heuristic = deriveDefaultTitle(next.name);
+        return heuristic || '';
+      });
+      // Reset upload state if the user re-picks after a previous failure.
+      setProgress({ status: 'idle' });
+    } catch (err) {
+      setProgress({
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Could not open the picker',
+      });
+    }
+  };
+
+  const handleRemove = () => {
+    haptics.tap();
+    setPicked(null);
+    setTitle('');
+    setCopyrightAck(false);
+    setProgress({ status: 'idle' });
+  };
+
+  const handleUpload = async () => {
+    if (!shareId || !picked || !canUpload) return;
+    haptics.tap();
+    setProgress({ status: 'requesting-presign' });
+
+    const { promise, handle } = runPdfUpload({
+      shareId,
+      fileUri: picked.uri,
+      filename: picked.name,
+      sizeBytes: picked.size,
+      title: title.trim(),
+      onProgress: (p) => setProgress(p),
+    });
+    handleRef.current = handle;
+
+    const final = await promise;
+    handleRef.current = null;
+
+    if (final.status === 'done' && final.item) {
+      haptics.success();
+      // Hand the new item off via the same outbox the URL/DOI flows use,
+      // then dismiss back to the editor.
+      setPendingItem({ kind: 'pdf', item: final.item });
+      router.back();
+    } else if (final.status === 'error') {
+      haptics.warn();
+      // State already set by the runPdfUpload progress callback — keep the
+      // picked file so the user can retry without re-picking (M6).
+    }
+  };
+
+  const handleCancel = async () => {
+    haptics.tap();
+    await handleRef.current?.cancel();
+    handleRef.current = null;
+    // Cancel may not fully short-circuit a background iOS upload, but flip
+    // local state so the UI unblocks immediately.
+    setProgress({ status: 'idle' });
+  };
+
+  // M1: auto-save the editor's draft when the user opens the PDF tab from a
+  // brand-new share. Backend now allows empty `items: []` so we can POST the
+  // current draft (name/description/type/tags) immediately and reuse the new
+  // shareId for presign. We only fire once per modal lifetime.
+  const autoSaveAttemptedRef = useRef(false);
+
+  const runAutoSave = useCallback(async () => {
+    autoSaveAttemptedRef.current = true;
+    const draft = peekPendingShareDraft();
+    if (!draft) {
+      // No draft staged — fall back to a minimally-valid skeleton so the
+      // POST still succeeds. The editor will replace these fields on the
+      // user's next save anyway.
+      setDraftSave({
+        status: 'error',
+        message: "Couldn't start your share — try again",
+      });
+      return;
+    }
+    setDraftSave({ status: 'saving' });
+    try {
+      const created = await api<ShareResponse>('/shares', {
+        method: 'POST',
+        json: draft,
+      });
+      // Tell the editor about the new share so it can router.replace from
+      // /share/new → /share/{id} when the modal closes.
+      setShareCreatedFromDraft(created);
+      clearPendingShareDraft();
+      // Flip the route param so a remount of this modal sees the new id.
+      try {
+        router.setParams({ shareId: created.id });
+      } catch {
+        // setParams is best-effort; local state is the source of truth.
+      }
+      setShareId(created.id);
+      setDraftSave({ status: 'idle' });
+    } catch (e) {
+      const msg =
+        e instanceof ApiError
+          ? e.detail
+          : "Couldn't start your share — try again";
+      setDraftSave({ status: 'error', message: msg });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (shareId) return;
+    if (autoSaveAttemptedRef.current) return;
+    void runAutoSave();
+  }, [shareId, runAutoSave]);
+
+  // Until we have a shareId, render the auto-save status — picker stays
+  // hidden so the user can't pick a file before we have somewhere to put it.
+  if (!shareId) {
+    return (
+      <ScrollView
+        contentContainerStyle={styles.paneScroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        {draftSave.status === 'error' ? (
+          <View style={styles.paneBody}>
+            <View
+              style={[
+                styles.errorCard,
+                { backgroundColor: c.surfaceSunken, borderColor: c.border },
+              ]}
+            >
+              <Ionicons
+                name="alert-circle-outline"
+                size={22}
+                color={c.text}
+                style={{ marginRight: Spacing.sm }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.errorTitle, { color: c.text }]}>
+                  Couldn&apos;t start your share — try again
+                </Text>
+                <Text style={[styles.errorBody, { color: c.textMuted }]}>
+                  {draftSave.message}
+                </Text>
+              </View>
+            </View>
+            <View style={{ height: Spacing.md }} />
+            <Button
+              label="Retry"
+              icon="refresh"
+              onPress={() => {
+                autoSaveAttemptedRef.current = false;
+                void runAutoSave();
+              }}
+            />
+          </View>
+        ) : (
+          <View style={styles.paneBody}>
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={c.text} />
+              <Text style={[styles.loadingText, { color: c.textMuted }]}>
+                Saving draft…
+              </Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.paneScroll}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={[styles.helperText, { color: c.textSubtle, marginBottom: Spacing.md }]}>
+        Upload a poster, slide deck, or paper PDF — anything up to 25 MB.
+      </Text>
+      {!picked ? (
+        <Text style={[styles.helperText, { color: c.textSubtle, marginBottom: Spacing.md }]}>
+          {PDF_TRUST_NOTE}
+        </Text>
+      ) : null}
+
+      {!picked ? (
+        <Pressable
+          onPress={handlePick}
+          style={({ pressed }) => [
+            styles.pdfPickCard,
+            {
+              borderColor: c.border,
+              backgroundColor: c.surfaceSunken,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="cloud-upload-outline" size={32} color={c.text} />
+          <Text style={[styles.pdfPickTitle, { color: c.text }]}>Choose a PDF</Text>
+          <Text style={[styles.pdfPickHint, { color: c.textMuted }]}>
+            Up to 25 MB. PDF only.
+          </Text>
+        </Pressable>
+      ) : (
+        <Animated.View
+          entering={FadeInUp.duration(180)}
+          style={[
+            styles.pdfFileCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+            Shadows.sm,
+          ]}
+        >
+          <View style={styles.pdfFileRow}>
+            <View style={[styles.pdfFileIcon, { backgroundColor: c.surfaceSunken }]}>
+              <Ionicons name="document-text" size={20} color={c.text} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.pdfFileName, { color: c.text }]} numberOfLines={1}>
+                {picked.name}
+              </Text>
+              <Text style={[styles.pdfFileMeta, { color: c.textMuted }]}>
+                {picked.size > 0 ? formatFileSize(picked.size) : 'Size unknown'}
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleRemove}
+              hitSlop={8}
+              disabled={isBusy}
+              style={({ pressed }) => ({
+                opacity: isBusy ? 0.4 : pressed ? 0.6 : 1,
+                padding: 4,
+              })}
+              accessibilityLabel="Remove file"
+            >
+              <Ionicons name="close-circle" size={22} color={c.textMuted} />
+            </Pressable>
+          </View>
+
+          {sizeError ? (
+            <Text style={[styles.pdfInlineError, { color: '#B00020' }]}>
+              {sizeError}
+            </Text>
+          ) : null}
+        </Animated.View>
+      )}
+
+      {picked && !sizeError ? (
+        <>
+          <View style={[styles.field, { marginTop: Spacing.md }]}>
+            <Text style={[styles.fieldLabel, { color: c.textMuted }]}>Title</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder={
+                picked && deriveDefaultTitle(picked.name) === ''
+                  ? 'e.g. Smith et al. 2024 — ICML poster'
+                  : "Title as it'll appear on the share"
+              }
+              placeholderTextColor={c.textMuted}
+              editable={!isBusy}
+              maxLength={500}
+              style={[
+                styles.input,
+                {
+                  color: c.text,
+                  backgroundColor: c.surface,
+                  borderColor: c.border,
+                  opacity: isBusy ? 0.6 : 1,
+                },
+              ]}
+            />
+          </View>
+
+          {/* Copyright acknowledgement — gates the upload button. */}
+          <Pressable
+            onPress={() => {
+              if (isBusy) return;
+              haptics.selection();
+              setCopyrightAck((v) => !v);
+            }}
+            style={({ pressed }) => [
+              styles.copyrightRow,
+              {
+                borderColor: copyrightAck ? c.text : c.border,
+                backgroundColor: c.surface,
+                opacity: pressed && !isBusy ? 0.85 : 1,
+              },
+            ]}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: copyrightAck, disabled: isBusy }}
+          >
+            <View
+              style={[
+                styles.copyrightCheckbox,
+                {
+                  backgroundColor: copyrightAck ? c.text : 'transparent',
+                  borderColor: copyrightAck ? c.text : c.border,
+                },
+              ]}
+            >
+              {copyrightAck ? (
+                <Ionicons name="checkmark" size={14} color={c.background} />
+              ) : null}
+            </View>
+            <Text style={[styles.copyrightLabel, { color: c.text }]}>
+              {PDF_COPYRIGHT_LABEL}
+            </Text>
+          </Pressable>
+        </>
+      ) : null}
+
+      {/* Progress / status. The state machine: idle → requesting-presign →
+          uploading → recording → done | error. We render a single inline
+          card and swap the contents based on status — keeps the layout
+          stable so the upload button doesn't jump around. */}
+      {progress.status !== 'idle' && progress.status !== 'done' ? (
+        <View
+          style={[
+            styles.progressCard,
+            { backgroundColor: c.surface, borderColor: c.border },
+          ]}
+        >
+          {progress.status === 'requesting-presign' ? (
+            <View style={styles.progressRow}>
+              <ActivityIndicator color={c.text} />
+              <Text style={[styles.progressText, { color: c.textMuted }]}>
+                Preparing upload…
+              </Text>
+            </View>
+          ) : null}
+
+          {progress.status === 'uploading' ? (
+            <>
+              <View style={styles.progressHeader}>
+                <Text style={[styles.progressText, { color: c.text }]}>
+                  Uploading {Math.round((progress.uploadFraction ?? 0) * 100)}%
+                </Text>
+                <Pressable onPress={handleCancel} hitSlop={8}>
+                  <Text style={[styles.progressCancel, { color: c.textMuted }]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+              </View>
+              <View style={[styles.progressTrack, { backgroundColor: c.surfaceSunken }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: c.text,
+                      width: `${Math.round((progress.uploadFraction ?? 0) * 100)}%`,
+                    },
+                  ]}
+                />
+              </View>
+              {progress.bytesSent != null && progress.bytesTotal ? (
+                <Text style={[styles.progressBytes, { color: c.textSubtle }]}>
+                  {formatFileSize(progress.bytesSent)} of {formatFileSize(progress.bytesTotal)}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
+
+          {progress.status === 'recording' ? (
+            <View style={styles.progressRow}>
+              <ActivityIndicator color={c.text} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.progressText, { color: c.text }]}>
+                  Finishing up…
+                </Text>
+                <Text style={[styles.progressBytes, { color: c.textSubtle }]}>
+                  (this can take a few seconds)
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {progress.status === 'error' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={20}
+                color="#B00020"
+                style={{ marginRight: Spacing.sm }}
+              />
+              <Text style={[styles.progressText, { color: '#B00020', flex: 1 }]}>
+                {progress.error ?? 'Upload failed'}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <View style={{ height: Spacing.md }} />
+      <Button
+        label={progress.status === 'error' ? 'Try again' : 'Upload PDF'}
+        icon="cloud-upload"
+        onPress={handleUpload}
+        disabled={!canUpload}
+        loading={isBusy}
       />
     </ScrollView>
   );
@@ -1408,4 +1937,104 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 14, fontWeight: '600' },
   emptyBody: { fontSize: 13, marginTop: 4, textAlign: 'center', lineHeight: 18 },
+
+  // PDF pane (PR-C)
+  pdfPickCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: 'dashed',
+  },
+  pdfPickTitle: { fontSize: 15, fontWeight: '600' },
+  pdfPickHint: { fontSize: 12 },
+  pdfFileCard: {
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  pdfFileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  pdfFileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfFileName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pdfFileMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  pdfInlineError: {
+    fontSize: 13,
+    marginTop: Spacing.sm,
+    lineHeight: 18,
+  },
+  copyrightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: Spacing.md,
+  },
+  copyrightCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  copyrightLabel: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  progressCard: {
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: Spacing.md,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  progressText: { fontSize: 13, fontWeight: '500' },
+  progressCancel: { fontSize: 13, fontWeight: '600' },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressBytes: {
+    fontSize: 11,
+    marginTop: Spacing.xs,
+    fontVariant: ['tabular-nums'] as const,
+  },
 });

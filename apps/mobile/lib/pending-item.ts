@@ -18,11 +18,20 @@
  */
 
 import type { Paper } from '@/types/paper';
+import type { ShareItem } from '@/types/share';
 
 export type PendingItem =
   | { kind: 'paper'; paper: Paper }
   | { kind: 'repo'; title: string; url: string; subtitle: string | null; image_url: string | null }
-  | { kind: 'link'; title: string; url: string; subtitle: string | null; image_url: string | null };
+  | { kind: 'link'; title: string; url: string; subtitle: string | null; image_url: string | null }
+  /**
+   * PR-C: PDFs are unique among item kinds — by the time the add-item modal
+   * dismisses, the file is already uploaded to R2 and the `ShareItem` row
+   * exists server-side (via `record-pdf-upload`). We hand the editor the
+   * fully-formed `ShareItem` so it can render the new row immediately
+   * without re-saving. Subsequent saves round-trip the file fields verbatim.
+   */
+  | { kind: 'pdf'; item: ShareItem };
 
 let _pending: PendingItem | null = null;
 const _listeners = new Set<(item: PendingItem) => void>();

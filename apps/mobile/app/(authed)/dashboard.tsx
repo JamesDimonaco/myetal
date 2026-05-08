@@ -88,13 +88,24 @@ export default function DashboardScreen() {
     );
   }
 
-  const shares = data ?? [];
+  const allShares = data ?? [];
+  // M-FIX-5: hide item-less shares from the dashboard list. Brand-new shares
+  // are auto-created by the PDF intent flow with `items: []` and remain in
+  // limbo if the user backs out before adding anything. Filter them out
+  // client-side so the dashboard stays a list of meaningful shares; if the
+  // user comes back with the share's id we still load it in the editor.
+  const shares = allShares.filter((s) => s.items.length > 0);
+  const hasOnlyEmptyDrafts = allShares.length > 0 && shares.length === 0;
   const noOrcid = !user?.orcid_id;
-  // E1 — brand-new user (no ORCID, no shares).
-  const showWelcomeBanner = noOrcid && shares.length === 0;
-  // E3 — has papers, no shares (suppressed when E1 is showing).
+  // E1 — brand-new user (no ORCID, no shares of any kind).
+  const showWelcomeBanner = noOrcid && allShares.length === 0;
+  // E3 — has papers, no shares (suppressed when E1 is showing or when the
+  // only "shares" are item-less drafts that we've hidden).
   const showHasPapersHint =
-    !showWelcomeBanner && shares.length === 0 && libraryCount > 0;
+    !showWelcomeBanner &&
+    !hasOnlyEmptyDrafts &&
+    shares.length === 0 &&
+    libraryCount > 0;
   // E4 — drafts only banner above list when shares exist but none published.
   const allUnpublished =
     shares.length > 0 && shares.every((s) => s.published_at === null);
@@ -181,6 +192,22 @@ export default function DashboardScreen() {
                 ]}
               >
                 <Text style={[styles.primaryText, { color: c.background }]}>Open library</Text>
+              </Pressable>
+            </View>
+          ) : hasOnlyEmptyDrafts ? (
+            <View style={styles.empty}>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>No shares yet</Text>
+              <Text style={[styles.emptyBody, { color: c.textMuted }]}>
+                Drafts in progress will appear here once you add an item.
+              </Text>
+              <Pressable
+                onPress={() => router.push('/(authed)/share/new')}
+                style={({ pressed }) => [
+                  styles.primary,
+                  { backgroundColor: c.text, opacity: pressed ? 0.85 : 1 },
+                ]}
+              >
+                <Text style={[styles.primaryText, { color: c.background }]}>Create a share</Text>
               </Pressable>
             </View>
           ) : (

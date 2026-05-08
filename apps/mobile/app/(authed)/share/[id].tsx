@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -31,11 +32,18 @@ import {
   useUpdateShare,
 } from '@/hooks/useShares';
 import { api, ApiError } from '@/lib/api';
+import { formatFileSize } from '@/lib/pdf-upload';
 import {
   consumePendingItem,
   subscribePendingItem,
   type PendingItem,
 } from '@/lib/pending-item';
+import {
+  clearPendingShareDraft,
+  consumeShareCreatedFromDraft,
+  setPendingShareDraft,
+  subscribeShareCreated,
+} from '@/lib/pending-share-draft';
 import type { Paper } from '@/types/paper';
 import type {
   ShareCreateInput,
@@ -48,7 +56,7 @@ import type {
 const SHARE_TYPES: ShareType[] = ['paper', 'collection', 'bundle', 'grant', 'project'];
 
 const itemSchema = z.object({
-  kind: z.enum(['paper', 'repo', 'link']).optional(),
+  kind: z.enum(['paper', 'repo', 'link', 'pdf']).optional(),
   title: z.string().trim().min(1, 'Item title required').max(500),
   scholar_url: z.string().trim().url('Invalid URL').max(2000).optional().or(z.literal('')),
   doi: z.string().trim().max(255).optional().or(z.literal('')),
@@ -72,9 +80,16 @@ const shareSchema = z.object({
 interface DraftItem {
   // Local-only key so reorders don't lose focus on the wrong row.
   _key: string;
-  // Mobile editor v1 only creates 'paper' rows. Non-paper rows loaded from
-  // the server are preserved verbatim so a Save round-trip doesn't drop
-  // their kind-specific fields — they render read-only in the form.
+  // Server-assigned id, present only on items hydrated from a ShareResponse
+  // (i.e. existing rows). New items added via the modal don't have an id
+  // until the next save round-trip. We forward the id back in `apiItems` so
+  // the backend's merge-by-id can preserve server-owned PDF fields without
+  // the client re-sending `kind=pdf` (which the schema rejects).
+  id?: string;
+  // Mobile editor v1 only creates 'paper' rows directly. Non-paper rows
+  // (repo / link / pdf) come from the server or from the add-item modal and
+  // are preserved verbatim so a Save round-trip doesn't drop their
+  // kind-specific fields — they render read-only in the form.
   kind: ShareItemKind;
   title: string;
   scholar_url: string;
@@ -86,6 +101,14 @@ interface DraftItem {
   url: string | null;
   subtitle: string | null;
   image_url: string | null;
+  // PDF fields (PR-C). Only populated when kind === 'pdf'. The mobile editor
+  // never sets these directly — they come from `record-pdf-upload` (for new
+  // uploads) or from the server response (for existing PDFs). Round-tripped
+  // through Save so editing other items doesn't strip the file metadata.
+  file_url: string | null;
+  thumbnail_url: string | null;
+  file_size_bytes: number | null;
+  file_mime: string | null;
 }
 
 let _itemKeySeed = 0;
@@ -103,10 +126,15 @@ const emptyItem = (): DraftItem => ({
   url: null,
   subtitle: null,
   image_url: null,
+  file_url: null,
+  thumbnail_url: null,
+  file_size_bytes: null,
+  file_mime: null,
 });
 
 const fromResponseItem = (it: ShareResponse['items'][number]): DraftItem => ({
   _key: newKey(),
+  id: it.id,
   kind: it.kind ?? 'paper',
   title: it.title,
   scholar_url: it.scholar_url ?? '',
@@ -117,6 +145,10 @@ const fromResponseItem = (it: ShareResponse['items'][number]): DraftItem => ({
   url: it.url ?? null,
   subtitle: it.subtitle ?? null,
   image_url: it.image_url ?? null,
+  file_url: it.file_url ?? null,
+  thumbnail_url: it.thumbnail_url ?? null,
+  file_size_bytes: it.file_size_bytes ?? null,
+  file_mime: it.file_mime ?? null,
 });
 
 const fromPaper = (p: Paper): DraftItem => ({
@@ -131,6 +163,10 @@ const fromPaper = (p: Paper): DraftItem => ({
   url: null,
   subtitle: null,
   image_url: null,
+  file_url: null,
+  thumbnail_url: null,
+  file_size_bytes: null,
+  file_mime: null,
 });
 
 const fromPendingItem = (item: { kind: 'repo' | 'link'; title: string; url: string; subtitle: string | null; image_url: string | null }): DraftItem => ({
@@ -145,6 +181,34 @@ const fromPendingItem = (item: { kind: 'repo' | 'link'; title: string; url: stri
   url: item.url,
   subtitle: item.subtitle,
   image_url: item.image_url,
+  file_url: null,
+  thumbnail_url: null,
+  file_size_bytes: null,
+  file_mime: null,
+});
+
+/**
+ * Convert a freshly-uploaded PDF (returned by `record-pdf-upload`) into a
+ * draft item. The record endpoint already created the `ShareItem` server-side
+ * — appending it locally just keeps the editor in sync until the next save.
+ */
+const fromPdfItem = (item: ShareResponse['items'][number]): DraftItem => ({
+  _key: newKey(),
+  id: item.id,
+  kind: 'pdf',
+  title: item.title,
+  scholar_url: '',
+  doi: '',
+  authors: '',
+  year: '',
+  notes: item.notes ?? '',
+  url: item.url ?? null,
+  subtitle: item.subtitle ?? null,
+  image_url: null,
+  file_url: item.file_url ?? null,
+  thumbnail_url: item.thumbnail_url ?? null,
+  file_size_bytes: item.file_size_bytes ?? null,
+  file_mime: item.file_mime ?? null,
 });
 
 /**
@@ -231,9 +295,17 @@ export default function ShareEditorScreen() {
 
   /** Append an item from the add-item modal and scroll it into view. */
   const appendItem = (pending: PendingItem) => {
-    const draft = pending.kind === 'paper'
-      ? fromPaper(pending.paper)
-      : fromPendingItem(pending);
+    let draft: DraftItem;
+    if (pending.kind === 'paper') {
+      draft = fromPaper(pending.paper);
+    } else if (pending.kind === 'pdf') {
+      // PDF already exists server-side (created by record-pdf-upload). We
+      // mirror it into the local draft so the editor reflects it without
+      // a save round-trip.
+      draft = fromPdfItem(pending.item);
+    } else {
+      draft = fromPendingItem(pending);
+    }
     setItems((prev) => [...prev, draft]);
     // Short delay so the new row has time to lay out before we scroll.
     setTimeout(() => {
@@ -250,8 +322,86 @@ export default function ShareEditorScreen() {
     return subscribePendingItem((item) => appendItem(item));
   }, []);
 
+  // M1: when the modal auto-saves a brand-new share, swap the route from
+  // /share/new → /share/{newId} so subsequent saves PATCH instead of POST.
+  // We do this on focus (consume) and via the live subscriber to cover both
+  // mount-after-pop and the case where the editor is still mounted under
+  // the modal.
+  useEffect(() => {
+    const handleCreated = (created: ShareResponse) => {
+      if (!isNew) return;
+      // Mark hydrated so the existing-share fetch's hydrate effect doesn't
+      // race against the route swap.
+      hydratedRef.current = true;
+      router.replace({
+        pathname: '/(authed)/share/[id]',
+        params: { id: created.id },
+      } as any);
+    };
+    const queued = consumeShareCreatedFromDraft();
+    if (queued) handleCreated(queued);
+    return subscribeShareCreated(handleCreated);
+  }, [isNew]);
+
+  // Drop any leftover stashed draft when this screen unmounts, so a future
+  // open of /share/new doesn't auto-save against stale state.
+  useEffect(() => () => clearPendingShareDraft(), []);
+
   const openAddItem = () => {
-    router.push('/add-item' as any);
+    // For PDF uploads the modal needs a server-side `shareId` to presign
+    // against. When the share already exists we just pass it through; when
+    // the share is brand-new (id === 'new') we stash the current draft into
+    // a module outbox so the PDF tab can auto-save it (M1) and reuse the
+    // newly-minted id without a "save first" dead-end.
+    if (!isNew && id) {
+      router.push({ pathname: '/add-item', params: { shareId: id } } as any);
+    } else {
+      // Snapshot the editor's current draft (empty items is OK — backend
+      // accepts it). We map the local DraftItem shape onto the API shape
+      // the same way handleSave does, modulo schema validation, so an
+      // auto-save is byte-identical to a manual Save with no items added.
+      // Note: this path runs only on a brand-new share (no existing items
+      // ever have an id yet — but if the modal somehow re-runs after one
+      // has been added, we still id-round-trip rather than re-sending
+      // kind=pdf which the backend rejects).
+      const draftItems: ShareItemInput[] = items.map((it) => {
+        if (it.kind === 'pdf' && it.id) {
+          return {
+            id: it.id,
+            title: it.title,
+            subtitle: it.subtitle ?? null,
+            notes: it.notes ? it.notes : null,
+          };
+        }
+        return {
+          ...(it.id ? { id: it.id } : {}),
+          kind: it.kind,
+          title: it.title,
+          scholar_url: it.scholar_url ? it.scholar_url : null,
+          doi: it.doi ? it.doi : null,
+          authors: it.authors ? it.authors : null,
+          year: it.year ? Number(it.year) : null,
+          notes: it.notes ? it.notes : null,
+          url: it.url ?? null,
+          subtitle: it.subtitle ?? null,
+          image_url: it.image_url ?? null,
+        };
+      });
+      const payload: ShareCreateInput = {
+        // The backend tolerates an empty name on create? Not in v1 — but we
+        // only ever auto-save a draft the user has opened from the PDF
+        // intent, and a brand-new share starts blank. Default to a stub
+        // name so the POST succeeds; the user replaces it when they come
+        // back to the editor.
+        name: name.trim() || 'Untitled share',
+        description: description.trim() ? description.trim() : null,
+        type: shareType,
+        items: draftItems,
+        tags: tags.slice(0, 5),
+      };
+      setPendingShareDraft(payload);
+      router.push('/add-item' as any);
+    }
   };
 
   const removeItem = (key: string) => {
@@ -287,18 +437,47 @@ export default function ShareEditorScreen() {
     // Convert empty strings → null for the API. Non-paper kinds round-trip
     // their server-owned fields verbatim — the mobile editor doesn't expose
     // edit UI for them in v1.
-    const apiItems: ShareItemInput[] = parsed.data.items.map((it) => ({
-      kind: it.kind ?? 'paper',
-      title: it.title,
-      scholar_url: it.scholar_url ? it.scholar_url : null,
-      doi: it.doi ? it.doi : null,
-      authors: it.authors ? it.authors : null,
-      year: it.year ? Number(it.year) : null,
-      notes: it.notes ? it.notes : null,
-      url: it.url ?? null,
-      subtitle: it.subtitle ?? null,
-      image_url: it.image_url ?? null,
-    }));
+    const apiItems: ShareItemInput[] = parsed.data.items.map((it, idx) => {
+      // The zod schema only validates the paper-shaped fields, so reach back
+      // into the original (non-zod-stripped) draft for the kind-specific
+      // fields the schema doesn't know about (file_url etc.). The arrays
+      // are 1:1 — same length, same order — so index is safe.
+      const draft = items[idx];
+      const draftKind = draft?.kind ?? 'paper';
+
+      // PDF round-trip: the backend's ShareItemCreate schema rejects
+      // `kind=pdf` from clients (PDF rows are created by record-pdf-upload).
+      // For an existing PDF item we therefore emit only the editable fields
+      // — the server identifies the row by `id` and preserves file_url /
+      // thumbnail_url / file_size_bytes / file_mime untouched. We also
+      // OMIT `kind` so the schema validates as PAPER (it ignores the field
+      // when id is present anyway).
+      if (draftKind === 'pdf' && draft?.id) {
+        return {
+          id: draft.id,
+          title: it.title,
+          subtitle: draft.subtitle ?? null,
+          notes: it.notes ? it.notes : null,
+        };
+      }
+
+      return {
+        // Forward server-assigned id when present so the backend's
+        // merge-by-id can preserve any server-owned fields without the
+        // client re-sending them.
+        ...(draft?.id ? { id: draft.id } : {}),
+        kind: it.kind ?? draftKind,
+        title: it.title,
+        scholar_url: it.scholar_url ? it.scholar_url : null,
+        doi: it.doi ? it.doi : null,
+        authors: it.authors ? it.authors : null,
+        year: it.year ? Number(it.year) : null,
+        notes: it.notes ? it.notes : null,
+        url: it.url ?? null,
+        subtitle: it.subtitle ?? null,
+        image_url: it.image_url ?? null,
+      };
+    });
 
     const payload: ShareCreateInput = {
       name: parsed.data.name,
@@ -565,7 +744,7 @@ export default function ShareEditorScreen() {
             <View style={[styles.emptyItems, { backgroundColor: c.surface, borderColor: c.border }]}>
               <Ionicons name="document-outline" size={28} color={c.textMuted} />
               <Text style={[styles.emptyItemsText, { color: c.textMuted }]}>
-                No items yet. Tap &apos;Add item&apos; to start.
+                A bundle gathers papers, repos, and PDFs behind one QR. Start by adding an item.
               </Text>
             </View>
           ) : null}
@@ -614,38 +793,79 @@ export default function ShareEditorScreen() {
               </View>
 
               {it.kind !== 'paper' ? (
-                // Non-paper kinds (repo / link) are read-only on mobile in v1.
-                // Reorder + remove still work above; field edits happen on web.
-                <View>
-                  <View style={styles.readOnlyKindRow}>
-                    <Ionicons
-                      name={it.kind === 'repo' ? 'logo-github' : 'link'}
-                      size={14}
-                      color={c.textMuted}
-                    />
-                    <Text style={[styles.readOnlyKindLabel, { color: c.textMuted }]}>
-                      {it.kind === 'repo' ? 'REPO' : 'LINK'}
+                // Non-paper kinds (repo / link / pdf) are read-only on mobile
+                // in v1. Reorder + remove still work above; only field
+                // edits (title/details) happen on web. PDFs surface a
+                // thumbnail to disambiguate two PDFs with similar titles.
+                <View style={it.kind === 'pdf' ? styles.pdfRow : undefined}>
+                  {it.kind === 'pdf' ? (
+                    it.thumbnail_url ? (
+                      <Image
+                        source={{ uri: it.thumbnail_url }}
+                        style={[
+                          styles.pdfRowThumb,
+                          { backgroundColor: c.surfaceSunken, borderColor: c.border },
+                        ]}
+                        contentFit="cover"
+                        transition={150}
+                      />
+                    ) : (
+                      // Legacy data may pre-date thumbnail generation —
+                      // mirror the public PdfCard fallback (Ionicons
+                      // document-text in a sunken square).
+                      <View
+                        style={[
+                          styles.pdfRowThumb,
+                          styles.pdfRowThumbFallback,
+                          { backgroundColor: c.surfaceSunken, borderColor: c.border },
+                        ]}
+                      >
+                        <Ionicons name="document-text" size={24} color={c.textMuted} />
+                      </View>
+                    )
+                  ) : null}
+                  <View style={it.kind === 'pdf' ? { flex: 1 } : undefined}>
+                    <View style={styles.readOnlyKindRow}>
+                      <Ionicons
+                        name={
+                          it.kind === 'repo'
+                            ? 'logo-github'
+                            : it.kind === 'pdf'
+                              ? 'document-text'
+                              : 'link'
+                        }
+                        size={14}
+                        color={c.textMuted}
+                      />
+                      <Text style={[styles.readOnlyKindLabel, { color: c.textMuted }]}>
+                        {it.kind === 'repo' ? 'REPO' : it.kind === 'pdf' ? 'PDF' : 'LINK'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.readOnlyTitle, { color: c.text }]}>
+                      {it.title}
+                    </Text>
+                    {it.kind === 'pdf' && it.file_size_bytes != null ? (
+                      <Text style={[styles.readOnlySub, { color: c.textMuted }]}>
+                        PDF · {formatFileSize(it.file_size_bytes)}
+                      </Text>
+                    ) : null}
+                    {it.subtitle ? (
+                      <Text style={[styles.readOnlySub, { color: c.textMuted }]}>
+                        {it.subtitle}
+                      </Text>
+                    ) : null}
+                    {it.url && it.kind !== 'pdf' ? (
+                      <Text
+                        style={[styles.readOnlySub, { color: c.textSubtle }]}
+                        numberOfLines={1}
+                      >
+                        {it.url}
+                      </Text>
+                    ) : null}
+                    <Text style={[styles.readOnlyHint, { color: c.textMuted }]}>
+                      Title and details can be edited on the web.
                     </Text>
                   </View>
-                  <Text style={[styles.readOnlyTitle, { color: c.text }]}>
-                    {it.title}
-                  </Text>
-                  {it.subtitle ? (
-                    <Text style={[styles.readOnlySub, { color: c.textMuted }]}>
-                      {it.subtitle}
-                    </Text>
-                  ) : null}
-                  {it.url ? (
-                    <Text
-                      style={[styles.readOnlySub, { color: c.textSubtle }]}
-                      numberOfLines={1}
-                    >
-                      {it.url}
-                    </Text>
-                  ) : null}
-                  <Text style={[styles.readOnlyHint, { color: c.textMuted }]}>
-                    Edit this item on the web app.
-                  </Text>
                 </View>
               ) : (
                 <>
@@ -1005,6 +1225,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
     marginTop: Spacing.sm,
+  },
+
+  // PDF item row layout: thumbnail | (kind chip + title + meta + hint).
+  pdfRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'flex-start',
+  },
+  pdfRowThumb: {
+    width: 60,
+    height: 80,
+    borderRadius: Radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  pdfRowThumbFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   analyticsSection: {

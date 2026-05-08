@@ -8,9 +8,10 @@ export type ShareType = 'paper' | 'collection' | 'bundle' | 'grant' | 'project';
 
 /**
  * v1 item kinds. Server defaults to 'paper' for legacy rows so this stays
- * backward-compatible with existing shares.
+ * backward-compatible with existing shares. `pdf` (PR-C) covers user-uploaded
+ * PDF files; the file lives in R2 and surfaces via `file_url` + `thumbnail_url`.
  */
-export type ShareItemKind = 'paper' | 'repo' | 'link';
+export type ShareItemKind = 'paper' | 'repo' | 'link' | 'pdf';
 
 /**
  * Topical tag. Mirrors the backend `TagOut` schema. `slug` is the canonical
@@ -38,6 +39,14 @@ export interface ShareItem {
   authors: string | null;
   year: number | null;
   notes: string | null;
+  // PDF item fields (PR-C). Populated only when `kind === 'pdf'`. The R2
+  // public URL of the uploaded PDF; the first-page thumbnail JPEG (also on
+  // R2); the actual byte size after server-side recheck; the sniffed MIME
+  // (always `application/pdf` for kind=pdf, kept for parity with web).
+  file_url?: string | null;
+  thumbnail_url?: string | null;
+  file_size_bytes?: number | null;
+  file_mime?: string | null;
 }
 
 /** A share that has at least one paper in common with the viewed share (D8). */
@@ -87,6 +96,13 @@ export interface ShareResponse {
 }
 
 export interface ShareItemInput {
+  /**
+   * Server-assigned id for an existing item. Present on round-trip updates so
+   * the backend's merge logic can identify the row by id and preserve
+   * server-owned fields (e.g. PDF file_url / thumbnail_url) without the client
+   * having to re-send them. Absent on new items — server creates fresh rows.
+   */
+  id?: string;
   title: string;
   kind?: ShareItemKind;
   url?: string | null;
@@ -97,6 +113,15 @@ export interface ShareItemInput {
   authors?: string | null;
   year?: number | null;
   notes?: string | null;
+  // PDF item fields. The mobile editor never sets these directly — PDFs come
+  // back from `record-pdf-upload` already populated. They live on the input
+  // type so a round-trip through the editor (which serialises every item)
+  // doesn't drop the values. See `apps/mobile/app/(authed)/share/[id].tsx`
+  // `apiItems` where every server field is forwarded back verbatim.
+  file_url?: string | null;
+  thumbnail_url?: string | null;
+  file_size_bytes?: number | null;
+  file_mime?: string | null;
 }
 
 export interface ShareCreateInput {
