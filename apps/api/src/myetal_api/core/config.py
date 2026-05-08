@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     #   ADMIN_EMAILS=james@example.com,ops@example.com
     admin_emails: list[str] = []
 
+    # ---- Better Auth — Phase 0 spike (do not use in any non-spike code path) ----
+    # URL the FastAPI side fetches the JWKS document from. The spike mounts
+    # Better Auth at /api/ba-auth on Next.js, so the dev default points
+    # there. Empty default keeps test/CI envs that never hit the spike
+    # route from blowing up at import time.
+    better_auth_jwks_url: str = ""
+
     # Telegram — for instant push notifications on user feedback submissions.
     # Both must be set for Telegram delivery; if either is empty the notification
     # is skipped with a warning log.
