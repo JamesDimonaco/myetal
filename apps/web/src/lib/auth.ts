@@ -91,10 +91,21 @@ async function sendMail(args: {
 // BA blocks cross-origin auth requests by default. In prod, only the
 // canonical ``BETTER_AUTH_URL`` (and any hand-listed extras) are trusted;
 // in dev we add localhost ports for the Next dev server.
+//
+// Phase 4 (mobile cutover): the mobile app calls BA REST endpoints
+// directly from native (cross-origin from the host's perspective) and
+// expects to receive deep-link callbacks at ``myetal://``. Both schemes
+// are listed so BA accepts the ``Origin``/``callbackURL`` they appear in.
+const NATIVE_DEEP_LINK_ORIGINS = ['myetal://', 'exp+myetal://', 'exp://'];
 const trustedOrigins =
   process.env.NODE_ENV === 'production'
-    ? [BA_URL]
-    : [BA_URL, 'http://localhost:3000', 'http://localhost:3001'];
+    ? [BA_URL, ...NATIVE_DEEP_LINK_ORIGINS]
+    : [
+        BA_URL,
+        'http://localhost:3000',
+        'http://localhost:3001',
+        ...NATIVE_DEEP_LINK_ORIGINS,
+      ];
 
 // ---- ORCID provider config (sandbox toggle) -------------------------------
 // Sandbox toggle for the dev environment. Production uses the live
