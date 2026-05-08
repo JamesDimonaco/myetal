@@ -476,6 +476,39 @@ curl -s https://api.myetal.app/healthz/ba-auth \
 # expect: { ok: true, claims: { sub, email, is_admin: false, ... } }
 ```
 
+### OAuth provider allow-lists for mobile (Phase 4)
+
+The mobile app uses Better Auth's OAuth flow but can't redirect directly
+to a custom URL scheme — Google, GitHub, and ORCID all require https
+redirect URIs in their console allow-lists. To bridge the gap we added
+a server-rendered bounce page at
+``${BETTER_AUTH_URL}/auth/mobile-bounce`` that reads the BA session,
+mints a JWT, and 302/JS-redirects to ``myetal://auth/callback?token=…``.
+
+Each provider console must allow **both** the BA callback (already
+configured pre-cutover) **and** keep the bounce page reachable. In
+practice that means:
+
+- **Google** — Authorized redirect URIs: keep
+  ``https://myetal.app/api/auth/callback/google``. No new entry; BA's
+  callback is what Google sees. The bounce page is loaded via a 302 from
+  BA, never directly from Google.
+- **GitHub** — Authorization callback URL: keep
+  ``https://myetal.app/api/auth/callback/github``. Same reasoning.
+- **ORCID** (sandbox + prod) — Redirect URIs: keep
+  ``https://myetal.app/api/auth/oauth2/callback/orcid``. Same reasoning.
+
+If we ever discover a provider DOES need a literal entry for the bounce
+page (CORS-style preflight on the callback chain, etc), add
+``https://myetal.app/auth/mobile-bounce`` to the same redirect-URI list.
+
+**Verify the deep-link flow before declaring Phase 4 shipped:** sign in
+on a dev build of the mobile app via Google → expect the in-app browser
+to land on ``mobile-bounce`` for ~150 ms then close, returning the user
+to the app's dashboard. If the browser stays open on ``mobile-bounce``
+the deep-link target is wrong (check ``app.json``'s ``scheme`` and the
+``trustedOrigins`` list in ``apps/web/src/lib/auth.ts``).
+
 ### Re-granting admin after cutover
 
 After the destructive migration `users.is_admin` is `false` for
