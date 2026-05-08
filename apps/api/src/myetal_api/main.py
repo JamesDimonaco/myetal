@@ -9,6 +9,7 @@ from myetal_api.api.routes import auth as auth_routes
 from myetal_api.api.routes import feedback as feedback_routes
 from myetal_api.api.routes import health as health_routes
 from myetal_api.api.routes import healthz as ba_healthz_routes
+from myetal_api.api.routes import me as me_routes
 from myetal_api.api.routes import oauth as oauth_routes
 from myetal_api.api.routes import papers as papers_routes
 from myetal_api.api.routes import public as public_routes
@@ -57,6 +58,7 @@ app.include_router(health_routes.router)
 app.include_router(ba_healthz_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(oauth_routes.router)
+app.include_router(me_routes.router)
 app.include_router(shares_routes.router)
 app.include_router(papers_routes.router)
 app.include_router(public_routes.router)
