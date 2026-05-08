@@ -1,20 +1,17 @@
 /**
- * Better Auth — Phase 0 spike configuration.
+ * Better Auth — Phase 1 cutover configuration.
  *
- * Goal: prove cross-stack identity (Next.js mints a session JWT, FastAPI
- * verifies it via JWKS). Nothing else. Phase 1+ (cutover, OAuth, ORCID
- * hijack-hardening, etc) happens later under human supervision.
+ * Tables now live at their final names (no ``ba_`` prefix). The drizzle
+ * schema in ``./db-schema.ts`` is the runtime view of the Alembic-
+ * managed tables. Field-name mapping is snake_case → camelCase: BA's
+ * TS code uses camelCase fields internally, but the DB columns are
+ * snake_case (matching the SQLAlchemy models on the API side).
  *
- * Spike isolation: Better Auth's drizzle adapter wants to own its tables.
- * The legacy MyEtAl schema has a `users` table (plural) — Better Auth's
- * default user table is `user` (singular), so technically there's no
- * collision. We still namespace BA's tables under a `ba_` prefix via
- * `modelName` overrides on every core resource so the spike cannot
- * accidentally write to or read from the legacy auth tables. Phase 1
- * drops the prefix when the cutover replaces the legacy auth.
+ * Mount path stays at ``/api/ba-auth`` until Phase 3 collapses it to
+ * ``/api/auth`` — that move is intertwined with deleting the legacy
+ * route handlers, which is out of scope here.
  *
- * Pinned to `better-auth ~1.6.9` — the first stable release with native
- * Next 16 support (peer-dep accepts `^16.0.0`).
+ * Pinned to ``better-auth ~1.6.9``.
  */
 
 import { betterAuth } from 'better-auth';
@@ -22,6 +19,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { jwt } from 'better-auth/plugins';
 
 import { db } from './db';
+import { account, jwks, session, users, verification } from './db-schema';
 
 // Argon2 is a native module. Importing at the top of the file is fine for
 // a Route Handler (server-only); the Next bundler keeps it server-side.
@@ -51,34 +49,87 @@ if (!BA_SECRET || BA_SECRET.length < 32) {
 export const auth = betterAuth({
   secret: BA_SECRET,
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
-  // Spike-only mount path — keep clear of the legacy /api/auth/* routes.
-  // Phase 1 deletes the legacy routes and this drops back to the default.
+  // Mount path stays here until Phase 3 — see file header.
   basePath: '/api/ba-auth',
 
   database: drizzleAdapter(db, {
     provider: 'pg',
+    // Hand the adapter the explicit schema map. Without this, BA falls
+    // back to model-name-based table lookup which only works for default
+    // table names — we override `users` to plural below.
+    schema: {
+      user: users,
+      session,
+      account,
+      verification,
+      jwks,
+    },
   }),
 
-  // Spike isolation — every BA-owned table sits under a `ba_` prefix so
-  // it cannot collide with anything we already have.
+  // The MyEtAl `users` table is plural (kept that way to preserve every
+  // existing FK on the API side — see better_auth.py docstring).
   user: {
-    modelName: 'ba_user',
+    modelName: 'users',
+    fields: {
+      // Map BA's camelCase internal fields to our snake_case DB columns.
+      emailVerified: 'email_verified',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
     additionalFields: {
       is_admin: {
         type: 'boolean',
         defaultValue: false,
         input: false,
       },
+      avatar_url: {
+        type: 'string',
+        required: false,
+        input: false,
+      },
+      orcid_id: {
+        type: 'string',
+        required: false,
+        input: false,
+        unique: true,
+      },
+      last_orcid_sync_at: {
+        type: 'date',
+        required: false,
+        input: false,
+      },
     },
   },
   session: {
-    modelName: 'ba_session',
+    fields: {
+      expiresAt: 'expires_at',
+      ipAddress: 'ip_address',
+      userAgent: 'user_agent',
+      userId: 'user_id',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
   },
   account: {
-    modelName: 'ba_account',
+    fields: {
+      accountId: 'account_id',
+      providerId: 'provider_id',
+      userId: 'user_id',
+      accessToken: 'access_token',
+      refreshToken: 'refresh_token',
+      idToken: 'id_token',
+      accessTokenExpiresAt: 'access_token_expires_at',
+      refreshTokenExpiresAt: 'refresh_token_expires_at',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
   },
   verification: {
-    modelName: 'ba_verification',
+    fields: {
+      expiresAt: 'expires_at',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
   },
 
   emailAndPassword: {
