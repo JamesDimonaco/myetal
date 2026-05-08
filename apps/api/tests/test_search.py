@@ -333,16 +333,14 @@ async def test_tag_autocomplete_q_min_length(api_client: TestClient) -> None:
 async def test_popular_tags_returns_top_by_usage(api_client: TestClient) -> None:
     from myetal_api.core.database import get_db
     from myetal_api.schemas.share import ShareCreate
-    from myetal_api.services import auth as auth_service
     from myetal_api.services import share as share_service
     from myetal_api.services import tags as tags_service
+    from tests.conftest import make_user
 
     override = api_client.app.dependency_overrides
 
     async for db in override[get_db]():
-        user, _, _ = await auth_service.register_with_password(
-            db, "pop@example.com", "hunter22", "Pop"
-        )
+        user = await make_user(db, email="pop@example.com", name="Pop")
         a = await share_service.create_share(db, user.id, ShareCreate(name="a"))
         b = await share_service.create_share(db, user.id, ShareCreate(name="b"))
         await tags_service.set_share_tags(db, a.id, ["virology"])
@@ -400,10 +398,10 @@ async def _seed_user(
     ``search_published_users``) can be exercised end-to-end on SQLite.
     """
     from myetal_api.schemas.share import ShareCreate
-    from myetal_api.services import auth as auth_service
     from myetal_api.services import share as share_service
+    from tests.conftest import make_user
 
-    user, _, _ = await auth_service.register_with_password(db_session, email, "hunter22", name)
+    user = await make_user(db_session, email=email, name=name)
     for i in range(published_count):
         s = await share_service.create_share(
             db_session, user.id, ShareCreate(name=f"{name} pub {i}")
@@ -736,11 +734,11 @@ async def test_search_excludes_users_with_no_published_shares(db_session) -> Non
 async def test_search_excludes_users_whose_shares_are_private(db_session) -> None:
     """Privacy filter respects ``is_public=false``."""
     from myetal_api.schemas.share import ShareCreate
-    from myetal_api.services import auth as auth_service
     from myetal_api.services import share as share_service
+    from tests.conftest import make_user
 
-    user, _, _ = await auth_service.register_with_password(
-        db_session, "private-svc@example.com", "hunter22", "Private Patty"
+    user = await make_user(
+        db_session, email="private-svc@example.com", name="Private Patty"
     )
     s = await share_service.create_share(
         db_session, user.id, ShareCreate(name="private", is_public=False)

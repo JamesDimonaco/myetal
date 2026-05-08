@@ -11,15 +11,14 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.schemas.share import ShareCreate
-from myetal_api.services import auth as auth_service
 from myetal_api.services import share as share_service
 from myetal_api.services import tags as tags_service
 from myetal_api.services.tags import InvalidTagSlug, TooManyTags
+from tests.conftest import make_user
 
 
 async def _make_user(db: AsyncSession, email: str = "tagger@example.com"):
-    user, _, _ = await auth_service.register_with_password(db, email, "hunter22", "Tagger")
-    return user
+    return await make_user(db, email=email, name="Tagger")
 
 
 # ---------- canonicalize ----------

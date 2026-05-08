@@ -27,8 +27,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from myetal_api.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from myetal_api.models.share import Share
     from myetal_api.models.better_auth import User
+    from myetal_api.models.share import Share
 
 
 class ShareReportReason(enum.StrEnum):

@@ -9,6 +9,10 @@
  * here because `cookies().set()` is silently ignored during Server Component
  * rendering — the new tokens would never reach the browser, and the consumed
  * refresh token would lock the user out.
+ *
+ * TODO Phase 3: cookie name moves to `myetal_session` (BA's JWT plugin), the
+ * refresh dance goes away (BA owns it), and all `/auth/me*` URLs in callers
+ * repoint to `/me` / `/me/orcid` (FastAPI side, see apps/api routes/me.py).
  */
 
 import { cookies } from 'next/headers';

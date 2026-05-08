@@ -35,10 +35,6 @@ def authed_user_key(request: Request) -> str:
     return get_remote_address(request)
 
 
-# Default rule for sensitive auth endpoints — applied via decorator on each
-# route, NOT here, so the routes' intent is visible at the call site.
-AUTH_LIMIT = "5/minute"
-
 # Anonymous read of public share endpoints. Cloudflare is DNS-only on
 # api.myetal.app (no proxy / no edge rate limiting), so this is the sole
 # defence against scraping. 60/min/IP is generous enough for legitimate
