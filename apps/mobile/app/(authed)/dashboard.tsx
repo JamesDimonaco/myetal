@@ -18,6 +18,7 @@ import {
 
 import { QrModal } from '@/components/qr-modal';
 import { TagChips } from '@/components/tag-chips';
+import { VerifyEmailBanner } from '@/components/verify-email-banner';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
@@ -122,6 +123,10 @@ export default function DashboardScreen() {
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
         ListHeaderComponent={
           <View style={styles.headerWrap}>
+            {/* Soft email-verification reminder. Self-gating; renders nothing
+                when the user is verified or has dismissed it for this
+                email — see VerifyEmailBanner for the gating logic. */}
+            <VerifyEmailBanner />
             {showWelcomeBanner ? (
               <View
                 style={[
