@@ -8,19 +8,22 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://staging-api.myetal.app"
+        "EXPO_PUBLIC_API_URL": "https://staging-api.myetal.app",
+        "EXPO_PUBLIC_WEB_URL": "https://myetal-web-git-staging-james-dimonacos-projects.vercel.app"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://staging-api.myetal.app"
+        "EXPO_PUBLIC_API_URL": "https://staging-api.myetal.app",
+        "EXPO_PUBLIC_WEB_URL": "https://myetal-web-git-staging-james-dimonacos-projects.vercel.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.myetal.app"
+        "EXPO_PUBLIC_API_URL": "https://api.myetal.app",
+        "EXPO_PUBLIC_WEB_URL": "https://myetal.app"
       }
     }
   },
