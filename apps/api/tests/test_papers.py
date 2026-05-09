@@ -27,12 +27,11 @@ from myetal_api.services import papers as papers_service
 from tests.conftest import make_user as _make_user_helper
 
 
-async def register_with_password(
-    db: AsyncSession, email: str, password: str, name: str | None
-):
+async def register_with_password(db: AsyncSession, email: str, password: str, name: str | None):
     """Compatibility shim for the legacy register_with_password call sites."""
     user = await _make_user_helper(db, email=email, name=name)
     return user, "", ""
+
 
 # ---------- fixtures ----------
 

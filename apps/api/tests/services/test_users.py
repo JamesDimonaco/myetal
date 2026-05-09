@@ -31,16 +31,12 @@ async def test_set_user_orcid_id_resets_last_sync_when_value_changes(
     db_session: AsyncSession,
 ) -> None:
     user = await make_user(db_session, email="orcid-reset@example.com")
-    user = await users_service.set_user_orcid_id(
-        db_session, user.id, "0000-0002-1825-0097"
-    )
+    user = await users_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
     user.last_orcid_sync_at = datetime.now(UTC)
     await db_session.commit()
     assert user.last_orcid_sync_at is not None
 
-    user = await users_service.set_user_orcid_id(
-        db_session, user.id, "0000-0001-2345-6789"
-    )
+    user = await users_service.set_user_orcid_id(db_session, user.id, "0000-0001-2345-6789")
     assert user.last_orcid_sync_at is None
 
 
@@ -48,9 +44,7 @@ async def test_set_user_orcid_id_resets_last_sync_when_cleared(
     db_session: AsyncSession,
 ) -> None:
     user = await make_user(db_session, email="orcid-clear@example.com")
-    user = await users_service.set_user_orcid_id(
-        db_session, user.id, "0000-0002-1825-0097"
-    )
+    user = await users_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
     user.last_orcid_sync_at = datetime.now(UTC)
     await db_session.commit()
 
@@ -62,16 +56,12 @@ async def test_set_user_orcid_id_does_not_reset_on_idempotent_set(
     db_session: AsyncSession,
 ) -> None:
     user = await make_user(db_session, email="orcid-idem@example.com")
-    user = await users_service.set_user_orcid_id(
-        db_session, user.id, "0000-0002-1825-0097"
-    )
+    user = await users_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
     stamp = datetime.now(UTC)
     user.last_orcid_sync_at = stamp
     await db_session.commit()
 
-    user = await users_service.set_user_orcid_id(
-        db_session, user.id, "0000-0002-1825-0097"
-    )
+    user = await users_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
     assert user.last_orcid_sync_at is not None
     stored = user.last_orcid_sync_at
     if stored.tzinfo is None:
@@ -95,9 +85,7 @@ async def test_set_user_orcid_id_translates_integrity_error_to_already_linked(
     db_session.rollback = fake_rollback  # type: ignore[method-assign]
     try:
         with pytest.raises(users_service.OrcidIdAlreadyLinked):
-            await users_service.set_user_orcid_id(
-                db_session, user.id, "0000-0002-1825-0097"
-            )
+            await users_service.set_user_orcid_id(db_session, user.id, "0000-0002-1825-0097")
     finally:
         db_session.commit = real_commit  # type: ignore[method-assign]
         db_session.rollback = real_rollback  # type: ignore[method-assign]
@@ -116,6 +104,4 @@ async def test_set_user_orcid_id_precheck_rejects_already_linked(
     await users_service.set_user_orcid_id(db_session, a.id, "0000-0001-2345-6789")
 
     with pytest.raises(users_service.OrcidIdAlreadyLinked):
-        await users_service.set_user_orcid_id(
-            db_session, b.id, "0000-0001-2345-6789"
-        )
+        await users_service.set_user_orcid_id(db_session, b.id, "0000-0001-2345-6789")

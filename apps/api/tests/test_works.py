@@ -29,9 +29,7 @@ from myetal_api.services.users import set_user_orcid_id
 from tests.conftest import make_user as _make_user_helper
 
 
-async def register_with_password(
-    db: AsyncSession, email: str, password: str, name: str | None
-):
+async def register_with_password(db: AsyncSession, email: str, password: str, name: str | None):
     """Compatibility shim — Phase 2 deletes the legacy auth service.
 
     Tests in this module just need ``(user, _, _)``; password / refresh

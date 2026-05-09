@@ -119,9 +119,7 @@ class Settings(BaseSettings):
         if not self.better_auth_jwks_url and self.better_auth_url:
             # Mount path is `/api/auth` post-Phase-3. Override
             # BETTER_AUTH_JWKS_URL in env if you need to pin elsewhere.
-            self.better_auth_jwks_url = (
-                self.better_auth_url.rstrip("/") + "/api/auth/jwks"
-            )
+            self.better_auth_jwks_url = self.better_auth_url.rstrip("/") + "/api/auth/jwks"
         if not self.better_auth_issuer and self.better_auth_url:
             self.better_auth_issuer = self.better_auth_url
         return self
@@ -133,9 +131,7 @@ class Settings(BaseSettings):
             return self
         secret = self.better_auth_secret.get_secret_value()
         if not secret:
-            raise RuntimeError(
-                "BETTER_AUTH_SECRET must be set when ENV is not 'dev'"
-            )
+            raise RuntimeError("BETTER_AUTH_SECRET must be set when ENV is not 'dev'")
         if len(secret) < 32:
             raise RuntimeError(
                 "BETTER_AUTH_SECRET must be at least 32 characters "

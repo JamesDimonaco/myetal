@@ -59,12 +59,8 @@ def _b64url(b: bytes) -> str:
 def _new_keypair(kid: str) -> tuple[bytes, dict[str, str]]:
     """Return (private_pem, jwk_dict) for an Ed25519 key with the given kid."""
     private = Ed25519PrivateKey.generate()
-    private_pem = private.private_bytes(
-        Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()
-    )
-    raw_public = private.public_key().public_bytes(
-        Encoding.Raw, PublicFormat.Raw
-    )
+    private_pem = private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    raw_public = private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     jwk = {
         "kty": "OKP",
         "crv": "Ed25519",
@@ -110,9 +106,7 @@ def _patch_jwks(monkeypatch: pytest.MonkeyPatch, jwks_doc: dict[str, Any]) -> Ma
 @pytest.fixture(autouse=True)
 def _isolate_settings_and_caches(monkeypatch: pytest.MonkeyPatch) -> None:
     """Set deterministic JWKS URL / issuer and reset caches between tests."""
-    monkeypatch.setattr(
-        settings, "better_auth_jwks_url", "http://localhost:3000/api/auth/jwks"
-    )
+    monkeypatch.setattr(settings, "better_auth_jwks_url", "http://localhost:3000/api/auth/jwks")
     monkeypatch.setattr(settings, "better_auth_url", "http://localhost:3000")
     monkeypatch.setattr(settings, "better_auth_issuer", "http://localhost:3000")
     _reset_jwks_caches_for_tests()
@@ -172,12 +166,12 @@ def test_valid_ed25519_token_verifies(
 
 def test_alg_none_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     # Build a "alg=none" token by hand.
-    header = base64.urlsafe_b64encode(
-        json.dumps({"alg": "none", "kid": "anything"}).encode()
-    ).rstrip(b"=").decode()
-    payload = base64.urlsafe_b64encode(
-        json.dumps(_claims()).encode()
-    ).rstrip(b"=").decode()
+    header = (
+        base64.urlsafe_b64encode(json.dumps({"alg": "none", "kid": "anything"}).encode())
+        .rstrip(b"=")
+        .decode()
+    )
+    payload = base64.urlsafe_b64encode(json.dumps(_claims()).encode()).rstrip(b"=").decode()
     token = f"{header}.{payload}."
     _patch_jwks(monkeypatch, {"keys": []})
 
@@ -191,8 +185,7 @@ def test_alg_hs256_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     # secret so PyJWT does not emit InsecureKeyLengthWarning at encode time
     # (the bytes are irrelevant — the verifier rejects on alg, never reaches
     # the signature check).
-    token = jwt.encode(_claims(), "x" * 32, algorithm="HS256",
-                       headers={"kid": "anything"})
+    token = jwt.encode(_claims(), "x" * 32, algorithm="HS256", headers={"kid": "anything"})
     _patch_jwks(monkeypatch, {"keys": []})
 
     with pytest.raises(BetterAuthTokenError, match="unexpected JWT alg"):
@@ -300,9 +293,7 @@ def test_jwks_stale_if_error_within_grace(
     private_pem, jwk = signing_key
     # 1) First call succeeds and warms the last-known-good cache.
     _patch_jwks(monkeypatch, {"keys": [jwk]})
-    token = _sign_jwt(
-        private_pem, kid=jwk["kid"], payload=_claims()
-    )
+    token = _sign_jwt(private_pem, kid=jwk["kid"], payload=_claims())
     verify_better_auth_jwt(token)
 
     # 2) Force the fresh cache to expire so the next call hits the network.
@@ -326,16 +317,14 @@ def test_jwks_fails_after_stale_grace(
 
     private_pem, jwk = signing_key
     _patch_jwks(monkeypatch, {"keys": [jwk]})
-    token = _sign_jwt(
-        private_pem, kid=jwk["kid"], payload=_claims(exp_offset=3600)
-    )
+    token = _sign_jwt(private_pem, kid=jwk["kid"], payload=_claims(exp_offset=3600))
     verify_better_auth_jwt(token)  # warm cache
 
     # Backdate the last-known-good fetch to before the grace window.
     url = "http://localhost:3000/api/auth/jwks"
     ba_security._jwks_fresh.clear()
-    ba_security._jwks_last_fetched_at[url] = (
-        time.monotonic() - (ba_security._JWKS_STALE_GRACE_SECONDS + 60)
+    ba_security._jwks_last_fetched_at[url] = time.monotonic() - (
+        ba_security._JWKS_STALE_GRACE_SECONDS + 60
     )
 
     monkeypatch.setattr(

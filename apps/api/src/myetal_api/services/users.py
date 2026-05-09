@@ -37,9 +37,7 @@ class UserNotFound(Exception):
     """The user_id passed to a service helper does not exist."""
 
 
-async def set_user_orcid_id(
-    db: AsyncSession, user_id: uuid.UUID, orcid_id: str | None
-) -> User:
+async def set_user_orcid_id(db: AsyncSession, user_id: uuid.UUID, orcid_id: str | None) -> User:
     """Set or clear ``orcid_id`` for a user.
 
     Format is assumed pre-validated by the schema layer (see

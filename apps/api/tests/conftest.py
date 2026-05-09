@@ -33,9 +33,7 @@ import uuid
 # claim. setdefault means a real env var still wins if present.
 os.environ.setdefault("BETTER_AUTH_URL", "http://test")
 os.environ.setdefault("BETTER_AUTH_ISSUER", "http://test")
-os.environ.setdefault(
-    "BETTER_AUTH_JWKS_URL", "http://test/api/auth/jwks"
-)
+os.environ.setdefault("BETTER_AUTH_JWKS_URL", "http://test/api/auth/jwks")
 # ORCID public-API credentials — services/orcid_client.py reads these.
 # Only ORCID matters post-cutover (Google/GitHub OAuth move to BA on
 # Next.js), but the test env had all three before — keep the doc the
@@ -90,12 +88,8 @@ def _b64url(b: bytes) -> str:
 
 def _build_keypair() -> tuple[bytes, dict[str, str]]:
     private = Ed25519PrivateKey.generate()
-    private_pem = private.private_bytes(
-        Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()
-    )
-    raw_public = private.public_key().public_bytes(
-        Encoding.Raw, PublicFormat.Raw
-    )
+    private_pem = private.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+    raw_public = private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     jwk = {
         "kty": "OKP",
         "crv": "Ed25519",
@@ -204,9 +198,7 @@ def _patch_jwks_globally(monkeypatch: pytest.MonkeyPatch) -> None:
     response = MagicMock()
     response.raise_for_status = MagicMock()
     response.json = MagicMock(return_value=_TEST_JWKS_DOC)
-    monkeypatch.setattr(
-        ba_security.httpx, "get", MagicMock(return_value=response)
-    )
+    monkeypatch.setattr(ba_security.httpx, "get", MagicMock(return_value=response))
     # Pin settings so the verifier expects the test issuer / JWKS URL
     # regardless of ``.env`` overrides on a developer's machine.
     from myetal_api.core.config import settings

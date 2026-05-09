@@ -36,9 +36,7 @@ async def get_me(user: CurrentUser) -> UserResponse:
 
 
 @router.patch("/orcid", response_model=UserResponse)
-async def update_me_orcid(
-    body: UpdateMeRequest, user: CurrentUser, db: DbSession
-) -> UserResponse:
+async def update_me_orcid(body: UpdateMeRequest, user: CurrentUser, db: DbSession) -> UserResponse:
     """Set or clear the calling user's ``orcid_id`` (manual entry).
 
     409 when the iD is already linked to another user — same contract
@@ -47,9 +45,7 @@ async def update_me_orcid(
     fields = body.model_dump(exclude_unset=True)
     if "orcid_id" in fields:
         try:
-            user = await users_service.set_user_orcid_id(
-                db, user.id, fields["orcid_id"]
-            )
+            user = await users_service.set_user_orcid_id(db, user.id, fields["orcid_id"])
         except users_service.OrcidIdAlreadyLinked as exc:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

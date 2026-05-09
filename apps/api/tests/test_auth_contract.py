@@ -49,9 +49,7 @@ def test_no_auth_returns_401(api_client: TestClient) -> None:
 
 def test_invalid_bearer_returns_401(api_client: TestClient) -> None:
     """Gibberish that isn't even a JWT → 401 (verifier rejects malformed token)."""
-    response = api_client.get(
-        "/me", headers={"Authorization": "Bearer not-a-jwt-just-junk"}
-    )
+    response = api_client.get("/me", headers={"Authorization": "Bearer not-a-jwt-just-junk"})
     assert response.status_code == 401
     assert response.headers.get("WWW-Authenticate") == "Bearer"
 
@@ -66,9 +64,7 @@ def test_expired_bearer_returns_401(api_client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_session_cookie_alone_is_rejected(
-    api_client: TestClient, db_session: AsyncSession
-) -> None:
+def test_session_cookie_alone_is_rejected(api_client: TestClient, db_session: AsyncSession) -> None:
     """Sending a ``myetal_session`` cookie WITHOUT a Bearer header → 401.
 
     Locks the contract: the cookie path is dropped. Even if we plant a

@@ -221,9 +221,7 @@ def downgrade() -> None:
     # exact shape. We let SQLAlchemy create the auth_provider PG enum
     # automatically as a side-effect of the column type — no explicit
     # ``.create()`` call (which would emit a duplicate ``CREATE TYPE``).
-    auth_provider = sa.Enum(
-        "orcid", "google", "github", "password", name="auth_provider"
-    )
+    auth_provider = sa.Enum("orcid", "google", "github", "password", name="auth_provider")
     op.create_table(
         "auth_identities",
         sa.Column("id", sa.Uuid(), primary_key=True),
@@ -267,14 +265,10 @@ def downgrade() -> None:
         sa.Column(
             "rotated_to_id",
             sa.Uuid(),
-            sa.ForeignKey(
-                "refresh_tokens.id", use_alter=True, name="fk_refresh_tokens_rotated_to"
-            ),
+            sa.ForeignKey("refresh_tokens.id", use_alter=True, name="fk_refresh_tokens_rotated_to"),
             nullable=True,
         ),
-        sa.Column(
-            "revoked", sa.Boolean(), server_default=sa.text("false"), nullable=False
-        ),
+        sa.Column("revoked", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("family_id", sa.Uuid(), nullable=False),
         sa.UniqueConstraint("token_hash", name="uq_refresh_tokens_token_hash"),
     )

@@ -52,9 +52,7 @@ _JWKS_STALE_GRACE_SECONDS = 30 * 60
 
 # Fresh cache (TTL-bounded). On expiry the entry vanishes; a successful
 # refetch repopulates it.
-_jwks_fresh: TTLCache[str, dict[str, Any]] = TTLCache(
-    maxsize=4, ttl=_JWKS_FRESH_TTL_SECONDS
-)
+_jwks_fresh: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=4, ttl=_JWKS_FRESH_TTL_SECONDS)
 # Long-lived "last-known-good" copy keyed by URL. Never auto-evicted —
 # we explicitly check ``_jwks_last_fetched_at`` against the grace window
 # at read time.
@@ -120,8 +118,7 @@ def _fetch_jwks(force: bool = False) -> dict[str, Any]:
         last_fetched = _jwks_last_fetched_at.get(url, 0.0)
         if last is not None and (time.monotonic() - last_fetched) <= _JWKS_STALE_GRACE_SECONDS:
             _logger.warning(
-                "JWKS fetch failed (%s); serving stale-if-error copy "
-                "(age=%.0fs, grace=%ds)",
+                "JWKS fetch failed (%s); serving stale-if-error copy (age=%.0fs, grace=%ds)",
                 exc,
                 time.monotonic() - last_fetched,
                 _JWKS_STALE_GRACE_SECONDS,

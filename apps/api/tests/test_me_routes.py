@@ -84,13 +84,9 @@ def test_patch_me_orcid_clears_with_null(authed_as_user_b: TestClient) -> None:
     assert r.json()["orcid_id"] is None
 
 
-async def test_get_me_returns_profile(
-    api_client: TestClient, db_session: AsyncSession
-) -> None:
+async def test_get_me_returns_profile(api_client: TestClient, db_session: AsyncSession) -> None:
     """GET /me returns the calling user's UserResponse via BA JWT."""
-    user = await make_user(
-        db_session, email="me-test@example.com", name="Me Test"
-    )
+    user = await make_user(db_session, email="me-test@example.com", name="Me Test")
     r = api_client.get("/me", headers=auth_headers(user))
     assert r.status_code == 200
     body = r.json()
@@ -107,8 +103,6 @@ def test_get_me_unauthenticated_returns_401(api_client: TestClient) -> None:
 
 
 def test_get_me_invalid_token_returns_generic_401(api_client: TestClient) -> None:
-    r = api_client.get(
-        "/me", headers={"Authorization": "Bearer garbage-not-a-jwt"}
-    )
+    r = api_client.get("/me", headers={"Authorization": "Bearer garbage-not-a-jwt"})
     assert r.status_code == 401
     assert r.json()["detail"] == "Invalid or expired session"

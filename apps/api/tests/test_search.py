@@ -737,9 +737,7 @@ async def test_search_excludes_users_whose_shares_are_private(db_session) -> Non
     from myetal_api.services import share as share_service
     from tests.conftest import make_user
 
-    user = await make_user(
-        db_session, email="private-svc@example.com", name="Private Patty"
-    )
+    user = await make_user(db_session, email="private-svc@example.com", name="Private Patty")
     s = await share_service.create_share(
         db_session, user.id, ShareCreate(name="private", is_public=False)
     )
