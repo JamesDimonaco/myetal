@@ -44,6 +44,40 @@ class Settings(BaseSettings):
     #   ADMIN_EMAILS=james@example.com,ops@example.com
     admin_emails: list[str] = []
 
+    # ---- Better Auth ----
+    # Set in production. Used for issuer pinning and as the base for
+    # computing `better_auth_jwks_url` / `better_auth_issuer` when those
+    # aren't set explicitly.
+    #
+    #   BETTER_AUTH_URL=https://myetal.app          # prod
+    #   BETTER_AUTH_URL=http://localhost:3000        # dev (default)
+    better_auth_url: str = "http://localhost:3000"
+
+    # Shared signing/encryption secret used by Better Auth on the Next.js
+    # side. Mirrored here so the API process can refuse to boot in prod
+    # without it (BA itself enforces a 32-char minimum at first request,
+    # which is too late — we want fail-fast at process start). Empty
+    # string in dev / test is allowed.
+    better_auth_secret: SecretStr = SecretStr("")
+
+    # JWKS endpoint URL. Empty default = computed from `better_auth_url`
+    # (`{better_auth_url}/api/auth/jwks`, post-Phase-3). The verifier
+    # reads `settings.better_auth_jwks_url` directly so the override path
+    # is explicit-set wins.
+    better_auth_jwks_url: str = ""
+
+    # Expected `iss` claim on Better Auth JWTs. Empty default = use
+    # `better_auth_url`. Override only when running BA behind a proxy
+    # that rewrites the issuer (rare).
+    better_auth_issuer: str = ""
+
+    # ---- Email (Resend) ----
+    # Required for password-reset / email-verification transactional
+    # mail. Empty in dev / test = email send is skipped with a warning
+    # log; the auth flows still succeed.
+    resend_api_key: SecretStr = SecretStr("")
+    email_from: str = "MyEtAl <noreply@myetal.app>"
+
     # Telegram — for instant push notifications on user feedback submissions.
     # Both must be set for Telegram delivery; if either is empty the notification
     # is skipped with a warning log.
@@ -73,6 +107,40 @@ class Settings(BaseSettings):
     def reject_dev_secret_in_prod(self) -> "Settings":
         if self.env != "dev" and self.secret_key.get_secret_value() == DEV_SECRET_PLACEHOLDER:
             raise RuntimeError("SECRET_KEY must be set to a real value when ENV is not 'dev'")
+        return self
+
+    @model_validator(mode="after")
+    def _better_auth_defaults(self) -> "Settings":
+        """Fill in computed Better Auth defaults from `better_auth_url`.
+
+        Allows env contracts to specify only `BETTER_AUTH_URL` for the
+        common case; explicit JWKS / issuer overrides still win.
+        """
+        if not self.better_auth_jwks_url and self.better_auth_url:
+            # Mount path is `/api/auth` post-Phase-3. Override
+            # BETTER_AUTH_JWKS_URL in env if you need to pin elsewhere.
+            self.better_auth_jwks_url = (
+                self.better_auth_url.rstrip("/") + "/api/auth/jwks"
+            )
+        if not self.better_auth_issuer and self.better_auth_url:
+            self.better_auth_issuer = self.better_auth_url
+        return self
+
+    @model_validator(mode="after")
+    def _better_auth_secret_min_length_in_prod(self) -> "Settings":
+        """Better Auth requires a 32+ char secret. Fail fast in prod."""
+        if self.env == "dev":
+            return self
+        secret = self.better_auth_secret.get_secret_value()
+        if not secret:
+            raise RuntimeError(
+                "BETTER_AUTH_SECRET must be set when ENV is not 'dev'"
+            )
+        if len(secret) < 32:
+            raise RuntimeError(
+                "BETTER_AUTH_SECRET must be at least 32 characters "
+                "(generate one with `openssl rand -base64 32`)"
+            )
         return self
 
 

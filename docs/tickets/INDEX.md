@@ -10,13 +10,14 @@ When a ticket ships, `git mv` it into `done/` so the queue stays clean.
 
 | # | Ticket | Effort | Why this priority | Depends on |
 |---|---|---|---|---|
-| 1 | **[better-auth-migration](to-do/better-auth-migration.md)** | ~2 weeks | **Foundational + cheap-while-no-real-users.** Replaces hand-rolled auth before the user base matters. Unblocks account linking, makes comments richer, hardens the auth layer. Owner direction: ship before going to "proper prod prod." Fresh-start cutover (test accounts nuked) skips dual-mode complexity. | none |
-| 2 | **[railway-migration-future](to-do/railway-migration-future.md)** | ~5-7 days | Reliability — moves prod off home internet + SD card. Plan recommends *"after Round 2 bakes for 2-4 weeks"*. Pi becomes staging. Better Auth lands first so we're not migrating two foundations at once. | Better Auth shipped |
-| 3 | **[qr-poster-pdf](to-do/qr-poster-pdf.md)** | ~1.5 days | Print-ready A4 PDF download from the share's QR modal. The QR is the bridge from physical → digital; this makes that bridge actually printable. Cheap, on-wedge, ship-on-a-Saturday-afternoon. | none |
-| 4 | **[comments-on-shares](to-do/comments-on-shares.md)** | ~6 days | Deferred for user testing. Locked decisions (Q11-B, Q12-A, Q13). Pull off the shelf when usage data justifies it. | none (Better Auth would help cleaner identity, not strictly required) |
-| 5 | **[email-notifications-future](to-do/email-notifications-future.md)** | ~3-4 days | Comment notifications go in-app first. Email digest only matters once comments are active and noisy. | Comments shipped |
-| 6 | **[pdf-virus-scanning-future](to-do/pdf-virus-scanning-future.md)** | ~1.5 days (Pi) / ~2-3 days (Railway) | Defensive depth. PR-C v1 has MIME magic-bytes + `pdftoppm` timeout — sufficient at our scale. Revisit on first abuse incident or > 100 PDF uploads/month. | none |
-| 7 | **[discovery-and-handles-future](to-do/discovery-and-handles-future.md)** | ~3 days | Needs demand signal. Today: owner-name links route to `/browse?owner_id=` (works, ugly URL). Real `/u/{handle}` profiles wait for > 100 users or branding requests. | none |
+| 1 | **[better-auth-cutover-runbook](to-do/better-auth-cutover-runbook.md)** | ~2 hours (deploy-day) | **Deploy-day deliverable for the shipped Better Auth migration.** Sequenced operational runbook (pre-cutover comms → destructive Alembic → post-cutover verification). Stays in to-do/ until actually run. The migration code is on `feat/better-auth-migration`; this is the operational gate that promotes it. Blocked on owner: Resend account setup (brother on it). | Better Auth merged to main |
+| 2 | **[better-auth-followups](to-do/better-auth-followups.md)** | ~5-7 days | **Account linking across email / Google / GitHub / ORCID** — owner-prioritised UX gap. Plus smaller post-cutover hardening (mobile sign-out server-revoke, JWT-in-URL exchange code, hard email verification flip, mypy/eslint debt). The headline is the linking UI; the rest is bundled because it's all post-BA cleanup. | Better Auth cutover run |
+| 3 | **[railway-migration-future](to-do/railway-migration-future.md)** | ~5-7 days | Reliability — moves prod off home internet + SD card. Plan recommends *"after Round 2 bakes for 2-4 weeks"*. Pi becomes staging. Better Auth shipped first so we're not migrating two foundations at once. | Better Auth cutover run |
+| 4 | **[qr-poster-pdf](to-do/qr-poster-pdf.md)** | ~1.5 days | Print-ready A4 PDF download from the share's QR modal. The QR is the bridge from physical → digital; this makes that bridge actually printable. Cheap, on-wedge, ship-on-a-Saturday-afternoon. | none |
+| 5 | **[comments-on-shares](to-do/comments-on-shares.md)** | ~6 days | Deferred for user testing. Locked decisions (Q11-B, Q12-A, Q13). Pull off the shelf when usage data justifies it. | none (Better Auth shipped — cleaner identity now in place) |
+| 6 | **[email-notifications-future](to-do/email-notifications-future.md)** | ~3-4 days | Comment notifications go in-app first. Email digest only matters once comments are active and noisy. | Comments shipped |
+| 7 | **[pdf-virus-scanning-future](to-do/pdf-virus-scanning-future.md)** | ~1.5 days (Pi) / ~2-3 days (Railway) | Defensive depth. PR-C v1 has MIME magic-bytes + `pdftoppm` timeout — sufficient at our scale. Revisit on first abuse incident or > 100 PDF uploads/month. | none |
+| 8 | **[discovery-and-handles-future](to-do/discovery-and-handles-future.md)** | ~3 days | Needs demand signal. Today: owner-name links route to `/browse?owner_id=` (works, ugly URL). Real `/u/{handle}` profiles wait for > 100 users or branding requests. | none |
 
 ---
 
@@ -39,7 +40,11 @@ Ideas surfaced by the new-ticket-scoping pass. All small, all on-wedge, but **no
 Listed by domain, not strict chronology.
 
 ### Auth + identity
-- [orcid-integration-and-account-linking](done/orcid-integration-and-account-linking.md) — Phase A: ORCID OAuth sign-in, manual ORCID iD entry, auto-populate on sign-in. (Phase B account linking deferred to Better Auth.)
+- [better-auth-migration](done/better-auth-migration.md) — fresh-start cutover off hand-rolled JWT/Argon2 onto Better Auth (Next.js Route Handler). Drops `auth_identities` + `refresh_tokens`; FastAPI verifies BA-minted JWTs via JWKS. Six phases (Phase 0 spike → Phase 6 hardening). Shipped on `feat/better-auth-migration`; awaits the deploy-day runbook to actually go live.
+- [better-auth-spike-notes](done/better-auth-spike-notes.md) — Phase 0 spike record (cross-stack identity proof). Historical only.
+- [better-auth-orcid-flow](done/better-auth-orcid-flow.md) — Phase 5 ORCID flow audit + 10-row smoke matrix. Hijack-hardening + `disableImplicitLinking` posture preserved through the cutover.
+- [better-auth-known-limitations](done/better-auth-known-limitations.md) — record of every "important but non-blocking" gap accepted for v1 (mobile sign-out doesn't invalidate server session, JWT-in-bounce-URL TTL, soft email verification, admin re-grant, etc.) with file:line and fix paths.
+- [orcid-integration-and-account-linking](done/orcid-integration-and-account-linking.md) — Phase A: ORCID OAuth sign-in, manual ORCID iD entry, auto-populate on sign-in. (Phase B account linking now lives inside the Better Auth migration.)
 - [orcid-import-and-polish](done/orcid-import-and-polish.md) — Phase A.5: works import via `/me/works/sync-orcid`, library auto-fire on first visit, profile section polish, error handling, mobile parity.
 
 ### Library + works

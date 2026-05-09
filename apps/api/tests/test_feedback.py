@@ -12,12 +12,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.models.feedback import Feedback
-from myetal_api.services import auth as auth_service
+from tests.conftest import make_user, signed_jwt
 
 
 async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
-    user, access, _ = await auth_service.register_with_password(db, email, "hunter22", "Researcher")
-    return user, access
+    """BA-JWT replacement for the legacy register_with_password helper."""
+    user = await make_user(db, email=email, name="Researcher")
+    return user, signed_jwt(user.id, email=user.email or "")
 
 
 # ---------- anonymous submission ----------

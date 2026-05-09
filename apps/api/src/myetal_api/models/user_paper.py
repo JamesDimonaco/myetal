@@ -27,8 +27,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from myetal_api.models.base import Base
 
 if TYPE_CHECKING:
+    from myetal_api.models.better_auth import User
     from myetal_api.models.paper import Paper
-    from myetal_api.models.user import User
 
 
 class UserPaperAddedVia(enum.StrEnum):

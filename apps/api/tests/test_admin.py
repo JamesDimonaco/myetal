@@ -25,8 +25,8 @@ from myetal_api.models import (
     ShareReportStatus,
 )
 from myetal_api.schemas.share import ShareCreate
-from myetal_api.services import auth as auth_service
 from myetal_api.services import share as share_service
+from tests.conftest import make_user, signed_jwt
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +36,11 @@ def _admin_allowlist(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 async def _make_user(db: AsyncSession, email: str) -> tuple:
-    return await auth_service.register_with_password(db, email, "hunter22hunter22", email)
+    """Compatibility shim — every call site below unpacks
+    ``(user, access, _)``. We mint a BA-style JWT here and return the
+    same tuple shape so the migration is a one-line import change."""
+    user = await make_user(db, email=email, name=email)
+    return user, signed_jwt(user.id, email=user.email or ""), ""
 
 
 async def _seed_open_report(db: AsyncSession) -> tuple[Share, ShareReport]:

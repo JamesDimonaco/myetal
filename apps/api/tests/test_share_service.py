@@ -3,13 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.models import ItemKind, ShareType
 from myetal_api.schemas.share import ShareCreate, ShareItemCreate, ShareUpdate
-from myetal_api.services import auth as auth_service
 from myetal_api.services import share as share_service
+from tests.conftest import auth_headers, make_user
 
 
 async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
-    user, _, _ = await auth_service.register_with_password(db, email, "hunter22", "Researcher")
-    return user
+    return await make_user(db, email=email, name="Researcher")
 
 
 async def test_create_share_with_items(db_session: AsyncSession) -> None:
@@ -402,22 +401,12 @@ async def test_create_share_unknown_slug_auto_creates_tag(
 
 
 async def test_create_share_too_many_tags_rejected_at_schema(
-    api_client: TestClient,
+    api_client: TestClient, db_session: AsyncSession
 ) -> None:
     """Schema cap of 5 — Pydantic Field(max_length=5) rejects 6 tags
-    with 422 before the service ever runs.
-
-    Auth: stub a user via direct registration + login flow, then POST.
-    """
-    # Register + login to get a bearer token.
-    r = api_client.post(
-        "/auth/register",
-        json={"email": "capper@example.com", "password": "hunter22", "name": "Cap"},
-    )
-    assert r.status_code in (200, 201)
-    body = r.json()
-    token = body.get("access_token") or body.get("token")
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    with 422 before the service ever runs."""
+    user = await _make_user(db_session, "capper@example.com")
+    headers = auth_headers(user)
 
     payload = {
         "name": "x",
@@ -470,14 +459,8 @@ async def test_patch_share_with_pdf_kind_in_items_returns_422(
 ) -> None:
     """K1: PATCH /shares/{id} with ``kind=pdf`` items in the body must
     fail at validation (422) before any DB write."""
-    # Register + login.
-    r = api_client.post(
-        "/auth/register",
-        json={"email": "k1@example.com", "password": "hunter22", "name": "K1"},
-    )
-    assert r.status_code in (200, 201)
-    token = r.json().get("access_token") or r.json().get("token")
-    headers = {"Authorization": f"Bearer {token}"}
+    user = await _make_user(db_session, "k1@example.com")
+    headers = auth_headers(user)
 
     r = api_client.post("/shares", json={"name": "x"}, headers=headers)
     assert r.status_code == 201
@@ -588,19 +571,14 @@ async def test_unpublished_public_share_not_resolvable_via_short_code(
 
 
 async def test_post_share_with_empty_items_succeeds(
-    api_client: TestClient,
+    api_client: TestClient, db_session: AsyncSession
 ) -> None:
     """Empty share save (Option A): the editor needs to be able to save a
     share before any items are attached so the PDF-upload tab can run with
     a real share_id. POST /shares with ``items=[]`` returns 201.
     """
-    r = api_client.post(
-        "/auth/register",
-        json={"email": "empty@example.com", "password": "hunter22", "name": "Empty"},
-    )
-    assert r.status_code in (200, 201)
-    token = r.json().get("access_token") or r.json().get("token")
-    headers = {"Authorization": f"Bearer {token}"}
+    user = await _make_user(db_session, "empty@example.com")
+    headers = auth_headers(user)
 
     r = api_client.post(
         "/shares",

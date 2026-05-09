@@ -9,7 +9,7 @@ import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 
 /**
- * Marketing landing. Server-rendered. Tries to fetch /auth/me — if the user
+ * Marketing landing. Server-rendered. Tries to fetch /me — if the user
  * has a valid session, the header swaps to "Go to dashboard" + sign-out and
  * the hero CTA changes to point at /dashboard. Anonymous users see the
  * original sign-in / try-the-demo flow.
@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic';
 
 async function getCurrentUser(): Promise<UserResponse | null> {
   try {
-    return await serverFetch<UserResponse>('/auth/me', { cache: 'no-store' });
+    return await serverFetch<UserResponse>('/me', { cache: 'no-store' });
   } catch {
     // 401/403 (not signed in) or API down — render the anonymous landing
     // rather than breaking the whole homepage.

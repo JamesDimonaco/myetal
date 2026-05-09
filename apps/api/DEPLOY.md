@@ -255,9 +255,17 @@ which already replaces containers when the image changes.)
 ```bash
 curl -fsS https://api.myetal.app/healthz                          # liveness
 curl -fsS https://api.myetal.app/readyz                           # DB reachable
-curl -fsS -o /dev/null -w '%{http_code}\n' \
-  'https://api.myetal.app/auth/orcid/start?platform=web&return_to=/'   # → 302
+
+# Better Auth JWKS reachable from FastAPI's vantage point — every
+# authenticated request goes through this. ``keys`` should be a
+# non-empty array.
+curl -fsS https://myetal.app/api/auth/jwks | jq '.keys | length'  # → 1+
 ```
+
+(The legacy ORCID smoke against ``/auth/orcid/start`` was deleted in
+Phase 2 — that route lives on the Next.js side now via Better Auth's
+genericOAuth plugin. The post-cutover smoke matrix for the OAuth flows
+themselves lives in §9a "Post-cutover ORCID smoke (deploy gate)".)
 
 ---
 
@@ -299,20 +307,17 @@ slowapi backend, not more workers.
 
 ---
 
-## 7. Refresh-token cleanup (cron)
+## 7. Session cleanup
 
-The `refresh_tokens` table grows monotonically. Run the cleanup script
-nightly via cron on the Pi:
+Better Auth owns the ``session`` table (replaces the legacy
+``refresh_tokens``). It expires sessions automatically based on the
+``expiresIn`` config in ``apps/web/src/lib/auth.ts``; no nightly cron
+job is required on the API side.
 
-```cron
-@daily root docker exec myetal-api-1 python -m scripts.cleanup_refresh_tokens >> /var/log/myetal-cleanup.log 2>&1
-```
-
-(The container name is `myetal-api-1` under compose's default naming. Adjust
-if you rename the project with `COMPOSE_PROJECT_NAME` or a `name:` directive.)
-
-The script deletes rows where `revoked=True` OR `expires_at < now()` and
-prints the row count to stdout.
+The Phase 2 cutover dropped both ``refresh_tokens`` and the
+``scripts/cleanup_refresh_tokens.py`` helper that paired with it. Any
+crontab entry referencing that script should be removed when this
+deploys — see Alembic 0016 for the table drop.
 
 ---
 
@@ -383,6 +388,198 @@ docker exec -i myetal-db-1 pg_restore --clean --if-exists -U myetal -d myetal < 
 - **PostHog** — backend doesn't ingest. Add only when there's a real backend
   event worth shipping (e.g. share-created); scan analytics already go via
   the Next.js public page, not here.
+
+---
+
+## 9a. Better Auth migration cutover
+
+The Phase 1 Alembic migration (`0016_better_auth_cutover.py`) is
+**destructive** — it truncates `users` and every table that FKs to it,
+drops `auth_identities` + `refresh_tokens`, and creates Better Auth's
+core tables. Plan accordingly.
+
+> **Phase 3 path collapse:** the Better Auth catch-all moved from
+> `/api/ba-auth/*` (Phase 0 safety mount) to `/api/auth/*` in Phase 3.
+> Update any pinned `BETTER_AUTH_JWKS_URL` env var on the Pi /
+> Vercel — the auto-derived default also changed and will pick up
+> `${BETTER_AUTH_URL}/api/auth/jwks` on next boot.
+
+> **Resend DNS warning:** before this deploys, set up DKIM + SPF
+> records on the `myetal.app` domain inside Resend's dashboard.
+> Without verified DNS, `RESEND_API_KEY` is set but password-reset and
+> email-verification mail bounces silently. Verify by sending a test
+> message via the Resend dashboard *before* flipping prod traffic.
+
+### Pre-cutover checklist
+
+- [ ] Comms email sent **7 days** before merge — every test address
+  (the small set in `auth_identities WHERE provider='password'` plus
+  ORCID-only sign-ins). Include the cutover date and the link to
+  `myetal.app/sign-up` for re-registration.
+- [ ] Reminder comms **24h** before. Same list.
+- [ ] Admin allowlist documented for re-grant. After cutover
+  `users.is_admin` is `false` for everyone — set the desired admins
+  by hand once they've re-signed-up. (Owner usually = James + ops.)
+- [ ] Resend account live and DNS DKIM/SPF records published on
+  `myetal.app`. Without this `RESEND_API_KEY` is set but no mail
+  delivers.
+- [ ] Vercel project (web) has `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
+  `RESEND_API_KEY`, `EMAIL_FROM`, `DATABASE_URL` pointing at the same
+  Pi Postgres.
+
+### New env vars on the Pi
+
+Append to `/home/pi/myetal/.env`:
+
+```env
+# Better Auth — must match the value set on Vercel for the web app
+BETTER_AUTH_SECRET=<openssl rand -base64 32>
+BETTER_AUTH_URL=https://myetal.app
+# BETTER_AUTH_JWKS_URL / BETTER_AUTH_ISSUER auto-derive from BETTER_AUTH_URL.
+# Override only if running BA behind a path-rewriting proxy.
+
+# Resend — https://resend.com → API Keys
+RESEND_API_KEY=re_...
+EMAIL_FROM="MyEtAl <noreply@myetal.app>"
+
+# Already present, double-check:
+ORCID_USE_SANDBOX=false
+```
+
+### Deploy command sequence
+
+```bash
+ssh pi
+cd /home/pi/myetal
+
+# Fresh DB dump first — destructive migration ahead.
+sudo /usr/local/bin/myetal-backup.sh
+
+docker compose pull
+docker compose down
+# `up -d` runs `alembic upgrade head` as part of the API container's
+# startup command. Watch the logs to confirm 0016 applied:
+docker compose up -d
+docker compose logs -f api
+```
+
+You should see `INFO  [alembic.runtime.migration] Running upgrade
+0015 -> 0016, better auth cutover — fresh-start, single revision`
+followed by the uvicorn boot.
+
+### Verification
+
+```bash
+# JWKS doc serves (signed-key set Better Auth manages):
+curl -s https://myetal.app/api/auth/jwks | jq '.keys | length'
+# expect: 1 (or more after rotations)
+
+# Fetch a JWT for an authenticated session, then verify cross-stack:
+JWT="<paste the token from the cookie / token endpoint>"
+curl -s https://api.myetal.app/me \
+  -H "Authorization: Bearer $JWT" | jq .
+# expect: { id: "...", email: "...", name: "...", ... } — the calling user.
+# 401 = JWT didn't verify (issuer mismatch, wrong key, expired). Check the
+# API logs for the specific reason; the wire response is intentionally generic.
+```
+
+### OAuth provider allow-lists for mobile (Phase 4)
+
+The mobile app uses Better Auth's OAuth flow but can't redirect directly
+to a custom URL scheme — Google, GitHub, and ORCID all require https
+redirect URIs in their console allow-lists. To bridge the gap we added
+a server-rendered bounce page at
+``${BETTER_AUTH_URL}/auth/mobile-bounce`` that reads the BA session,
+mints a JWT, and 302/JS-redirects to ``myetal://auth/callback?token=…``.
+
+Each provider console must allow **both** the BA callback (already
+configured pre-cutover) **and** keep the bounce page reachable. In
+practice that means:
+
+- **Google** — Authorized redirect URIs: keep
+  ``https://myetal.app/api/auth/callback/google``. No new entry; BA's
+  callback is what Google sees. The bounce page is loaded via a 302 from
+  BA, never directly from Google.
+- **GitHub** — Authorization callback URL: keep
+  ``https://myetal.app/api/auth/callback/github``. Same reasoning.
+- **ORCID** (sandbox + prod) — Redirect URIs: keep
+  ``https://myetal.app/api/auth/oauth2/callback/orcid``. Same reasoning.
+
+If we ever discover a provider DOES need a literal entry for the bounce
+page (CORS-style preflight on the callback chain, etc), add
+``https://myetal.app/auth/mobile-bounce`` to the same redirect-URI list.
+
+**Verify the deep-link flow before declaring Phase 4 shipped:** sign in
+on a dev build of the mobile app via Google → expect the in-app browser
+to land on ``mobile-bounce`` for ~150 ms then close, returning the user
+to the app's dashboard. If the browser stays open on ``mobile-bounce``
+the deep-link target is wrong (check ``app.json``'s ``scheme`` and the
+``trustedOrigins`` list in ``apps/web/src/lib/auth.ts``).
+
+### Post-cutover ORCID smoke (deploy gate)
+
+After the cutover migration applies, before declaring the deploy
+green, run a quick ORCID end-to-end against a known-good iD on the
+*sandbox* environment. Both auto-sync and manual flows must work:
+
+1. **OAuth path.** Sign in via "Continue with ORCID" using a sandbox
+   iD you control. Confirm the resulting `users` row has the iD
+   populated and `last_orcid_sync_at IS NULL`.
+2. **Public-API sync.** Hit `POST /me/works/sync-orcid`. Confirm the
+   response lists imported papers and that `last_orcid_sync_at` is
+   stamped to `now()`.
+3. **Manual entry.** As a different user (no ORCID), `PATCH /me/orcid`
+   with another sandbox iD. Confirm 200 + iD set + `last_orcid_sync_at
+   IS NULL`.
+4. **Hijack guard.** Try to sign in via ORCID using the iD already on
+   user (1)'s row from a fresh browser/session. Expect a redirect to
+   `/sign-in?error=orcid_already_linked` and NO duplicate user row.
+
+The full Phase 5 smoke matrix lives in
+`docs/tickets/done/better-auth-orcid-flow.md`.
+
+### Re-granting admin after cutover
+
+After the destructive migration `users.is_admin` is `false` for
+every account. Once the desired admins have re-signed-up (their
+fresh sign-in lands them in the new `users` table), grant by
+email from a psql session on the Pi:
+
+```sql
+UPDATE users
+SET is_admin = true
+WHERE email = ANY(ARRAY['james@example.com', 'ops@example.com']);
+```
+
+`is_admin` is a Better-Auth `additionalField` (column lives on
+`users` directly); the next session-mint picks the new value into
+the JWT payload, so the user must sign out and back in once before
+the API's `require_admin` dep starts treating them as admin.
+
+### Rollback
+
+If the deploy fails or sign-up is broken in ways we can't hot-fix:
+
+```bash
+# Web side — revert the cutover commit on main and let Vercel redeploy.
+git revert <cutover commit SHA>
+git push
+
+# API side — IMPORTANT: run `alembic downgrade -1` while still on the
+# NEW image (the one that contains revision 0016 in its alembic chain).
+# Running downgrade against the old image walks 0015→0014 because 0016
+# isn't known there.
+docker compose run --rm api uv run alembic downgrade -1
+
+# Now re-pin to the previous SHA and bring the old image up.
+sed -i 's/^API_TAG=.*/API_TAG=<previous SHA>/' /home/pi/myetal/.env
+docker compose pull
+docker compose up -d
+```
+
+The downgrade recreates `auth_identities` and `refresh_tokens` empty.
+Test users will need to sign up a third time once we redeploy forward
+— accept this; rolling back data is out of scope.
 
 ---
 

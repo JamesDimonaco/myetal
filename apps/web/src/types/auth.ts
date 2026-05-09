@@ -1,9 +1,11 @@
-export interface TokenPair {
-  access_token: string;
-  refresh_token: string;
-  token_type?: string;
-}
-
+/**
+ * Calling-user shape — JSON body of GET /me on the API side.
+ *
+ * Mirrors ``apps/api/src/myetal_api/schemas/user.py::UserResponse``.
+ * Phase 3 dropped the legacy ``TokenPair`` / ``LoginInput`` /
+ * ``RegisterInput`` / ``SessionResponse`` shapes — Better Auth's
+ * client owns those concerns now.
+ */
 export interface UserResponse {
   id: string;
   email: string | null;
@@ -13,23 +15,4 @@ export interface UserResponse {
   orcid_id: string | null;
   last_orcid_sync_at: string | null;
   created_at: string;
-}
-
-export interface LoginInput {
-  email: string;
-  password: string;
-}
-
-export interface RegisterInput {
-  email: string;
-  password: string;
-  name?: string;
-}
-
-/** GET /auth/me/sessions — list of refresh-token rows (= signed-in devices). */
-export interface SessionResponse {
-  id: string;
-  issued_at: string;
-  expires_at: string;
-  revoked: boolean;
 }

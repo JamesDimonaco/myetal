@@ -10,13 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.models import ShareReport, ShareReportStatus
 from myetal_api.schemas.share import ShareCreate
-from myetal_api.services import auth as auth_service
 from myetal_api.services import share as share_service
+from tests.conftest import auth_headers, make_user
 
 
 async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
-    user, _, _ = await auth_service.register_with_password(db, email, "hunter22", "Researcher")
-    return user
+    return await make_user(db, email=email, name="Researcher")
 
 
 async def test_submit_report_anonymous(db_session: AsyncSession, api_client) -> None:
@@ -45,13 +44,11 @@ async def test_submit_report_authenticated(db_session: AsyncSession, api_client)
     owner = await _make_user(db_session)
     share = await share_service.create_share(db_session, owner.id, ShareCreate(name="x"))
 
-    reporter, access, _ = await auth_service.register_with_password(
-        db_session, "reporter@example.com", "hunter22", "Reporter"
-    )
+    reporter = await make_user(db_session, email="reporter@example.com", name="Reporter")
 
     r = api_client.post(
         f"/shares/{share.short_code}/report",
-        headers={"Authorization": f"Bearer {access}"},
+        headers=auth_headers(reporter),
         json={"reason": "spam"},
     )
     assert r.status_code == 201

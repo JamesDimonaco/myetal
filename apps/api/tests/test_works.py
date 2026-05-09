@@ -25,7 +25,20 @@ from myetal_api.models import Paper, UserPaper, UserPaperAddedVia
 from myetal_api.services import orcid_client
 from myetal_api.services import papers as papers_service
 from myetal_api.services import works as works_service
-from myetal_api.services.auth import register_with_password, set_user_orcid_id
+from myetal_api.services.users import set_user_orcid_id
+from tests.conftest import make_user as _make_user_helper
+
+
+async def register_with_password(
+    db: AsyncSession, email: str, password: str, name: str | None
+):
+    """Compatibility shim — Phase 2 deletes the legacy auth service.
+
+    Tests in this module just need ``(user, _, _)``; password / refresh
+    are unused. Returns the same tuple shape so call-sites stay terse.
+    """
+    user = await _make_user_helper(db, email=email, name=name)
+    return user, "", ""
 
 
 @pytest.fixture(autouse=True)

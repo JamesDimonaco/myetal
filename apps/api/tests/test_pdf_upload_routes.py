@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.api.routes import shares as shares_routes
 from myetal_api.schemas.share import ShareCreate
-from myetal_api.services import auth as auth_service
 from myetal_api.services import share as share_service
+from tests.conftest import make_user, signed_jwt
 
 
 @pytest.fixture
@@ -73,32 +73,13 @@ def _reset_presign_cache() -> Iterator[None]:
     shares_routes._presign_cache.clear()
 
 
-async def _register_and_login(api_client: TestClient, email: str = "pdf@example.com") -> str:
-    r = api_client.post(
-        "/auth/register",
-        json={"email": email, "password": "hunter22", "name": "Pdfer"},
-    )
-    assert r.status_code in (200, 201)
-    body = r.json()
-    token = body.get("access_token") or body.get("token")
-    assert token is not None
-    return token
-
-
 async def _make_share(
     db_session: AsyncSession, owner_email: str = "pdf@example.com"
 ) -> tuple[str, str]:
-    """Create a user + share via the service layer (no auth) and return
-    (share_id_str, token) for HTTP calls."""
-    user, _, _ = await auth_service.register_with_password(
-        db_session, owner_email, "hunter22", "Pdfer"
-    )
+    """Create a user + share and return (share_id_str, BA-style JWT)."""
+    user = await make_user(db_session, email=owner_email, name="Pdfer")
     share = await share_service.create_share(db_session, user.id, ShareCreate(name="x"))
-    # Mint an access token directly via the security helper so we don't
-    # have to re-login.
-    from myetal_api.core.security import create_access_token
-
-    token = create_access_token(user.id)
+    token = signed_jwt(user.id, email=user.email or "")
     return str(share.id), token
 
 
@@ -168,12 +149,8 @@ async def test_upload_url_rejects_other_users_share(
 ) -> None:
     # Alice owns the share, Bob tries to upload to it.
     share_id, _alice_token = await _make_share(db_session, owner_email="alice@example.com")
-    bob, _, _ = await auth_service.register_with_password(
-        db_session, "bob@example.com", "hunter22", "Bob"
-    )
-    from myetal_api.core.security import create_access_token
-
-    bob_token = create_access_token(bob.id)
+    bob = await make_user(db_session, email="bob@example.com", name="Bob")
+    bob_token = signed_jwt(bob.id, email=bob.email or "")
     r = api_client.post(
         f"/shares/{share_id}/items/upload-url",
         json={

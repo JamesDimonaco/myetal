@@ -1,126 +1,46 @@
 /**
- * Gatekeeper for /dashboard/*. Anything under /dashboard requires a valid
- * access token cookie. When the access token has expired but a refresh token
- * is still present, the middleware refreshes the pair *here* (before the
- * request reaches server components) so every downstream `serverFetch` call
- * sees a valid token.
+ * Gatekeeper for /dashboard/*. Requires a valid Better Auth session.
  *
- * Why here and not in serverFetch?
- * `cookies().set()` is silently ignored during Server Component rendering —
- * only Route Handlers, Server Actions, and middleware can write cookies.
- * Refreshing in middleware guarantees the new tokens are delivered to the
- * browser via Set-Cookie headers on the response.
+ * Phase 3 rewrite: drops the JWT-decode-and-refresh dance. Better Auth
+ * owns refresh — the session cookie either resolves to a valid session
+ * (let the request through) or it doesn't (bounce to /sign-in). We do
+ * not call ``auth.api.getSession()`` here because it requires the
+ * Node runtime, while Next 16 middleware runs on the Edge runtime by
+ * default. Instead we look for the session cookie's presence; the
+ * downstream layout's ``serverFetch`` to ``/me`` is the authoritative
+ * check (it 401s on invalid sessions and the layout redirects).
  *
- * NOTE on Next.js 16: `middleware` is deprecated in favour of `proxy`. Both
- * still work in 16.x; we use `middleware` per the build spec. When we
- * upgrade to a release that drops middleware, run
- * `npx @next/codemod@canary middleware-to-proxy .` to rename.
+ * Cookie presence is sufficient at the middleware boundary: cookies
+ * are unforgeable to anyone without ``BETTER_AUTH_SECRET``, and the
+ * server-side ``/me`` round-trip catches expired sessions.
+ *
+ * NOTE on Next.js 16: ``middleware`` is deprecated in favour of
+ * ``proxy``. Both still work in 16.x; we use ``middleware`` per the
+ * existing build spec. Codemod when we upgrade past the deprecation.
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
 
-import {
-  ACCESS_COOKIE,
-  REFRESH_COOKIE,
-  accessCookieOptions,
-  refreshCookieOptions,
-} from '@/lib/auth-cookies';
+const SESSION_COOKIE = 'myetal_session';
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.API_URL ??
-  'http://localhost:8000'
-).replace(/\/$/, '');
-
-/**
- * Decode the JWT *without* verifying the signature (we only need the `exp`
- * claim to decide whether to refresh). The backend will reject truly
- * invalid tokens — this is just an optimistic check.
- */
-function jwtExpiresAt(token: string): number | null {
-  try {
-    const payload = JSON.parse(
-      Buffer.from(token.split('.')[1], 'base64url').toString(),
-    );
-    return typeof payload.exp === 'number' ? payload.exp : null;
-  } catch {
-    return null;
-  }
-}
-
-/** True when the token is expired or will expire within 60 seconds. */
-function isExpiredOrStale(token: string): boolean {
-  const exp = jwtExpiresAt(token);
-  if (exp === null) return true; // can't parse → treat as expired
-  return exp - 60 < Date.now() / 1000;
-}
-
-export async function middleware(request: NextRequest) {
-  const accessValue = request.cookies.get(ACCESS_COOKIE)?.value;
-  const refreshValue = request.cookies.get(REFRESH_COOKIE)?.value;
-
-  // ---- Happy path: access token present and still valid ----
-  if (accessValue && !isExpiredOrStale(accessValue)) {
+export function middleware(request: NextRequest) {
+  const sessionValue = request.cookies.get(SESSION_COOKIE)?.value;
+  if (sessionValue) {
     return NextResponse.next();
   }
-
-  // ---- No refresh token → can't recover → sign-in ----
-  if (!refreshValue) {
-    return redirectToSignIn(request);
-  }
-
-  // ---- Try to refresh the token pair ----
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: refreshValue }),
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      // Refresh token is invalid / revoked / expired → sign-in
-      return redirectToSignIn(request);
-    }
-
-    const data = (await res.json()) as {
-      access_token: string;
-      refresh_token: string;
-    };
-
-    // Let the request proceed AND set the new tokens on the response
-    const response = NextResponse.next();
-    response.cookies.set(ACCESS_COOKIE, data.access_token, accessCookieOptions);
-    response.cookies.set(REFRESH_COOKIE, data.refresh_token, refreshCookieOptions);
-
-    // Also set on the *request* so downstream server components see the
-    // refreshed access token in the same render pass.
-    request.cookies.set(ACCESS_COOKIE, data.access_token);
-    request.cookies.set(REFRESH_COOKIE, data.refresh_token);
-
-    return response;
-  } catch {
-    // Network error talking to the API — don't lock the user out, let
-    // the downstream code try with whatever token is left.
-    if (accessValue) return NextResponse.next();
-    return redirectToSignIn(request);
-  }
+  return redirectToSignIn(request);
 }
 
 function redirectToSignIn(request: NextRequest): NextResponse {
   const signIn = new URL('/sign-in', request.url);
   const returnTo = request.nextUrl.pathname + request.nextUrl.search;
   signIn.searchParams.set('return_to', returnTo);
-  const response = NextResponse.redirect(signIn);
-  // Clear stale cookies so the sign-in page doesn't think the user is logged in
-  response.cookies.set(ACCESS_COOKIE, '', { ...accessCookieOptions, maxAge: 0 });
-  response.cookies.set(REFRESH_COOKIE, '', { ...refreshCookieOptions, maxAge: 0 });
-  return response;
+  return NextResponse.redirect(signIn);
 }
 
 export const config = {
+  // Don't gate /api/auth/* — Better Auth owns its own routing and our
+  // middleware must not interfere with the OAuth redirect chain or the
+  // sign-out cookie clear.
   matcher: ['/dashboard/:path*'],
 };

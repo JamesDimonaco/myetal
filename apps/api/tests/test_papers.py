@@ -24,7 +24,15 @@ from myetal_api.api.deps import get_current_user
 from myetal_api.core.database import get_db
 from myetal_api.main import app
 from myetal_api.services import papers as papers_service
-from myetal_api.services.auth import register_with_password
+from tests.conftest import make_user as _make_user_helper
+
+
+async def register_with_password(
+    db: AsyncSession, email: str, password: str, name: str | None
+):
+    """Compatibility shim for the legacy register_with_password call sites."""
+    user = await _make_user_helper(db, email=email, name=name)
+    return user, "", ""
 
 # ---------- fixtures ----------
 

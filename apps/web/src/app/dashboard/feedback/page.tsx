@@ -10,7 +10,7 @@ export default async function FeedbackPage() {
   let userEmail: string | null = null;
 
   try {
-    const user = await serverFetch<UserResponse>('/auth/me', {
+    const user = await serverFetch<UserResponse>('/me', {
       cache: 'no-store',
     });
     userEmail = user.email;
