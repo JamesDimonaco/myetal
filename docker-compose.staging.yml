@@ -1,6 +1,7 @@
 # ============================================================
 # docker-compose.staging.yml — Pi-hosted staging stack
 # ============================================================
+# Last deploy poke: 2026-05-09
 # Separate from docker-compose.yml so staging can run alongside dev/prod
 # on the same Pi without colliding. Use a distinct project name when
 # bringing it up:
