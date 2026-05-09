@@ -2,8 +2,9 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import 'react-native-reanimated';
+import { PostHogProvider } from 'posthog-react-native';
 
 import { AnalyticsConsent } from '@/components/analytics-consent';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -19,26 +20,26 @@ import { queryClient } from '@/lib/queryClient';
 const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY ?? '';
 const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST ?? '';
 
+// Statically typed reference so we can fall back to a passthrough if the
+// module ever fails to load. Avoids `require()` inside a render body, which
+// re-evaluates the module on every render and can cross React copies.
+const PostHogProviderSafe = (PostHogProvider ?? null) as
+  | ComponentType<{ apiKey: string; options?: { host?: string }; children?: ReactNode }>
+  | null;
+
 /**
  * Conditionally wraps children in PostHogProvider. If the key is empty or
- * the import fails, children render unwrapped — the app never crashes
- * because of analytics.
+ * the provider is unavailable, children render unwrapped — the app never
+ * crashes because of analytics.
  */
 function MaybePostHog({ enabled, children }: { enabled: boolean; children: ReactNode }) {
-  if (!enabled || !POSTHOG_KEY) return <>{children}</>;
+  if (!enabled || !POSTHOG_KEY || !PostHogProviderSafe) return <>{children}</>;
 
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { PostHogProvider } = require('posthog-react-native');
-    return (
-      <PostHogProvider apiKey={POSTHOG_KEY} options={{ host: POSTHOG_HOST }}>
-        {children}
-      </PostHogProvider>
-    );
-  } catch {
-    // posthog-react-native failed to load — run without analytics
-    return <>{children}</>;
-  }
+  return (
+    <PostHogProviderSafe apiKey={POSTHOG_KEY} options={{ host: POSTHOG_HOST }}>
+      {children}
+    </PostHogProviderSafe>
+  );
 }
 
 export default function RootLayout() {
