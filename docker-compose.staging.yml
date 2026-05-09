@@ -1,7 +1,6 @@
 # ============================================================
 # docker-compose.staging.yml — Pi-hosted staging stack
 # ============================================================
-# Last deploy poke: 2026-05-09 (retrigger after .git chown fix)
 # Separate from docker-compose.yml so staging can run alongside dev/prod
 # on the same Pi without colliding. Use a distinct project name when
 # bringing it up:
@@ -14,6 +13,10 @@
 #
 # DB is co-resident on the same Pi but a SEPARATE Postgres container so
 # staging migrations / truncates can never touch prod data.
+#
+# Both services load env vars from `.env.staging` via the env_file directive
+# rather than ${VAR} interpolation, so we don't depend on the compose CLI's
+# `--env-file` flag picking up the file (which has been flaky in practice).
 
 # Pinned project name — even without `-p`, this stack can't collide with
 # the prod compose project (which defaults to `myetal`).
@@ -22,10 +25,8 @@ name: myetal-staging
 services:
   db:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+    env_file:
+      - .env.staging
     # Bind to 127.0.0.1 only — staging Postgres should not be reachable
     # from anywhere except the Pi itself + the API container in this stack.
     ports:
@@ -33,7 +34,9 @@ services:
     volumes:
       - myetal_staging_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      # The `$$` escapes a single `$` for compose so the variable is
+      # expanded INSIDE the container at exec time, not by compose.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -42,16 +45,10 @@ services:
   api:
     image: jamesdimonaco/myetal-api:staging
     pull_policy: always   # `docker compose pull` always grabs the latest :staging tag
-    ports:
-      - "127.0.0.1:8001:8000"
     env_file:
       - .env.staging
-    environment:
-      ENV: staging
-      # Override the env-file's host-targeted DB URL — inside the compose
-      # network, the API talks to the `db` service by service name.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      DATABASE_URL_SYNC: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:8001:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -64,7 +61,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      # First-run on Pi includes alembic migration + uvicorn boot — give it
+      # time. Subsequent runs are faster, but start_period covers worst case.
+      start_period: 60s
     restart: unless-stopped
 
 volumes:

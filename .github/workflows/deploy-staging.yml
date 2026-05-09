@@ -121,11 +121,22 @@ jobs:
             git reset --hard origin/staging
             # Pull new image + recreate the stack. compose handles
             # alembic upgrade head as the api container's startup command.
-            docker compose -p myetal-staging -f docker-compose.staging.yml --env-file .env.staging pull
-            docker compose -p myetal-staging -f docker-compose.staging.yml --env-file .env.staging up -d
-            # Quick sanity check — fail the workflow if the stack didn't come up.
-            sleep 10
+            docker compose -p myetal-staging -f docker-compose.staging.yml pull
+            docker compose -p myetal-staging -f docker-compose.staging.yml up -d
             docker compose -p myetal-staging -f docker-compose.staging.yml ps
-            curl -fsS --max-time 10 http://127.0.0.1:8001/healthz
+            # Wait up to 90s for the api to pass healthz. First boot on Pi
+            # includes alembic migration + uvicorn startup which can take
+            # 30-60s on cold start.
+            for i in $(seq 1 30); do
+              if curl -fsS --max-time 5 http://127.0.0.1:8001/healthz; then
+                echo "✅ api healthy after ${i} attempts"
+                exit 0
+              fi
+              echo "waiting for api... (attempt ${i}/30)"
+              sleep 3
+            done
+            echo "❌ api never came up — last 50 lines of api logs:"
+            docker compose -p myetal-staging -f docker-compose.staging.yml logs api --tail 50
+            exit 1
         env:
           DEPLOY_PATH: ${{ secrets.PI_DEPLOY_PATH }}
