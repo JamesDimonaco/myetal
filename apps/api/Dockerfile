@@ -55,22 +55,18 @@ USER myetal
 
 EXPOSE 8000
 
-# /healthz is the liveness probe — never touches the DB. /readyz exists for
-# orchestration but Docker's HEALTHCHECK only cares "is the process alive".
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()" || exit 1
-
-# Single worker — slowapi's in-memory rate limit counter is per-worker, so
-# multi-worker deployments would multiply the effective limit. See DEPLOY.md.
-# --proxy-headers makes uvicorn trust X-Forwarded-For from Caddy so slowapi
-# rate-limits by the real client IP, not the loopback address.
-# --log-level warning silences the per-request INFO access log (the loud
-# /healthz polling output); errors/warnings still surface, and the
-# application's structlog output is unaffected.
-CMD ["uvicorn", "myetal_api.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "1", \
-     "--proxy-headers", \
-     "--forwarded-allow-ips", "*", \
-     "--log-level", "warning"]
+# Shell-form CMD so `$PORT` expands at runtime. Railway sets $PORT to a
+# random value and routes external traffic to it. Falls back to 8000 for
+# the Pi compose stack which sets ENV-PORT mappings explicitly.
+# We run alembic before uvicorn so a migration drift never serves traffic.
+# `exec` ensures uvicorn replaces the shell so SIGTERM reaches the
+# Python process for clean shutdown.
+# --log-level info so first-boot messages are visible in Railway logs.
+# --workers 1 because slowapi's rate limit counter is per-worker.
+CMD alembic upgrade head && exec uvicorn myetal_api.main:app \
+     --host 0.0.0.0 \
+     --port ${PORT:-8000} \
+     --workers 1 \
+     --proxy-headers \
+     --forwarded-allow-ips '*' \
+     --log-level info
