@@ -122,7 +122,10 @@ jobs:
             # Pull new image + recreate the stack. compose handles
             # alembic upgrade head as the api container's startup command.
             docker compose -p myetal-staging -f docker-compose.staging.yml pull
-            docker compose -p myetal-staging -f docker-compose.staging.yml up -d
+            # --force-recreate so changes to .env.staging values get picked
+            # up — without it, compose only recreates when the YAML itself
+            # changes, and env_file content edits get silently ignored.
+            docker compose -p myetal-staging -f docker-compose.staging.yml up -d --force-recreate
             docker compose -p myetal-staging -f docker-compose.staging.yml ps
             # Wait up to 90s for the api to pass healthz. First boot on Pi
             # includes alembic migration + uvicorn startup which can take
