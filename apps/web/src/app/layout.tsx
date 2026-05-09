@@ -1,6 +1,15 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+
+// Web is intentionally light-only (see globals.css). Pinning theme-color and
+// color-scheme stops mobile browsers from drawing a dark URL bar over the
+// off-white page and stops dark-mode UAs from painting native scrollbar
+// chrome that clashes with the chalkboard palette (feedback round 3 #3, #6).
+export const viewport: Viewport = {
+  themeColor: '#FAFAF7',
+  colorScheme: 'light',
+};
 
 export const metadata: Metadata = {
   title: {
