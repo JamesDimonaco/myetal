@@ -9,12 +9,13 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
 
 COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv sync --no-dev --no-install-project --frozen
+# No --mount=type=cache here: Railway's Metal builder requires a specific
+# cacheKey prefix on the id that other builders don't need. Easier to drop
+# the cache mount entirely; uv sync from a frozen lockfile is fast enough.
+RUN uv sync --no-dev --no-install-project --frozen
 
 COPY src ./src
-RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
-    uv sync --no-dev --frozen
+RUN uv sync --no-dev --frozen
 
 
 FROM python:3.13-slim
