@@ -30,6 +30,14 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /*
+   * Force light browser UA controls regardless of OS theme. Web is
+   * intentionally light-only (see comment above) — without this, users on
+   * dark-mode OSes get dark scrollbars and form-control chrome that clash
+   * with the chalkboard palette, and the page gets a white scrollbar-track
+   * "flash" at the top of long pages (feedback round 3 #3, #6).
+   */
+  color-scheme: light;
 }
 
 ::selection {
