@@ -133,11 +133,13 @@ export const auth = betterAuth({
 
   database: drizzleAdapter(db, {
     provider: 'pg',
-    // Hand the adapter the explicit schema map. Without this, BA falls
-    // back to model-name-based table lookup which only works for default
-    // table names — we override `users` to plural below.
+    // Schema map keys must match BA's internal model name for each
+    // resource. We override `user` resource's modelName to `'users'`
+    // (plural — matches the API-side users table), so the schema map
+    // key has to be `users` too. Other resources (session/account/
+    // verification/jwks) keep BA's default singular model names.
     schema: {
-      user: users,
+      users,
       session,
       account,
       verification,
