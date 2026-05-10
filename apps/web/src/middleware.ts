@@ -21,10 +21,17 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Better Auth adds the `__Secure-` prefix automatically when the cookie is
+// set with the Secure flag on HTTPS (any production-like host). On HTTP
+// (local dev with `expo start` against a non-https origin) the prefix is
+// absent. Check both so middleware works in both modes.
 const SESSION_COOKIE = 'myetal_session';
+const SESSION_COOKIE_SECURE = `__Secure-${SESSION_COOKIE}`;
 
 export function middleware(request: NextRequest) {
-  const sessionValue = request.cookies.get(SESSION_COOKIE)?.value;
+  const sessionValue =
+    request.cookies.get(SESSION_COOKIE_SECURE)?.value ??
+    request.cookies.get(SESSION_COOKIE)?.value;
   if (sessionValue) {
     return NextResponse.next();
   }

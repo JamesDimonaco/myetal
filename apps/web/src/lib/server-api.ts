@@ -27,15 +27,20 @@ import { api, ApiError, type RequestOptions } from './api';
 import { auth } from './auth';
 
 export const SESSION_COOKIE = 'myetal_session';
+const SESSION_COOKIE_SECURE = `__Secure-${SESSION_COOKIE}`;
 
 /** Read the raw BA session cookie. Surface for callers that genuinely
  *  need to know whether a session cookie is present at all (e.g. the
  *  layout's "is signed in?" probe). Most code should call
  *  ``serverFetch`` instead.
+ *
+ *  Handles both the bare name (HTTP/dev) and the `__Secure-` prefixed
+ *  name (HTTPS, which is everything in staging+prod). Matches the
+ *  middleware's same dual-name check.
  */
 export async function getSessionCookie(): Promise<string | undefined> {
   const store = await cookies();
-  return store.get(SESSION_COOKIE)?.value;
+  return store.get(SESSION_COOKIE_SECURE)?.value ?? store.get(SESSION_COOKIE)?.value;
 }
 
 /**
