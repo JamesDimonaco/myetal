@@ -39,7 +39,7 @@ export default function DiscoverScreen() {
   const c = Colors[scheme];
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ tag?: string; owner_id?: string }>();
-  const savedShares = useSavedShares();
+  const { items: savedShares } = useSavedShares();
   const hasSaved = (savedShares?.length ?? 0) > 0;
 
   const [activeTag, setActiveTag] = useState<string | null>(null);

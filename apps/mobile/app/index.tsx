@@ -21,9 +21,9 @@ import { useSplashGate } from '@/hooks/useSplashGate';
 export default function LandingScreen() {
   const scheme = useColorScheme() ?? 'light';
   const c = Colors[scheme];
-  const recents = useRecentShares();
+  const { items: recents, clear: clearRecents } = useRecentShares();
   const hasRecents = (recents?.length ?? 0) > 0;
-  const savedShares = useSavedShares();
+  const { items: savedShares, clear: clearSaved } = useSavedShares();
   const hasSaved = (savedShares?.length ?? 0) > 0;
   useSplashGate();
 
@@ -100,9 +100,21 @@ export default function LandingScreen() {
               <Text style={[styles.sectionLabel, { color: c.textSubtle }]}>
                 SAVED
               </Text>
-              <Text style={[styles.sectionCount, { color: c.textSubtle }]}>
-                {savedShares!.length}
-              </Text>
+              <View style={styles.sectionHeaderActions}>
+                <Text style={[styles.sectionCount, { color: c.textSubtle }]}>
+                  {savedShares!.length}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear saved collections"
+                  onPress={clearSaved}
+                  hitSlop={8}
+                >
+                  <Text style={[styles.sectionAction, { color: c.textSubtle }]}>
+                    Clear
+                  </Text>
+                </Pressable>
+              </View>
             </View>
             <Animated.View layout={LinearTransition.springify().damping(20)}>
               {savedShares!.map((entry, i) => (
@@ -127,9 +139,21 @@ export default function LandingScreen() {
               <Text style={[styles.sectionLabel, { color: c.textSubtle }]}>
                 RECENTLY VIEWED
               </Text>
-              <Text style={[styles.sectionCount, { color: c.textSubtle }]}>
-                {recents!.length}
-              </Text>
+              <View style={styles.sectionHeaderActions}>
+                <Text style={[styles.sectionCount, { color: c.textSubtle }]}>
+                  {recents!.length}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear recently viewed"
+                  onPress={clearRecents}
+                  hitSlop={8}
+                >
+                  <Text style={[styles.sectionAction, { color: c.textSubtle }]}>
+                    Clear
+                  </Text>
+                </Pressable>
+              </View>
             </View>
             <Animated.View layout={LinearTransition.springify().damping(20)}>
               {recents!.map((entry, i) => (
@@ -244,6 +268,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1.5,
     fontVariant: ['tabular-nums'],
+  },
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  sectionAction: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   emptyState: {
     marginTop: Spacing.xl,
