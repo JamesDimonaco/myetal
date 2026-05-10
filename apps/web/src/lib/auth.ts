@@ -18,6 +18,8 @@
  * Pinned to ``better-auth ~1.6.9``.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { genericOAuth, jwt } from 'better-auth/plugins';
@@ -228,6 +230,15 @@ export const auth = betterAuth({
       session_token: {
         name: 'myetal_session',
       },
+    },
+    // BA's default ID generator produces a 32-char URL-safe random string
+    // (e.g. "GSieSJUYSXuHe8vffpuJjEOSER4fKruz"). Our Postgres schema
+    // declares all `id` columns as native `uuid` type (the Pi alembic
+    // migration creates them that way), which only accepts the canonical
+    // 8-4-4-4-12 hex format. Override BA to mint UUID v4s so its random
+    // string format stops conflicting with the column type.
+    database: {
+      generateId: () => randomUUID(),
     },
   },
 
