@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -102,6 +102,17 @@ export default function SignInScreen() {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Tracks which OAuth provider is currently in-flight so we can
+  // disable the others and show "Redirecting…" copy. Mirrors the web
+  // pattern in apps/web/src/app/sign-in/oauth-buttons.tsx.
+  const [pendingProvider, setPendingProvider] = useState<
+    'google' | 'github' | 'orcid' | null
+  >(null);
+
+  // Refs for chaining returnKey from email → password → submit, so users
+  // can complete the form without lifting their thumb to "Done"/"Submit".
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const goToDashboard = () => {
     // Dismiss the sign-in modal. The (authed) layout detects isAuthed
@@ -148,9 +159,10 @@ export default function SignInScreen() {
 
   const handleProvider = async (
     fn: () => Promise<unknown>,
-    providerLabel: string,
+    providerLabel: 'google' | 'github' | 'orcid',
   ) => {
     setError(null);
+    setPendingProvider(providerLabel);
     try {
       await fn();
       goToDashboard();
@@ -159,6 +171,8 @@ export default function SignInScreen() {
       // Cancel/dismiss is intentional user action — stay quiet.
       if (msg.endsWith('_oauth_cancel') || msg.endsWith('_oauth_dismiss')) return;
       setError(describeAuthError(msg));
+    } finally {
+      setPendingProvider(null);
     }
   };
 
@@ -185,54 +199,75 @@ export default function SignInScreen() {
           <View style={styles.providerStack}>
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ disabled: pendingProvider !== null }}
               onPress={() => handleProvider(signInWithGoogle, 'google')}
+              disabled={pendingProvider !== null}
               style={({ pressed }) => [
                 styles.providerButton,
                 {
                   borderColor: c.border,
                   backgroundColor: c.surface,
-                  opacity: pressed ? 0.7 : 1,
+                  opacity:
+                    pendingProvider !== null && pendingProvider !== 'google'
+                      ? 0.5
+                      : pressed
+                        ? 0.7
+                        : 1,
                 },
               ]}
             >
               <Text style={[styles.providerText, { color: c.text }]}>
-                Continue with Google
+                {pendingProvider === 'google' ? 'Redirecting…' : 'Continue with Google'}
               </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ disabled: pendingProvider !== null }}
               onPress={() => handleProvider(signInWithGitHub, 'github')}
+              disabled={pendingProvider !== null}
               style={({ pressed }) => [
                 styles.providerButton,
                 {
                   borderColor: c.border,
                   backgroundColor: c.surface,
-                  opacity: pressed ? 0.7 : 1,
+                  opacity:
+                    pendingProvider !== null && pendingProvider !== 'github'
+                      ? 0.5
+                      : pressed
+                        ? 0.7
+                        : 1,
                 },
               ]}
             >
               <Text style={[styles.providerText, { color: c.text }]}>
-                Continue with GitHub
+                {pendingProvider === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
               </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ disabled: pendingProvider !== null }}
               onPress={() => handleProvider(signInWithOrcid, 'orcid')}
+              disabled={pendingProvider !== null}
               style={({ pressed }) => [
                 styles.providerButton,
                 {
                   borderColor: c.border,
                   backgroundColor: c.surface,
-                  opacity: pressed ? 0.7 : 1,
+                  opacity:
+                    pendingProvider !== null && pendingProvider !== 'orcid'
+                      ? 0.5
+                      : pressed
+                        ? 0.7
+                        : 1,
                 },
               ]}
             >
               <View style={styles.providerRow}>
                 <OrcidIcon size={18} />
                 <Text style={[styles.providerText, { color: c.text }]}>
-                  Continue with ORCID
+                  {pendingProvider === 'orcid' ? 'Redirecting…' : 'Continue with ORCID'}
                 </Text>
               </View>
             </Pressable>
@@ -256,6 +291,9 @@ export default function SignInScreen() {
                 autoComplete="name"
                 placeholder="Ada Lovelace"
                 placeholderTextColor={c.textMuted}
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                submitBehavior="submit"
                 style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
               />
             </View>
@@ -264,6 +302,7 @@ export default function SignInScreen() {
           <View style={styles.field}>
             <Text style={[styles.label, { color: c.textMuted }]}>Email</Text>
             <TextInput
+              ref={emailRef}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -272,6 +311,9 @@ export default function SignInScreen() {
               inputMode="email"
               placeholder="you@university.edu"
               placeholderTextColor={c.textMuted}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              submitBehavior="submit"
               style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
             />
           </View>
@@ -279,12 +321,17 @@ export default function SignInScreen() {
           <View style={styles.field}>
             <Text style={[styles.label, { color: c.textMuted }]}>Password</Text>
             <TextInput
+              ref={passwordRef}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               placeholder={mode === 'signin' ? 'Your password' : 'At least 8 characters'}
               placeholderTextColor={c.textMuted}
+              returnKeyType={mode === 'signin' ? 'go' : 'done'}
+              onSubmitEditing={() => {
+                if (!submitting) handleSubmit();
+              }}
               style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
             />
           </View>
