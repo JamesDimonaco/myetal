@@ -14,6 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
+import { GitHubIcon } from '@/components/github-icon';
+import { GoogleIcon } from '@/components/google-icon';
 import { OrcidIcon } from '@/components/orcid-icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -216,9 +218,12 @@ export default function SignInScreen() {
                 },
               ]}
             >
-              <Text style={[styles.providerText, { color: c.text }]}>
-                {pendingProvider === 'google' ? 'Redirecting…' : 'Continue with Google'}
-              </Text>
+              <View style={styles.providerRow}>
+                <GoogleIcon size={18} />
+                <Text style={[styles.providerText, { color: c.text }]}>
+                  {pendingProvider === 'google' ? 'Redirecting…' : 'Continue with Google'}
+                </Text>
+              </View>
             </Pressable>
 
             <Pressable
@@ -240,9 +245,12 @@ export default function SignInScreen() {
                 },
               ]}
             >
-              <Text style={[styles.providerText, { color: c.text }]}>
-                {pendingProvider === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
-              </Text>
+              <View style={styles.providerRow}>
+                <GitHubIcon size={18} color={c.text} />
+                <Text style={[styles.providerText, { color: c.text }]}>
+                  {pendingProvider === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
+                </Text>
+              </View>
             </Pressable>
 
             <Pressable
