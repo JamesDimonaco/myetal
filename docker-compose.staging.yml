@@ -27,10 +27,13 @@ services:
     image: postgres:16-alpine
     env_file:
       - .env.staging
-    # Bind to 127.0.0.1 only — staging Postgres should not be reachable
-    # from anywhere except the Pi itself + the API container in this stack.
+    # Bind to all interfaces. Staging Postgres is reachable externally on
+    # Pi:5433 so Vercel's BA route handlers can read/write the session +
+    # account tables. Router forwards external :55432 to Pi:5433.
+    # Strong password (~96 bits entropy) + non-standard external port
+    # mitigate the public exposure for staging; revisit if abuse appears.
     ports:
-      - "127.0.0.1:5433:5432"
+      - "5433:5432"
     volumes:
       - myetal_staging_pgdata:/var/lib/postgresql/data
     healthcheck:
