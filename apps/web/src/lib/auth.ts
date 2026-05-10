@@ -145,14 +145,15 @@ export const auth = betterAuth({
 
   // The MyEtAl `users` table is plural (kept that way to preserve every
   // existing FK on the API side — see better_auth.py docstring).
+  //
+  // No `fields:` mapping needed: BA's drizzle adapter expects the
+  // mapping value to be the JS field name in the drizzle schema (which
+  // is already camelCase like BA's defaults). Drizzle itself handles
+  // the JS-name→snake_case-DB-column translation via the string passed
+  // to `timestamp(...)`/`varchar(...)`/etc. Mapping camelCase→snake_case
+  // here would tell BA to look up a JS property that doesn't exist.
   user: {
     modelName: 'users',
-    fields: {
-      // Map BA's camelCase internal fields to our snake_case DB columns.
-      emailVerified: 'email_verified',
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
-    },
     additionalFields: {
       is_admin: {
         type: 'boolean',
@@ -177,29 +178,11 @@ export const auth = betterAuth({
       },
     },
   },
-  session: {
-    fields: {
-      expiresAt: 'expires_at',
-      ipAddress: 'ip_address',
-      userAgent: 'user_agent',
-      userId: 'user_id',
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
-    },
-  },
+  // Sessions, accounts, verifications, jwks: no `fields:` mapping needed
+  // for the same reason as the `user` resource above (BA defaults match
+  // our drizzle JS field names; drizzle handles the snake_case DB columns).
+  session: {},
   account: {
-    fields: {
-      accountId: 'account_id',
-      providerId: 'provider_id',
-      userId: 'user_id',
-      accessToken: 'access_token',
-      refreshToken: 'refresh_token',
-      idToken: 'id_token',
-      accessTokenExpiresAt: 'access_token_expires_at',
-      refreshTokenExpiresAt: 'refresh_token_expires_at',
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
-    },
     // Security posture (Phase 5 — locked decision in the migration
     // ticket): we do NOT auto-link OAuth providers to existing user
     // rows by email. Today's behaviour (legacy ``services/oauth.py``)
@@ -229,13 +212,7 @@ export const auth = betterAuth({
       disableImplicitLinking: true,
     },
   },
-  verification: {
-    fields: {
-      expiresAt: 'expires_at',
-      createdAt: 'created_at',
-      updatedAt: 'updated_at',
-    },
-  },
+  verification: {},
 
   // ---- Cookie name -------------------------------------------------------
   // Locked decision: ``myetal_session`` (replaces the legacy
