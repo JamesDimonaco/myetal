@@ -158,24 +158,29 @@ export const auth = betterAuth({
   // here would tell BA to look up a JS property that doesn't exist.
   user: {
     modelName: 'users',
+    // additionalFields keys are JS field names from db-schema.ts (camelCase).
+    // Drizzle handles the DB-column-name (snake_case) translation via the
+    // string passed to `boolean('is_admin')` etc. — BA never sees the
+    // snake_case DB names directly. Convention: camelCase everywhere in
+    // the JS/TS layer; snake_case stays in the SQL/Postgres layer.
     additionalFields: {
-      is_admin: {
+      isAdmin: {
         type: 'boolean',
         defaultValue: false,
         input: false,
       },
-      avatar_url: {
+      avatarUrl: {
         type: 'string',
         required: false,
         input: false,
       },
-      orcid_id: {
+      orcidId: {
         type: 'string',
         required: false,
         input: false,
         unique: true,
       },
-      last_orcid_sync_at: {
+      lastOrcidSyncAt: {
         type: 'date',
         required: false,
         input: false,
@@ -305,8 +310,10 @@ export const auth = betterAuth({
           sub: user.id,
           email: user.email,
           // additionalField — defaults to false on the row, so this is always
-          // a concrete boolean.
-          is_admin: (user as { is_admin?: boolean }).is_admin ?? false,
+          // a concrete boolean. Claim name stays snake_case (`is_admin`) for
+          // the JWT wire format because the API side reads JWT claims via
+          // pyjwt and Python convention is snake_case there.
+          is_admin: (user as { isAdmin?: boolean }).isAdmin ?? false,
         }),
       },
     }),
@@ -335,7 +342,7 @@ export const auth = betterAuth({
             return {
               name: typeof profile.name === 'string' ? profile.name : undefined,
               email: typeof profile.email === 'string' ? profile.email : undefined,
-              orcid_id: orcidId || undefined,
+              orcidId: orcidId || undefined,
             };
           },
         },
