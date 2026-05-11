@@ -336,54 +336,70 @@ export const auth = betterAuth({
           // Hijack-hardening: refuse to sign in if the returned ORCID iD
           // is already linked to another user. Throwing here aborts the
           // OAuth chain before BA writes a row.
-          mapProfileToUser: async (profile: Record<string, unknown>) => {
-            const orcidId =
-              typeof profile.sub === 'string'
-                ? profile.sub
-                : typeof profile.orcid === 'string'
-                  ? profile.orcid
-                  : '';
-            if (orcidId) {
-              await assertOrcidIdNotClaimedElsewhere(orcidId);
-            }
-            // ORCID lets users keep their email private — when they do,
-            // we get no `email` claim back even with the `openid` scope.
-            // BA requires email (it's NOT NULL + UNIQUE on the users row),
-            // so synthesize one using the `.invalid` TLD (RFC 2606 reserves
-            // this — clearly non-deliverable, never collides with a real
-            // address). Users can update it later via PATCH /me/orcid's
-            // sister endpoint or a future profile-edit UI.
-            const emailFromProfile =
-              typeof profile.email === 'string' && profile.email.length > 0
-                ? profile.email
-                : null;
-            const email =
-              emailFromProfile ??
-              (orcidId ? `${orcidId}@orcid.invalid` : undefined);
-            // ORCID's `given_name` + `family_name` come back separately
-            // when present; combine into a single display name. Fall back
-            // to the ORCID iD itself if the user has both first + last
-            // name set to private — BA's user.name column is NOT NULL.
-            const nameFromProfile = (() => {
-              if (typeof profile.name === 'string' && profile.name.length > 0) {
-                return profile.name;
-              }
-              const given =
-                typeof profile.given_name === 'string' ? profile.given_name : '';
-              const family =
-                typeof profile.family_name === 'string' ? profile.family_name : '';
-              const combined = `${given} ${family}`.trim();
-              return combined.length > 0 ? combined : null;
-            })();
-            const name = nameFromProfile ?? (orcidId || 'ORCID user');
-            return {
-              name,
-              email,
-              orcidId: orcidId || undefined,
-            };
-          },
+          mapProfileToUser: mapOrcidProfileToUser,
         },
       ],
     }),
   ],
 });
+
+/**
+ * Pure shaping function for the ORCID OAuth profile.
+ *
+ * Extracted so the integration tests can exercise the email-fallback
+ * (``${orcidId}@orcid.invalid``), name-fallback (ORCID iD as the
+ * display name), and hijack-guard (``OrcidIdAlreadyLinkedError``)
+ * paths directly without spinning a full OAuth round trip.
+ *
+ * Side effect: calls :func:`assertOrcidIdNotClaimedElsewhere`, which
+ * reads from the ``users`` and ``account`` tables. The integration
+ * tests stand the DB up first and then call this; production calls
+ * it via the ``genericOAuth`` ``mapProfileToUser`` callback.
+ */
+export async function mapOrcidProfileToUser(
+  profile: Record<string, unknown>,
+): Promise<{ name: string; email: string | undefined; orcidId: string | undefined }> {
+  const orcidId =
+    typeof profile.sub === 'string'
+      ? profile.sub
+      : typeof profile.orcid === 'string'
+        ? profile.orcid
+        : '';
+  if (orcidId) {
+    await assertOrcidIdNotClaimedElsewhere(orcidId);
+  }
+  // ORCID lets users keep their email private — when they do, we get
+  // no `email` claim back even with the `openid` scope. BA requires
+  // email (it's NOT NULL + UNIQUE on the users row), so synthesize one
+  // using the `.invalid` TLD (RFC 2606 reserves this — clearly
+  // non-deliverable, never collides with a real address). Users can
+  // update it later via PATCH /me/orcid's sister endpoint or a future
+  // profile-edit UI.
+  const emailFromProfile =
+    typeof profile.email === 'string' && profile.email.length > 0
+      ? profile.email
+      : null;
+  const email =
+    emailFromProfile ?? (orcidId ? `${orcidId}@orcid.invalid` : undefined);
+  // ORCID's `given_name` + `family_name` come back separately when
+  // present; combine into a single display name. Fall back to the
+  // ORCID iD itself if the user has both first + last name set to
+  // private — BA's user.name column is NOT NULL.
+  const nameFromProfile = (() => {
+    if (typeof profile.name === 'string' && profile.name.length > 0) {
+      return profile.name;
+    }
+    const given =
+      typeof profile.given_name === 'string' ? profile.given_name : '';
+    const family =
+      typeof profile.family_name === 'string' ? profile.family_name : '';
+    const combined = `${given} ${family}`.trim();
+    return combined.length > 0 ? combined : null;
+  })();
+  const name = nameFromProfile ?? (orcidId || 'ORCID user');
+  return {
+    name,
+    email,
+    orcidId: orcidId || undefined,
+  };
+}

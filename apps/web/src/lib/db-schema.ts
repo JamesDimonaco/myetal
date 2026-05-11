@@ -33,8 +33,23 @@ import {
 // ----------------------------------------------------------------------
 // users — Better Auth's user table (kept plural for FK compatibility)
 // ----------------------------------------------------------------------
+//
+// NOTE on `id` columns across this file: we do NOT declare
+// ``.defaultRandom()`` on any of the UUID primary keys. The Alembic
+// migrations do not add a ``DEFAULT gen_random_uuid()`` clause on the
+// column (see ``apps/api/alembic/versions/20260426_1200_0001_baseline.py``
+// and ``20260508_1300_0016_better_auth_cutover.py``). Better Auth
+// always provides the id explicitly via its
+// ``advanced.database.generateId`` override in ``./auth.ts``; any
+// drizzle code that bypasses BA (the ORCID hijack-guard queries, future
+// admin tooling) MUST also provide an ``id``. Declaring
+// ``.defaultRandom()`` here would tell drizzle the DB will fill the id
+// in, which it won't — INSERTs without an explicit id then fail at
+// runtime with ``null value in column "id" violates not-null constraint``.
+// Integration test ``__tests__/auth-integration.test.ts`` is the safety
+// net for this drift.
 export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey(),
   name: varchar('name', { length: 120 }),
   email: varchar('email', { length: 320 }).unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
@@ -56,7 +71,7 @@ export const users = pgTable('users', {
 export const session = pgTable(
   'session',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     token: varchar('token', { length: 255 }).notNull().unique(),
     ipAddress: varchar('ip_address', { length: 45 }),
@@ -78,7 +93,7 @@ export const session = pgTable(
 export const account = pgTable(
   'account',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey(),
     accountId: varchar('account_id', { length: 255 }).notNull(),
     providerId: varchar('provider_id', { length: 64 }).notNull(),
     userId: uuid('user_id')
@@ -109,7 +124,7 @@ export const account = pgTable(
 export const verification = pgTable(
   'verification',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey(),
     identifier: varchar('identifier', { length: 320 }).notNull(),
     value: text('value').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -125,7 +140,7 @@ export const verification = pgTable(
 // jwks — Better Auth JWT plugin's signing-key table
 // ----------------------------------------------------------------------
 export const jwks = pgTable('jwks', {
-  id: uuid('id').primaryKey().defaultRandom(),
+  id: uuid('id').primaryKey(),
   publicKey: text('public_key').notNull(),
   privateKey: text('private_key').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
