@@ -58,7 +58,7 @@ export default async function DashboardPage() {
     !user.orcid_id && shares.length === 0 && libraryCount === 0;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-10">
       {showWelcomeBanner ? (
         <div
           role="status"

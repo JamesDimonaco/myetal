@@ -22,7 +22,7 @@ export default async function FeedbackPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
+    <div className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-10 sm:py-14">
       <h1 className="font-serif text-4xl tracking-tight text-ink">
         Send us feedback
       </h1>
