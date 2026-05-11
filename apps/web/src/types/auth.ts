@@ -10,6 +10,15 @@ export interface UserResponse {
   id: string;
   email: string | null;
   name: string | null;
+  /**
+   * Soft email-verification flag (mirrors Better Auth's `emailVerified`
+   * core column, exposed by `schemas/user.py::UserResponse`). Mobile uses
+   * it to render an "unverified email" banner; web doesn't surface it
+   * today but it's present in the wire shape, so the type must include
+   * it to keep this interface honest. Removing it from the type would
+   * make the field silently `undefined` for any future web consumer.
+   */
+  email_verified: boolean;
   avatar_url: string | null;
   is_admin: boolean;
   orcid_id: string | null;
