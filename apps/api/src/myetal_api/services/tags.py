@@ -252,7 +252,7 @@ async def autocomplete(
             """
             SELECT id, slug, label, usage_count, created_at
             FROM tags
-            WHERE slug %% :q OR slug ILIKE :prefix
+            WHERE slug % :q OR slug ILIKE :prefix
             ORDER BY similarity(slug, :q) DESC, usage_count DESC, slug
             LIMIT :limit
             """

@@ -928,7 +928,7 @@ async def search_published_users(
                       AND s.deleted_at IS NULL
                 ) AS share_count
             FROM users u
-            WHERE u.name %% :q
+            WHERE u.name % :q
               AND EXISTS (
                   SELECT 1 FROM shares s2
                   WHERE s2.owner_user_id = u.id
