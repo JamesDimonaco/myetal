@@ -126,7 +126,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         <AnonymousHeader />
       )}
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 sm:py-14">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 sm:py-14">
         {ownerNotFound ? <OwnerNotFound /> : null}
 
         {data ? (
@@ -154,20 +154,20 @@ export default async function BrowsePage({ searchParams }: PageProps) {
 function AnonymousHeader() {
   return (
     <header className="border-b border-rule bg-paper">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
         <Link href="/" className="font-serif text-xl tracking-tight text-ink">
           MyEtAl
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
+        <nav className="flex items-center gap-2 text-sm sm:gap-6">
           <Link
             href="/sign-in"
-            className="rounded-md px-3 py-1.5 hover:text-ink"
+            className="whitespace-nowrap rounded-md px-2 py-1.5 hover:text-ink sm:px-3"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="rounded-md bg-ink px-3 py-1.5 text-paper transition hover:opacity-90"
+            className="whitespace-nowrap rounded-md bg-ink px-3 py-1.5 text-paper transition hover:opacity-90"
           >
             Get started
           </Link>
@@ -267,7 +267,7 @@ function BrowseHeader({
     <header>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-serif text-4xl tracking-tight text-ink">
+          <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">
             Browse public collections
           </h1>
           <p className="mt-3 text-base text-ink-muted">
