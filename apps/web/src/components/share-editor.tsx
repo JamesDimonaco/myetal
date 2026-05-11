@@ -13,6 +13,7 @@ import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
 import { TagInput } from '@/components/tag-input';
 import { ApiError } from '@/lib/api';
+import { clientApi } from '@/lib/client-api';
 import {
   useCreateShare,
   useDeleteShare,
@@ -399,9 +400,35 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
 
     setSubmitting(true);
     try {
-      const saved = isNew
+      let saved = isNew
         ? await createMutation.mutateAsync(payload)
         : await updateMutation.mutateAsync(payload);
+
+      // First-save auto-publish: the create endpoint produces a draft
+      // (published_at = NULL), which makes both /c/{code} and the QR PNG
+      // return 404 — i.e. the share's URL "doesn't exist" the moment the
+      // user celebrates having saved it. Users overwhelmingly expect Save to
+      // produce a live, shareable share; the discovery toggle on the edit
+      // page is for opting OUT later. So when creating a new share, publish
+      // it in the same flow before opening the QR modal.
+      if (isNew && saved.published_at === null) {
+        try {
+          saved = await clientApi<typeof saved>(
+            `/shares/${saved.id}/publish`,
+            { method: 'POST' },
+          );
+        } catch (publishErr) {
+          // Don't fail the whole save if publish hiccups — the share row
+          // exists, the user can toggle Publish from the edit page. Surface
+          // a non-fatal warning instead.
+          setError(
+            publishErr instanceof ApiError
+              ? `Saved as draft — publish failed: ${publishErr.detail}`
+              : 'Saved as draft — publish failed',
+          );
+        }
+      }
+
       setSavedShare(saved);
       setShowQr(true);
       // Flash a brief "saved" confirmation that persists after QR closes.
