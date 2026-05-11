@@ -346,9 +346,23 @@ export const auth = betterAuth({
             if (orcidId) {
               await assertOrcidIdNotClaimedElsewhere(orcidId);
             }
+            // ORCID lets users keep their email private — when they do,
+            // we get no `email` claim back even with the `openid` scope.
+            // BA requires email (it's NOT NULL + UNIQUE on the users row),
+            // so synthesize one using the `.invalid` TLD (RFC 2606 reserves
+            // this — clearly non-deliverable, never collides with a real
+            // address). Users can update it later via PATCH /me/orcid's
+            // sister endpoint or a future profile-edit UI.
+            const emailFromProfile =
+              typeof profile.email === 'string' && profile.email.length > 0
+                ? profile.email
+                : null;
+            const email =
+              emailFromProfile ??
+              (orcidId ? `${orcidId}@orcid.invalid` : undefined);
             return {
               name: typeof profile.name === 'string' ? profile.name : undefined,
-              email: typeof profile.email === 'string' ? profile.email : undefined,
+              email,
               orcidId: orcidId || undefined,
             };
           },
