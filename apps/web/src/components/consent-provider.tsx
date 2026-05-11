@@ -162,16 +162,19 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
 
   const contextValue: ConsentContextValue = { consent, accept, decline };
 
+  // PostHogProvider is rendered unconditionally so that `children` keeps the
+  // same parent across consent flips. Toggling the wrapper used to remount the
+  // entire subtree on Accept, wiping in-progress local state (e.g. an
+  // unsaved share-editor draft). The posthog SDK itself stays uninitialised
+  // until `accept()` calls `initPostHog()`, so capture calls before consent
+  // remain no-ops. PostHogPageview, which fires `$pageview`, is still gated
+  // so declined users don't get pageview events.
   return (
     <ConsentContext.Provider value={contextValue}>
-      {consent === 'accepted' ? (
-        <PostHogProvider client={posthog}>
-          <PostHogPageview />
-          {children}
-        </PostHogProvider>
-      ) : (
-        children
-      )}
+      <PostHogProvider client={posthog}>
+        {consent === 'accepted' ? <PostHogPageview /> : null}
+        {children}
+      </PostHogProvider>
 
       {showBanner && <CookieBanner onAccept={accept} onDecline={decline} />}
     </ConsentContext.Provider>
