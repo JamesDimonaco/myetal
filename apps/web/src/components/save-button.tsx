@@ -33,7 +33,7 @@ export function SaveButton({ shortCode, name, description, type, ownerName, item
   return (
     <button
       onClick={handleClick}
-      className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition ${
+      className={`inline-flex min-h-[40px] items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition ${
         saved
           ? 'border-accent/30 bg-accent/10 text-accent'
           : 'border-ink/20 text-ink-muted hover:border-ink/40 hover:text-ink'

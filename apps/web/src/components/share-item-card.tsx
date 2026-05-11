@@ -53,13 +53,13 @@ function PaperCard({
       href={titleHref}
       target="_blank"
       rel="noreferrer noopener"
-      className="font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
+      className="break-words font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
     >
       {item.title}
       <span aria-hidden className="ml-1 text-ink-faint">↗</span>
     </a>
   ) : (
-    <span className="font-serif text-lg leading-snug text-ink">{item.title}</span>
+    <span className="break-words font-serif text-lg leading-snug text-ink">{item.title}</span>
   );
 
   // Avoid a duplicate "Open paper" button when the only OA URL we have is the
@@ -74,7 +74,7 @@ function PaperCard({
       {titleNode}
       {meta ? <p className="mt-1 text-sm text-ink-muted">{meta}</p> : null}
       {item.doi ? (
-        <p className="mt-1 text-xs text-ink-faint">
+        <p className="mt-1 break-all text-xs text-ink-faint">
           DOI{' '}
           <a
             href={`https://doi.org/${item.doi}`}
@@ -87,7 +87,7 @@ function PaperCard({
         </p>
       ) : null}
       {item.notes ? (
-        <p className="mt-3 text-sm leading-relaxed text-ink">{item.notes}</p>
+        <p className="mt-3 break-words text-sm leading-relaxed text-ink">{item.notes}</p>
       ) : null}
 
       {showActions ? (
@@ -144,14 +144,14 @@ function RepoCard({
       href={href}
       target="_blank"
       rel="noreferrer noopener"
-      className="inline-flex items-center gap-2 font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
+      className="inline-flex flex-wrap items-center gap-x-2 break-words font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
     >
       <GitHubIcon size={18} className="text-ink-muted" />
       {titleText}
       <span aria-hidden className="text-ink-faint">↗</span>
     </a>
   ) : (
-    <span className="inline-flex items-center gap-2 font-serif text-lg leading-snug text-ink">
+    <span className="inline-flex flex-wrap items-center gap-x-2 break-words font-serif text-lg leading-snug text-ink">
       <GitHubIcon size={18} className="text-ink-muted" />
       {titleText}
     </span>
@@ -214,17 +214,17 @@ function PdfCard({ item }: { item: ShareItem }) {
       href={href}
       target="_blank"
       rel="noreferrer noopener"
-      className="font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
+      className="break-words font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
     >
       {item.title}
       <span aria-hidden className="ml-1 text-ink-faint">↗</span>
     </a>
   ) : (
-    <span className="font-serif text-lg leading-snug text-ink">{item.title}</span>
+    <span className="break-words font-serif text-lg leading-snug text-ink">{item.title}</span>
   );
 
   return (
-    <article className="flex gap-4 border-t border-rule py-5 first:border-t-0 sm:gap-5">
+    <article className="flex gap-3 border-t border-rule py-5 first:border-t-0 sm:gap-5">
       {item.thumbnail_url ? (
         href ? (
           <a
@@ -238,7 +238,7 @@ function PdfCard({ item }: { item: ShareItem }) {
             <img
               src={item.thumbnail_url}
               alt=""
-              className="h-auto max-h-72 w-[140px] rounded-md border border-rule bg-paper-soft object-cover sm:w-[180px]"
+              className="h-auto max-h-72 w-[96px] rounded-md border border-rule bg-paper-soft object-cover sm:w-[180px]"
             />
           </a>
         ) : (
@@ -246,14 +246,14 @@ function PdfCard({ item }: { item: ShareItem }) {
           <img
             src={item.thumbnail_url}
             alt=""
-            className="h-auto max-h-72 w-[140px] flex-shrink-0 rounded-md border border-rule bg-paper-soft object-cover sm:w-[180px]"
+            className="h-auto max-h-72 w-[96px] flex-shrink-0 rounded-md border border-rule bg-paper-soft object-cover sm:w-[180px]"
           />
         )
       ) : (
         // Generic PDF icon placeholder for legacy / missing-thumbnail rows.
         <div
           aria-hidden
-          className="flex h-[180px] w-[140px] flex-shrink-0 flex-col items-center justify-center gap-2 rounded-md border border-rule bg-paper-soft text-ink-muted sm:w-[180px]"
+          className="flex h-[126px] w-[96px] flex-shrink-0 flex-col items-center justify-center gap-2 rounded-md border border-rule bg-paper-soft text-ink-muted sm:h-[180px] sm:w-[180px]"
         >
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
             <path
@@ -323,13 +323,13 @@ function LinkCard({ item }: { item: ShareItem }) {
       href={href}
       target="_blank"
       rel="noreferrer noopener"
-      className="font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
+      className="break-words font-serif text-lg leading-snug text-ink underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
     >
       {item.title}
       <span aria-hidden className="ml-1 text-ink-faint">↗</span>
     </a>
   ) : (
-    <span className="font-serif text-lg leading-snug text-ink">{item.title}</span>
+    <span className="break-words font-serif text-lg leading-snug text-ink">{item.title}</span>
   );
 
   return (
