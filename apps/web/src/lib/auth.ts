@@ -360,8 +360,24 @@ export const auth = betterAuth({
             const email =
               emailFromProfile ??
               (orcidId ? `${orcidId}@orcid.invalid` : undefined);
+            // ORCID's `given_name` + `family_name` come back separately
+            // when present; combine into a single display name. Fall back
+            // to the ORCID iD itself if the user has both first + last
+            // name set to private — BA's user.name column is NOT NULL.
+            const nameFromProfile = (() => {
+              if (typeof profile.name === 'string' && profile.name.length > 0) {
+                return profile.name;
+              }
+              const given =
+                typeof profile.given_name === 'string' ? profile.given_name : '';
+              const family =
+                typeof profile.family_name === 'string' ? profile.family_name : '';
+              const combined = `${given} ${family}`.trim();
+              return combined.length > 0 ? combined : null;
+            })();
+            const name = nameFromProfile ?? (orcidId || 'ORCID user');
             return {
-              name: typeof profile.name === 'string' ? profile.name : undefined,
+              name,
               email,
               orcidId: orcidId || undefined,
             };
