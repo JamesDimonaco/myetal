@@ -60,8 +60,8 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
         <p className="mt-2 text-sm text-ink-muted">{share.name}</p>
       </header>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stat cards — stack on phones, 3-up on sm+ */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total views" value={analytics.total_views} />
         <StatCard label="Last 7 days" value={analytics.views_last_7d} />
         <StatCard label="Last 30 days" value={analytics.views_last_30d} />
