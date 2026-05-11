@@ -285,6 +285,7 @@ async def publish_share(db: AsyncSession, share: Share) -> Share:
     if share.published_at is None:
         share.published_at = datetime.now(UTC)
         await db.commit()
+        return await _reload_with_items(db, share.id)
     return share
 
 
@@ -293,6 +294,7 @@ async def unpublish_share(db: AsyncSession, share: Share) -> Share:
     if share.published_at is not None:
         share.published_at = None
         await db.commit()
+        return await _reload_with_items(db, share.id)
     return share
 
 
