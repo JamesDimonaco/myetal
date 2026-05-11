@@ -50,12 +50,12 @@ export function OAuthButtons({ returnTo: rawReturnTo }: { returnTo: string | nul
   }
 
   return (
-    <div className="mt-10 grid gap-3">
+    <div className="mt-8 grid gap-3 sm:mt-10">
       <button
         type="button"
         onClick={() => startSocial('google')}
         disabled={pending !== null}
-        className="inline-flex items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+        className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
       >
         <GoogleIcon size={18} />
         {pending === 'google' ? 'Redirecting…' : 'Continue with Google'}
@@ -64,7 +64,7 @@ export function OAuthButtons({ returnTo: rawReturnTo }: { returnTo: string | nul
         type="button"
         onClick={() => startSocial('github')}
         disabled={pending !== null}
-        className="inline-flex items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+        className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
       >
         <GitHubIcon size={18} />
         {pending === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
@@ -73,7 +73,7 @@ export function OAuthButtons({ returnTo: rawReturnTo }: { returnTo: string | nul
         type="button"
         onClick={startOrcid}
         disabled={pending !== null}
-        className="inline-flex items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+        className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
       >
         <OrcidIcon size={18} />
         {pending === 'orcid' ? 'Redirecting…' : 'Continue with ORCID'}
