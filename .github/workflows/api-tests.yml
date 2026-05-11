@@ -1,14 +1,23 @@
 name: api-tests
 
-# Lint + test the FastAPI backend on every PR that touches it.
-# We intentionally do NOT also run on push to main — api-image.yml has an
-# inline `test` job that runs the same checks before publishing the image,
-# so duplicating them here would just double the CI minutes per push.
+# Lint + test the FastAPI backend on every PR that touches it, AND the
+# Better Auth ↔ Postgres integration tests on every PR that touches either
+# the web auth glue or the alembic migration chain. We intentionally do NOT
+# also run on push to main — api-image.yml has an inline `test` job that
+# runs the same checks before publishing the image, so duplicating them
+# here would just double the CI minutes per push.
 
 on:
   pull_request:
     paths:
       - "apps/api/**"
+      - "apps/web/src/lib/auth.ts"
+      - "apps/web/src/lib/auth-orcid-claim.ts"
+      - "apps/web/src/lib/db.ts"
+      - "apps/web/src/lib/db-schema.ts"
+      - "apps/web/__tests__/**"
+      - "apps/web/vitest.config.ts"
+      - "apps/web/package.json"
       - ".github/workflows/api-tests.yml"
 
 permissions:
@@ -46,3 +55,67 @@ jobs:
 
       - name: Pytest
         run: uv run pytest
+
+  # Better Auth ↔ Postgres integration tests. Spins up a real Postgres via
+  # testcontainers, applies the full Alembic migration chain, wires BA's
+  # drizzle adapter to it, and exercises sign-up + sign-in + JWT mint +
+  # OAuth-create + ORCID profile mapping. Runs after the Python tests
+  # pass — the Python suite is faster (4s vs ~15s) and catches the
+  # cheapest class of regression first, so failing fast there saves
+  # spinning a Docker daemon for nothing.
+  web-integration:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # uv is required because the testcontainers fixture shells out to
+      # `uv run alembic upgrade head` against the Postgres container.
+      # Same uv version as the Python test job above.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.5.4"
+
+      - name: Set up Python (for alembic)
+        run: uv python install
+        working-directory: apps/api
+
+      - name: Sync API dependencies (for alembic)
+        run: uv sync --all-groups --frozen
+        working-directory: apps/api
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install web dependencies
+        # The web workspace has the testcontainers + vitest devDeps. Only
+        # install for that workspace to avoid pulling in the mobile
+        # workspace's react-native bits.
+        run: pnpm install --filter @myetal/web --frozen-lockfile
+
+      # Pre-pull the postgres image so testcontainers' startup wait is
+      # bounded by container init, not registry latency. The image hash
+      # pins us to a deterministic SHA (postgres:16-alpine on linux/amd64
+      # for this runner). docker buildx is already on the GitHub runner.
+      - name: Pre-pull Postgres image
+        run: docker pull postgres:16-alpine
+
+      - name: Run integration tests
+        run: pnpm vitest run __tests__/auth-integration.test.ts
+        working-directory: apps/web
+        env:
+          # testcontainers respects DOCKER_HOST; the GH runner exposes
+          # the default UNIX socket so we leave it unset. Setting an
+          # explicit empty Ryuk container TTL keeps cleanup fast on a
+          # green run.
+          TESTCONTAINERS_RYUK_DISABLED: "false"
