@@ -60,7 +60,11 @@ const itemSchema = z
     image_url: z.string().trim().max(2000).optional().or(z.literal('')),
     file_url: z.string().trim().max(2000).optional().or(z.literal('')),
     thumbnail_url: z.string().trim().max(2000).optional().or(z.literal('')),
-    file_size_bytes: z.number().int().positive().optional(),
+    // nonnegative (not positive) — the empty-item placeholder defaults to 0
+    // for non-PDF items. Zod's `.positive()` rejects 0 with "too small;
+    // expected number to be greater than zero" and the whole share fails
+    // to validate. The API enforces ge=1 for real PDF uploads separately.
+    file_size_bytes: z.number().int().nonnegative().optional(),
     file_mime: z.string().trim().max(64).optional().or(z.literal('')),
   })
   .refine(
