@@ -29,10 +29,6 @@ class Settings(BaseSettings):
     github_client_id: str = ""
     github_client_secret: SecretStr = SecretStr("")
 
-    # Observability — Sentry. Empty DSN = disabled (default for dev / test).
-    sentry_dsn: str = ""
-    sentry_traces_sample_rate: float = 0.1
-
     # CORS — list of allowed origins (exact match). Default empty = no CORS.
     # Pydantic-settings parses comma-separated env var into list[str], e.g.
     #   CORS_ORIGINS=https://myetal.app,https://www.myetal.app

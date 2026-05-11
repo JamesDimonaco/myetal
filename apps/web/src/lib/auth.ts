@@ -325,7 +325,14 @@ export const auth = betterAuth({
           clientId: process.env.ORCID_CLIENT_ID ?? '',
           clientSecret: process.env.ORCID_CLIENT_SECRET ?? '',
           ...orcidEndpoints,
-          scopes: ['openid', '/read-limited'],
+          // `/authenticate` works for both ORCID Public API and Member API
+          // clients. The previous `/read-limited` scope is Member-only —
+          // requesting it from a Public API client returns
+          // "invalid_request: one of the provided scopes is not allowed".
+          // We only need the ORCID iD itself (BA writes it to users.orcid_id);
+          // works are fetched separately via services/orcid_client.py against
+          // the public ORCID API.
+          scopes: ['openid', '/authenticate'],
           // Hijack-hardening: refuse to sign in if the returned ORCID iD
           // is already linked to another user. Throwing here aborts the
           // OAuth chain before BA writes a row.

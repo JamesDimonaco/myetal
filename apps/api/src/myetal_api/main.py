@@ -18,14 +18,13 @@ from myetal_api.core.config import settings
 from myetal_api.core.observability import (
     RequestIDMiddleware,
     configure_logging,
-    init_sentry,
 )
 from myetal_api.core.rate_limit import limiter
 
-# Order matters: configure logging + init Sentry BEFORE the FastAPI() call so
-# any startup errors are captured and any import-time logs use the right format.
+# Configure logging BEFORE the FastAPI() call so import-time logs use the
+# right format. (Sentry SDK removed — PostHog covers error tracking on the
+# client; server logs go to Railway/Pi stdout.)
 configure_logging()
-init_sentry()
 
 app = FastAPI(title="MyEtAl API", version=__version__)
 
