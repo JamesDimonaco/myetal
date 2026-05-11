@@ -39,8 +39,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     }));
-  } catch {
-    // Silently degrade — static pages are still returned.
+  } catch (err) {
+    // Graceful degradation: static pages are still returned so the
+    // sitemap is never a hard 500. We DO log though — a silent catch
+    // was hiding genuine API outages from observability. The error is
+    // best-effort and the build / request continues.
+    console.error('[sitemap] failed to fetch dynamic share entries', err);
   }
 
   return [...staticEntries, ...shareEntries];
