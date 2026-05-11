@@ -134,7 +134,33 @@ Same as #1 but on the mobile profile screen. Lower priority because mobile users
 
 ---
 
-### 9. Pre-existing mypy / eslint debt cleanup
+### 9. ORCID-private-email recovery flow
+
+**What:** When an ORCID user keeps their email private, our `mapProfileToUser`
+synthesises `${orcidId}@orcid.invalid` so BA's NOT NULL email column accepts
+the sign-up (commit `d038879`). It works, but:
+
+- Password reset can't deliver (`.invalid` is reserved + non-deliverable)
+- Email verification banner can never be confirmed (if flipped to hard)
+- The user sees a clearly-fake email in their profile
+
+**Fix:**
+- Detect `email.endsWith('@orcid.invalid')` on the dashboard
+- Show a non-blocking banner: *"Add a real email so we can send password
+  reset + notifications. ORCID didn't share yours."*
+- Profile page already has the structure for editable fields; add an
+  email row with BA's `auth.api.updateUser({ email })` wired to the
+  save action
+- Once updated, banner disappears
+
+**Effort:** ~30-45 min. Small.
+
+**Why deferred:** affects only ORCID-private-email users (subset). Not
+blocking sign-in. Surface during a profile-page polish pass.
+
+---
+
+### 10. Pre-existing mypy / eslint debt cleanup
 
 **What:** Five mypy errors and four eslint errors carry over from before the BA migration:
 - `services/share.py`, `services/papers.py`, `services/r2_client.py`, `api/routes/public.py`, `main.py` — all third-party stub gaps (`cachetools`, `boto3`, `qrcode`) plus a Starlette generic.
