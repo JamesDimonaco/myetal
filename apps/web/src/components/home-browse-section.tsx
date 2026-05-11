@@ -14,7 +14,7 @@ import Link from 'next/link';
 
 import { PopularTagsRow } from '@/components/popular-tags-row';
 import { ShareCard } from '@/components/share-card';
-import { ApiError, api } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { BrowseResponse, Tag } from '@/types/share';
 
 const FETCH_OPTIONS = { next: { revalidate: 300 } };
@@ -23,10 +23,10 @@ async function fetchPopularTags(): Promise<Tag[]> {
   try {
     return await api<Tag[]>('/public/tags/popular?limit=8', FETCH_OPTIONS);
   } catch (err) {
-    // Fail soft: if the tags endpoint hiccups, just hide the chip row rather
-    // than blanking the entire home page.
-    if (err instanceof ApiError) return [];
-    throw err;
+    // The marketing landing must never crash, even if the API is down or a
+    // network hop hiccups. Hide the chip row, log for diagnostics, move on.
+    console.error('[home] popular tags fetch failed', err);
+    return [];
   }
 }
 
@@ -34,10 +34,10 @@ async function fetchBrowseSnapshot(): Promise<BrowseResponse | null> {
   try {
     return await api<BrowseResponse>('/public/browse', FETCH_OPTIONS);
   } catch (err) {
-    // Fail soft on backend hiccups so the home page still renders. Anything
-    // that isn't a recognised ApiError is a genuine bug — let it bubble.
-    if (err instanceof ApiError) return null;
-    throw err;
+    // Same posture as fetchPopularTags. Returning null here falls through to
+    // the empty-state card (E7) so the page still renders.
+    console.error('[home] browse snapshot fetch failed', err);
+    return null;
   }
 }
 
