@@ -22,10 +22,10 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? 'https://myetal.app',
   ),
   icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico', sizes: 'any' },
-    ],
+    // SVG-only favicon. Modern browsers (Safari 9+, Chrome 80+, Firefox 41+,
+    // Edge) all support image/svg+xml favicons; the legacy /favicon.ico
+    // reference produced a 404 in Safari because the file was never shipped.
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
     apple: '/favicon.svg',
   },
   openGraph: {
