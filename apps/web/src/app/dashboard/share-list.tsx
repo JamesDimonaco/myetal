@@ -6,6 +6,13 @@ import { useState } from 'react';
 
 import { QrModal } from '@/components/qr-modal';
 import { TagChips } from '@/components/tag-chips';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ApiError } from '@/lib/api';
 import { useDeleteShare, useShares } from '@/lib/hooks/useShares';
 import type { ShareItemKind, ShareResponse } from '@/types/share';
@@ -272,9 +279,9 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
               </h3>
               <p className="mt-1 text-sm text-ink-muted">
                 {kindSummary(share.items)}
-                {' \u00b7 '}
+                {' · '}
                 <span className="capitalize">{share.type}</span>
-                {' \u00b7 '}
+                {' · '}
                 {share.published_at !== null ? 'Published' : 'Unlisted'}
               </p>
               {share.tags && share.tags.length > 0 ? (
@@ -339,52 +346,44 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
         />
       ) : null}
 
-      {deleteTarget ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-delete-title"
-          className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 px-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setDeleteTarget(null);
-          }}
-        >
-          <div className="w-full max-w-md rounded-lg border border-rule bg-paper p-6 shadow-xl">
-            <h2
-              id="confirm-delete-title"
-              className="font-serif text-xl text-ink"
+      {/* Delete-confirm — migrated to shadcn Dialog (round of pre-launch
+          polish). Radix handles focus-trap, Escape and outside-click; we
+          drive `open` off `deleteTarget` so the dialog mounts only when a
+          target is selected, matching the previous conditional render. */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent hideCloseButton>
+          <DialogTitle>Delete this share?</DialogTitle>
+          <DialogDescription className="mt-2">
+            <span className="text-ink">&quot;{deleteTarget?.name}&quot;</span>{' '}
+            will be removed. The QR code will stop working immediately. This
+            cannot be undone.
+          </DialogDescription>
+          {deleteError ? (
+            <p className="mt-3 text-sm text-danger">{deleteError}</p>
+          ) : null}
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteShare.isPending}
             >
-              Delete this share?
-            </h2>
-            <p className="mt-2 text-sm text-ink-muted">
-              <span className="text-ink">&quot;{deleteTarget.name}&quot;</span>{' '}
-              will be removed. The QR code will stop working immediately. This
-              cannot be undone.
-            </p>
-            {deleteError ? (
-              <p className="mt-3 text-sm text-danger">{deleteError}</p>
-            ) : null}
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleteShare.isPending}
-                className="rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink hover:bg-paper-soft disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={deleteShare.isPending}
-                className="rounded-md bg-danger px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
-              >
-                {deleteShare.isPending ? 'Deleting\u2026' : 'Delete'}
-              </button>
-            </div>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmDelete}
+              disabled={deleteShare.isPending}
+            >
+              {deleteShare.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

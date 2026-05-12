@@ -12,6 +12,13 @@ import {
 import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
 import { TagInput } from '@/components/tag-input';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ApiError } from '@/lib/api';
 import { clientApi } from '@/lib/client-api';
 import {
@@ -863,44 +870,41 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         />
       ) : null}
 
-      {confirmingDelete ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 px-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setConfirmingDelete(false);
-          }}
-        >
-          <div className="w-full max-w-md rounded-lg border border-rule bg-paper p-6 shadow-xl">
-            <h3 className="font-serif text-xl text-ink">Delete this share?</h3>
-            <p className="mt-2 text-sm text-ink-muted">
-              <span className="font-medium text-ink">&quot;{name}&quot;</span>{' '}
-              will be permanently removed. The QR code will stop working
-              immediately and anyone who scans it will see an error. This cannot
-              be undone.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                className="rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink hover:bg-paper-soft"
-                disabled={deleteMutation.isPending}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="rounded-md bg-danger px-4 py-2 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-60"
-              >
-                {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
+      {/* Delete-confirm — migrated from hand-rolled overlay to shadcn Dialog
+          so the focus-trap, Escape and outside-click logic comes from Radix
+          rather than this file. */}
+      <Dialog
+        open={confirmingDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingDelete(false);
+        }}
+      >
+        <DialogContent hideCloseButton>
+          <DialogTitle>Delete this share?</DialogTitle>
+          <DialogDescription className="mt-2">
+            <span className="font-medium text-ink">&quot;{name}&quot;</span>{' '}
+            will be permanently removed. The QR code will stop working
+            immediately and anyone who scans it will see an error. This cannot
+            be undone.
+          </DialogDescription>
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingDelete(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
