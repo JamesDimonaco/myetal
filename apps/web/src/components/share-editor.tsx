@@ -552,7 +552,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             required
             maxLength={200}
             className={[
-              'rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
+              'min-h-[44px] rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
               fieldErrors['name'] ? 'border-danger' : 'border-rule',
             ].join(' ')}
           />
@@ -591,7 +591,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                   type="button"
                   onClick={() => setShareType(t)}
                   className={[
-                    'rounded-full border px-4 py-2 text-sm font-medium capitalize transition',
+                    'inline-flex min-h-[40px] items-center rounded-full border px-4 py-2 text-sm font-medium capitalize transition',
                     active
                       ? 'border-ink bg-ink text-paper'
                       : 'border-rule bg-paper text-ink hover:bg-paper-soft',
@@ -684,7 +684,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                 setSavedShare(initial);
                 setShowQr(true);
               }}
-              className="rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Show QR
             </button>
@@ -705,7 +705,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             <button
               type="button"
               onClick={() => setShowAddItem(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                 <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -733,7 +733,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowAddItem(true)}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+                  className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                     <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -817,19 +817,19 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
+            className="inline-flex min-h-[44px] items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
               <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Back to dashboard
           </Link>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {!isNew ? (
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(true)}
-                className="rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
               >
                 Delete share
               </button>
@@ -837,7 +837,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             <button
               type="submit"
               disabled={submitting || !name.trim()}
-              className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
             >
               {submitting
                 ? 'Saving…'
@@ -1213,7 +1213,7 @@ function IconBtn({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+      className="inline-flex h-10 w-10 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 sm:h-8 sm:w-8"
     >
       {children}
     </button>
