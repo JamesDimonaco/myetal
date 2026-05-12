@@ -293,10 +293,12 @@ export function LibraryList({
         </div>
       ) : null}
 
-      {/* Add by DOI + Import from ORCID */}
-      <div className="flex flex-wrap items-stretch gap-3">
+      {/* Add by DOI + Import from ORCID. On phones the form stacks above
+          the ORCID button so the DOI input doesn't get squeezed to a
+          handful of characters by the Add-paper button next to it. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch">
         <form
-          className="flex flex-1 gap-3"
+          className="flex flex-1 flex-col gap-2 sm:flex-row sm:gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             const trimmed = doi.trim();
@@ -308,12 +310,12 @@ export function LibraryList({
             value={doi}
             onChange={(e) => setDoi(e.target.value)}
             placeholder="Paste a DOI (e.g. 10.1234/example)"
-            className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            className="min-h-[44px] flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
           />
           <button
             type="submit"
             disabled={addWork.isPending || !doi.trim()}
-            className="rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
           >
             {addWork.isPending ? 'Adding...' : '+ Add paper'}
           </button>
@@ -324,7 +326,7 @@ export function LibraryList({
             onClick={() => syncOrcid.mutate()}
             disabled={importDisabled}
             aria-label={importLabel}
-            className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
           >
             <OrcidIcon size={16} />
             {importLabel}
@@ -600,7 +602,7 @@ function WorkCard({
             <button
               onClick={onRestore}
               disabled={isRestoring}
-              className="rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+              className="inline-flex min-h-[40px] items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
             >
               Restore
             </button>
@@ -608,7 +610,7 @@ function WorkCard({
             <button
               onClick={onHide}
               disabled={isHiding}
-              className="rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink-muted transition hover:border-danger hover:text-danger disabled:opacity-50"
+              className="inline-flex min-h-[40px] items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink-muted transition hover:border-danger hover:text-danger disabled:opacity-50"
             >
               Hide
             </button>
@@ -706,7 +708,7 @@ function AddToShareMenu({
         disabled={isAdding}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+        className="inline-flex min-h-[40px] items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
       >
         {isAdding ? 'Adding…' : 'Add to share…'}
       </button>
