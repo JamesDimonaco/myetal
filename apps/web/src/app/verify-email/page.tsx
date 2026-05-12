@@ -9,11 +9,11 @@ export default function VerifyEmailPage() {
   return (
     <main
       data-ph-no-capture
-      className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 py-10 text-center"
+      className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-4 py-8 text-center sm:px-6 sm:py-10"
     >
       <Link
         href="/sign-in"
-        className="self-start text-sm text-ink-muted hover:text-ink"
+        className="inline-flex min-h-[40px] items-center self-start text-sm text-ink-muted hover:text-ink"
       >
         &larr; Back to sign in
       </Link>

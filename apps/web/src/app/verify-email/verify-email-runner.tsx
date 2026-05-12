@@ -62,7 +62,7 @@ export function VerifyEmailRunner() {
       </p>
       <a
         href="/sign-in"
-        className="mt-6 inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-2 text-sm font-medium text-ink hover:border-ink/40"
+        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-2 text-sm font-medium text-ink hover:border-ink/40"
       >
         Back to sign in
       </a>
