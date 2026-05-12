@@ -43,9 +43,13 @@ export default async function LandingPage() {
         <nav className="flex items-center gap-3 text-sm sm:gap-6">
           {signedIn ? (
             <>
+              {/* "Dashboard" hidden on mobile — avatar tap goes to profile,
+                  and the hero CTA below already says "Go to dashboard". This
+                  keeps the header to avatar + sign-out so the sign-out label
+                  doesn't wrap at 375px. */}
               <Link
                 href="/dashboard"
-                className="whitespace-nowrap text-ink-muted hover:text-ink"
+                className="hidden whitespace-nowrap text-ink-muted hover:text-ink sm:inline"
               >
                 Dashboard
               </Link>
@@ -66,13 +70,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/sign-in"
-                className="whitespace-nowrap rounded-md px-2 py-1.5 hover:text-ink sm:px-3"
+                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
               >
                 Sign in
               </Link>
               <Link
                 href="/sign-in"
-                className="whitespace-nowrap rounded-md bg-ink px-3 py-1.5 text-paper transition hover:opacity-90"
+                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
               >
                 Get started
               </Link>
