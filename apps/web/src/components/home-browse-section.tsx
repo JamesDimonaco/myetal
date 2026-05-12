@@ -63,7 +63,7 @@ export async function HomeBrowseSection() {
           </p>
           <Link
             href="/sign-up"
-            className="mt-6 inline-flex items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+            className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
           >
             Sign up
           </Link>
@@ -84,7 +84,7 @@ export async function HomeBrowseSection() {
         </h2>
         <Link
           href="/browse"
-          className="text-sm font-medium text-accent transition hover:opacity-80"
+          className="inline-flex min-h-[40px] items-center text-sm font-medium text-accent transition hover:opacity-80"
         >
           Browse all &rarr;
         </Link>

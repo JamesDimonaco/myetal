@@ -308,7 +308,7 @@ export function SearchResults() {
           </p>
           <Link
             href="/browse"
-            className="mt-5 inline-flex items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+            className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
           >
             Browse all
           </Link>
@@ -332,7 +332,7 @@ export function SearchResults() {
         <div className="mt-8 text-center">
           <button
             onClick={handleLoadMore}
-            className="text-sm font-medium text-accent transition hover:opacity-80"
+            className="inline-flex min-h-[44px] items-center justify-center text-sm font-medium text-accent transition hover:opacity-80"
           >
             Show more results
           </button>
