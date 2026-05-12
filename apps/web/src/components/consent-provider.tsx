@@ -84,7 +84,7 @@ function CookieBanner({
       role="dialog"
       aria-label="Cookie consent"
     >
-      <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-6 py-4 sm:flex-row">
+      <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-4 py-4 sm:flex-row sm:px-6">
         <p className="text-sm text-ink-muted">
           We use cookies for analytics and error tracking to improve MyEtAl.
         </p>
@@ -92,14 +92,14 @@ function CookieBanner({
           <button
             type="button"
             onClick={onDecline}
-            className="rounded border border-rule px-4 py-1.5 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
+            className="inline-flex min-h-[44px] items-center justify-center rounded border border-rule px-4 py-1.5 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
           >
             Decline
           </button>
           <button
             type="button"
             onClick={onAccept}
-            className="rounded bg-accent px-4 py-1.5 text-sm text-paper transition-colors hover:bg-accent/90"
+            className="inline-flex min-h-[44px] items-center justify-center rounded bg-accent px-4 py-1.5 text-sm text-paper transition-colors hover:bg-accent/90"
           >
             Accept
           </button>
