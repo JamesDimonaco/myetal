@@ -112,16 +112,16 @@ export function FeedbackForm({ userEmail }: Props) {
           </p>
         )}
 
-        <div className="mt-8 flex items-center gap-4">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={handleReset}
-            className="rounded-md border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-paper-soft"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-paper-soft"
           >
             Submit another
           </button>
           <Link
             href="/"
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             Back to app
           </Link>
@@ -381,7 +381,7 @@ export function FeedbackForm({ userEmail }: Props) {
       <button
         type="submit"
         disabled={submitting || !title.trim() || !description.trim()}
-        className="w-full rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-[44px] w-full items-center justify-center rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Sending...' : 'Submit feedback'}
       </button>
