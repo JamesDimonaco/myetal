@@ -199,7 +199,7 @@ export function SearchResults() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by title, author, or topic..."
           autoFocus
-          className="w-full rounded-md border border-rule bg-paper py-3 pl-10 pr-4 text-lg text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+          className="min-h-[48px] w-full rounded-md border border-rule bg-paper py-3 pl-10 pr-4 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none sm:text-lg"
         />
       </div>
 
@@ -255,7 +255,7 @@ export function SearchResults() {
             <button
               key={type}
               onClick={() => toggleType(type)}
-              className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider transition ${
+              className={`inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-wider transition ${
                 activeTypes.has(type)
                   ? 'border-ink bg-ink text-paper'
                   : 'border-rule bg-paper-soft text-ink-muted hover:border-ink/40'
@@ -269,7 +269,7 @@ export function SearchResults() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortOption)}
-              className="rounded-md border border-rule bg-paper px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted focus:border-accent focus:outline-none"
+              className="min-h-[36px] rounded-md border border-rule bg-paper px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted focus:border-accent focus:outline-none"
               aria-label="Sort results"
             >
               {SORT_OPTIONS.map((opt) => (
