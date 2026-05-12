@@ -8,8 +8,13 @@
  *
  * Classes use our paper/ink/rule tokens (NOT shadcn's default neutral theme)
  * so the modal still looks like MyEtAl. `DialogContent` is the visible card
- * itself — fixed-centered, bordered, with sensible padding. Wide modals
- * (AddItemModal) override `max-w-*` and add their own inner scroll container.
+ * itself — positioned absolutely at viewport center. Wide modals (AddItemModal)
+ * override the default `max-w-md` and supply their own inner scroll container.
+ *
+ * Layout matches the canonical shadcn pattern (fixed + translate centring on
+ * Content, Overlay underneath for backdrop clicks) rather than wrapping Content
+ * in an extra flex layer — Radix's outside-click handler reads the Content's
+ * bounding box, so the simpler positioning works correctly out of the box.
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as React from 'react';
@@ -36,55 +41,51 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
-    /** Hide the default X button — useful when the call site renders its own. */
+    /** Hide the default X button — useful for confirm dialogs whose own
+     *  Cancel button is the dismissal control. */
     hideCloseButton?: boolean;
   }
 >(({ className, children, hideCloseButton, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    {/* Use a fixed full-screen flex wrapper to centre the card. This lets
-        long content (AddItemModal) live inside its own scroll container
-        without us having to fight `position: fixed` + `transform`. The
-        wrapper itself is non-interactive — Radix's outside-click handler is
-        on `Content` and fires when the user clicks outside the card. */}
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:items-center">
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          'pointer-events-auto relative w-full max-w-md rounded-xl border border-rule bg-paper p-6 shadow-2xl',
-          'focus:outline-none',
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {hideCloseButton ? null : (
-          <DialogPrimitive.Close
-            aria-label="Close"
-            className={cn(
-              'absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center',
-              'rounded-md text-ink-muted transition hover:bg-paper-soft hover:text-ink',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-            )}
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        'fixed left-[50%] top-[50%] z-50 w-[calc(100%-2rem)] max-w-md',
+        'translate-x-[-50%] translate-y-[-50%]',
+        'rounded-xl border border-rule bg-paper p-6 shadow-2xl',
+        'focus:outline-none',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      {hideCloseButton ? null : (
+        <DialogPrimitive.Close
+          aria-label="Close"
+          className={cn(
+            'absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center',
+            'rounded-md text-ink-muted transition hover:bg-paper-soft hover:text-ink',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+          )}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M3 3l10 10M13 3L3 13"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </div>
+            <path
+              d="M3 3l10 10M13 3L3 13"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        </DialogPrimitive.Close>
+      )}
+    </DialogPrimitive.Content>
   </DialogPortal>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
