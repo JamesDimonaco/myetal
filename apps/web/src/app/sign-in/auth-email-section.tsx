@@ -94,7 +94,7 @@ export function AuthEmailSection({
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="mt-4 text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+        className="mt-4 inline-flex min-h-[44px] items-center text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
       >
         Sign in with email
       </button>
@@ -111,7 +111,7 @@ export function AuthEmailSection({
             setTab('sign-in');
             setError(null);
           }}
-          className={`pb-2 transition ${
+          className={`inline-flex min-h-[44px] items-center pb-2 transition ${
             tab === 'sign-in'
               ? 'border-b-2 border-ink font-medium text-ink'
               : 'text-ink-muted hover:text-ink'
@@ -125,7 +125,7 @@ export function AuthEmailSection({
             setTab('create-account');
             setError(null);
           }}
-          className={`pb-2 transition ${
+          className={`inline-flex min-h-[44px] items-center pb-2 transition ${
             tab === 'create-account'
               ? 'border-b-2 border-ink font-medium text-ink'
               : 'text-ink-muted hover:text-ink'
