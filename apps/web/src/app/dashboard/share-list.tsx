@@ -92,7 +92,7 @@ function TrashIcon() {
 }
 
 const iconBtnClass =
-  'rounded-md border border-rule bg-paper p-2 text-ink-muted transition hover:bg-paper-soft hover:text-ink';
+  'inline-flex h-11 w-11 items-center justify-center rounded-md border border-rule bg-paper text-ink-muted transition hover:bg-paper-soft hover:text-ink sm:h-9 sm:w-9';
 
 interface Props {
   initialShares: ShareResponse[];
@@ -165,7 +165,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
           </p>
           <Link
             href="/dashboard/share/new"
-            className="mt-6 inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+            className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
           >
             Create a share
           </Link>
@@ -186,13 +186,13 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/dashboard/library"
-              className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Open library
             </Link>
             <Link
               href="/dashboard/share/new"
-              className="inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
             >
               Create a share
             </Link>
@@ -209,7 +209,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
         </p>
         <Link
           href="/dashboard/share/new"
-          className="mt-6 inline-flex items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+          className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
         >
           Create a share
         </Link>
@@ -329,7 +329,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
                   setDeleteError(null);
                   setDeleteTarget(share);
                 }}
-                className="ml-auto rounded-md border border-rule bg-paper p-2 text-ink-muted transition hover:bg-paper-soft hover:text-danger"
+                className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md border border-rule bg-paper text-ink-muted transition hover:bg-paper-soft hover:text-danger sm:h-9 sm:w-9"
               >
                 <TrashIcon />
               </button>
