@@ -190,7 +190,7 @@ export default async function PublicSharePage({ params }: PageProps) {
         </p>
         <Link
           href="/"
-          className="mt-8 inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink hover:border-ink/40"
+          className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink hover:border-ink/40"
         >
           Back to MyEtAl
         </Link>

@@ -63,7 +63,7 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
       <select
         value={reason}
         onChange={(e) => setReason(e.target.value as ShareReportReason)}
-        className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+        className="min-h-[44px] w-full rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink focus:border-accent focus:outline-none"
       >
         {REASONS.map((r) => (
           <option key={r.value} value={r.value}>
@@ -77,21 +77,21 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
         placeholder="Optional details (max 2000 chars)"
         maxLength={2000}
         rows={3}
-        className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+        className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
       />
       {error ? <p className="text-xs text-danger">{error}</p> : null}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-md bg-danger px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          className="inline-flex min-h-[40px] items-center justify-center rounded-md bg-danger px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
         >
           {submitting ? 'Sending...' : 'Submit report'}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40"
+          className="inline-flex min-h-[40px] items-center justify-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40"
         >
           Cancel
         </button>

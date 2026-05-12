@@ -97,7 +97,7 @@ function PaperCard({
               href={oa.pdfUrl}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
             >
               View PDF <span aria-hidden>↗</span>
             </a>
@@ -107,7 +107,7 @@ function PaperCard({
               href={oaUrlForButton}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-md border border-ink/20 bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md border border-ink/20 bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40"
             >
               Open paper <span aria-hidden>↗</span>
             </a>
@@ -176,7 +176,7 @@ function RepoCard({
             href={href}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
           >
             View on GitHub <span aria-hidden>↗</span>
           </a>
@@ -292,7 +292,7 @@ function PdfCard({ item }: { item: ShareItem }) {
               href={href}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
             >
               Download PDF <span aria-hidden>↗</span>
             </a>
@@ -362,7 +362,7 @@ function LinkCard({ item }: { item: ShareItem }) {
               href={href}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
             >
               Open <span aria-hidden>↗</span>
             </a>
