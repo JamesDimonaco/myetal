@@ -209,7 +209,7 @@ export function OrcidSection({ initialOrcidId }: Props) {
               <button
                 type="submit"
                 disabled={submitting || !formatValid}
-                className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
               >
                 {submitting ? 'Saving…' : 'Save'}
               </button>
@@ -218,7 +218,7 @@ export function OrcidSection({ initialOrcidId }: Props) {
                 type="button"
                 onClick={handleRemove}
                 disabled={submitting}
-                className="rounded-md border border-danger/40 bg-paper px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
               >
                 {submitting ? 'Removing…' : 'Remove'}
               </button>
