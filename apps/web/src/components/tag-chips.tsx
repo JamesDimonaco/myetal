@@ -23,7 +23,7 @@ interface Props {
 }
 
 const chipClass =
-  'inline-flex items-center rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted transition hover:border-ink/40 hover:text-ink';
+  'inline-flex min-h-[32px] items-center rounded-full border border-rule bg-paper-soft px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-ink-muted transition hover:border-ink/40 hover:text-ink';
 
 const staticChipClass =
   'inline-flex items-center rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted';
