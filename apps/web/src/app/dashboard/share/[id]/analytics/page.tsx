@@ -49,7 +49,7 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
   const maxCount = Math.max(1, ...analytics.daily_views.map((d) => d.count));
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-8">
         <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
           /c/{share.short_code}
