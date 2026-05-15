@@ -1,5 +1,22 @@
 'use client';
 
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -379,6 +396,30 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       const next = [...prev];
       [next[idx], next[target]] = [next[target], next[idx]];
       return next;
+    });
+  };
+
+  // dnd-kit sensors — pointer for mouse/touch, keyboard for accessibility.
+  // PointerSensor's activation distance keeps the up/down icon buttons and
+  // form inputs click-targets usable; a drag only kicks in once the cursor
+  // has moved a few pixels.
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setItems((prev) => {
+      const fromIdx = prev.findIndex((it) => it._key === active.id);
+      const toIdx = prev.findIndex((it) => it._key === over.id);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      return arrayMove(prev, fromIdx, toIdx);
     });
   };
 
@@ -794,62 +835,28 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               </div>
             ) : null}
 
-            {items.map((it, idx) => (
-              <div
-                key={it._key}
-                className="rounded-md border border-rule bg-paper-soft p-4"
+            <DndContext
+              sensors={dragSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={items.map((it) => it._key)}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-                      #{idx + 1}
-                    </span>
-                    <KindBadge kind={it.kind} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <IconBtn
-                      label="Move up"
-                      disabled={idx === 0}
-                      onClick={() => moveItem(it._key, -1)}
-                    >
-                      <ArrowIcon direction="up" />
-                    </IconBtn>
-                    <IconBtn
-                      label="Move down"
-                      disabled={idx === items.length - 1}
-                      onClick={() => moveItem(it._key, 1)}
-                    >
-                      <ArrowIcon direction="down" />
-                    </IconBtn>
-                    <IconBtn
-                      label="Remove item"
-                      onClick={() => removeItem(it._key)}
-                    >
-                      <TrashIcon />
-                    </IconBtn>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-3">
-                  {it.kind === 'paper' ? (
-                    <PaperFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  ) : it.kind === 'repo' ? (
-                    <RepoFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  ) : it.kind === 'pdf' ? (
-                    <PdfFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  ) : (
-                    <LinkFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  )}
-                  <ItemField
-                    label="Notes"
-                    value={it.notes}
-                    onChange={(v) => updateItem(it._key, { notes: v })}
-                    placeholder="Why this matters"
-                    multiline
+                {items.map((it, idx) => (
+                  <SortableItemRow
+                    key={it._key}
+                    item={it}
+                    idx={idx}
+                    total={items.length}
+                    onMove={moveItem}
+                    onRemove={removeItem}
+                    onUpdate={updateItem}
                   />
-                </div>
-              </div>
-            ))}
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
 
@@ -1013,6 +1020,136 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// --- sortable item row ---
+
+/**
+ * One row of the items list. `useSortable` wires up the drag transform
+ * for dnd-kit. The drag handle is only visible on hover at sm+ widths;
+ * touch devices keep the up/down arrow buttons as the reorder path.
+ *
+ * Extracted so we can call the hook (which can't run inside a .map).
+ */
+function SortableItemRow({
+  item,
+  idx,
+  total,
+  onMove,
+  onRemove,
+  onUpdate,
+}: {
+  item: DraftItem;
+  idx: number;
+  total: number;
+  onMove: (key: string, direction: -1 | 1) => void;
+  onRemove: (key: string) => void;
+  onUpdate: (key: string, patch: Partial<DraftItem>) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item._key });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    // Lift the dragged card visually so it reads as detached.
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-md border border-rule bg-paper-soft p-4"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {/* Drag handle — sm:flex hides on phones, where arrow buttons
+              and a11y keyboard sortable cover reordering instead. */}
+          <button
+            type="button"
+            aria-label={`Drag to reorder item ${idx + 1}`}
+            className="hidden h-8 w-6 cursor-grab touch-none items-center justify-center text-ink-faint transition hover:text-ink active:cursor-grabbing sm:flex"
+            {...attributes}
+            {...listeners}
+          >
+            <GripIcon />
+          </button>
+          <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+            #{idx + 1}
+          </span>
+          <KindBadge kind={item.kind} />
+        </div>
+        <div className="flex items-center gap-1">
+          <IconBtn
+            label="Move up"
+            disabled={idx === 0}
+            onClick={() => onMove(item._key, -1)}
+          >
+            <ArrowIcon direction="up" />
+          </IconBtn>
+          <IconBtn
+            label="Move down"
+            disabled={idx === total - 1}
+            onClick={() => onMove(item._key, 1)}
+          >
+            <ArrowIcon direction="down" />
+          </IconBtn>
+          <IconBtn label="Remove item" onClick={() => onRemove(item._key)}>
+            <TrashIcon />
+          </IconBtn>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        {item.kind === 'paper' ? (
+          <PaperFields
+            item={item}
+            onChange={(p) => onUpdate(item._key, p)}
+          />
+        ) : item.kind === 'repo' ? (
+          <RepoFields item={item} onChange={(p) => onUpdate(item._key, p)} />
+        ) : item.kind === 'pdf' ? (
+          <PdfFields item={item} onChange={(p) => onUpdate(item._key, p)} />
+        ) : (
+          <LinkFields item={item} onChange={(p) => onUpdate(item._key, p)} />
+        )}
+        <ItemField
+          label="Notes"
+          value={item.notes}
+          onChange={(v) => onUpdate(item._key, { notes: v })}
+          placeholder="Why this matters"
+          multiline
+        />
+      </div>
+    </div>
+  );
+}
+
+function GripIcon() {
+  return (
+    <svg
+      width="12"
+      height="16"
+      viewBox="0 0 12 16"
+      fill="currentColor"
+      aria-hidden
+    >
+      <circle cx="3.5" cy="3" r="1.25" />
+      <circle cx="8.5" cy="3" r="1.25" />
+      <circle cx="3.5" cy="8" r="1.25" />
+      <circle cx="8.5" cy="8" r="1.25" />
+      <circle cx="3.5" cy="13" r="1.25" />
+      <circle cx="8.5" cy="13" r="1.25" />
+    </svg>
   );
 }
 
