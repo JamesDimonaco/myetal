@@ -112,6 +112,26 @@ const shareSchema = z.object({
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
+// Validation paths the user has a visible field for. Anything else
+// (file_size_bytes, file_mime, thumbnail_url, etc.) routes through the
+// hidden-field banner instead of leaking raw Zod messages — see
+// docs/tickets/to-do/form-error-surfacing.md.
+const USER_EDITABLE_FIELDS = new Set([
+  'name',
+  'description',
+  'type',
+  'items',
+  'items.*.title',
+  'items.*.scholar_url',
+  'items.*.doi',
+  'items.*.authors',
+  'items.*.year',
+  'items.*.notes',
+  'items.*.url',
+  'items.*.subtitle',
+  'items.*.image_url',
+]);
+
 interface DraftItem {
   _key: string;
   /** Server-assigned UUID. Present for items hydrated from the response,
@@ -443,14 +463,38 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       items,
     });
     if (!parsed.success) {
-      // Map zod issues to field-level errors for inline display.
-      const errs: Record<string, string> = {};
+      // Partition zod issues: anything on a user-editable field renders
+      // inline under that field; anything on a hidden/computed field
+      // (e.g. `items.*.file_size_bytes`, which the user can't see) routes
+      // to the top-of-form banner with friendly copy. The raw message is
+      // still console.warn'd so future hidden-field validations are easy
+      // to spot in DevTools without leaking the technical detail to the UI.
+      const inline: Record<string, string> = {};
+      const hidden: string[] = [];
       for (const issue of parsed.error.issues) {
-        const key = issue.path.join('.');
-        if (!errs[key]) errs[key] = issue.message;
+        const path = issue.path.join('.');
+        const pathPattern = path.replace(/\d+/g, '*');
+        if (USER_EDITABLE_FIELDS.has(pathPattern)) {
+          if (!inline[path]) inline[path] = issue.message;
+        } else {
+          hidden.push(`${path}: ${issue.message}`);
+        }
       }
-      setFieldErrors(errs);
-      setError(parsed.error.issues[0]?.message ?? 'Invalid input');
+      setFieldErrors(inline);
+      // Prefer surfacing a user-editable message (clear, actionable). Fall
+      // back to a generic banner only when every issue is on a hidden field
+      // — the previous code leaked raw Zod text in that case.
+      const firstInline = Object.values(inline)[0];
+      if (firstInline) {
+        setError(firstInline);
+      } else if (hidden.length > 0) {
+        console.warn('[share-editor] hidden-field validation failed:', hidden);
+        setError(
+          "Something didn't validate. Try again, or remove and re-add the last item.",
+        );
+      } else {
+        setError('Invalid input');
+      }
       // Scroll error into view so the user sees what went wrong.
       setTimeout(() => {
         document.querySelector('[role="alert"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
