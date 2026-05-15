@@ -308,6 +308,13 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [savedShare, setSavedShare] = useState<ShareResponse | null>(null);
   const [showQr, setShowQr] = useState(false);
+  // Distinguishes the post-save celebratory QR (close → dashboard) from the
+  // quick-access "Show QR" button on the edit page (close → stay here).
+  // Without this, closing the quick-access modal navigated the user away
+  // from the share they were editing.
+  const [qrMode, setQrMode] = useState<'post-save' | 'quick-access'>(
+    'post-save',
+  );
   const [showAddItem, setShowAddItem] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -437,6 +444,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       }
 
       setSavedShare(saved);
+      setQrMode('post-save');
       setShowQr(true);
       // Flash a brief "saved" confirmation that persists after QR closes.
       setJustSaved(true);
@@ -682,6 +690,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               type="button"
               onClick={() => {
                 setSavedShare(initial);
+                setQrMode('quick-access');
                 setShowQr(true);
               }}
               className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
@@ -865,8 +874,18 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         <QrModal
           shortCode={savedShare.short_code}
           collectionName={savedShare.name}
-          onClose={closeQrAndGoToDashboard}
-          onKeepEditing={closeQrAndKeepEditing}
+          onClose={
+            qrMode === 'post-save'
+              ? closeQrAndGoToDashboard
+              : closeQrAndKeepEditing
+          }
+          // The secondary "Keep editing" button only makes sense on the
+          // celebratory post-save modal — there's no "go to dashboard"
+          // alternative to differentiate from when the user is already
+          // editing.
+          onKeepEditing={
+            qrMode === 'post-save' ? closeQrAndKeepEditing : undefined
+          }
         />
       ) : null}
 
