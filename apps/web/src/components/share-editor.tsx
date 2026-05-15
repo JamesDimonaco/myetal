@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 
 import {
@@ -318,6 +318,41 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   const [showAddItem, setShowAddItem] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  // Unsaved-changes guard. `isDirty` flips true the first time any tracked
+  // form field changes after mount; flips back to false on successful save
+  // or explicit discard. Used by both the beforeunload listener and the
+  // in-editor "Back to dashboard" confirmation.
+  const [isDirty, setIsDirty] = useState(false);
+  const mountedRef = useRef(false);
+  const [pendingDiscardHref, setPendingDiscardHref] = useState<string | null>(
+    null,
+  );
+
+  // Mark the form dirty whenever a tracked field changes (skipping the
+  // initial mount-time set). The deep-equal check on items/tags isn't
+  // necessary because we only flip true; a clean revert would still mark
+  // dirty, but that's safer than the opposite.
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    setIsDirty(true);
+  }, [name, description, shareType, items, tags]);
+
+  // Browser-level guard: tab close, refresh, external nav. App-level
+  // intra-MyEtAl nav is intercepted by the discard dialog below.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers ignore the custom string and show their own
+      // confirmation. Setting returnValue is required for legacy support.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   const updateItem = (key: string, patch: Partial<DraftItem>) => {
     setItems((prev) =>
@@ -446,6 +481,9 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       setSavedShare(saved);
       setQrMode('post-save');
       setShowQr(true);
+      // Save succeeded — wipe the dirty flag so the discard guard doesn't
+      // fire on the post-save navigation to dashboard.
+      setIsDirty(false);
       // Flash a brief "saved" confirmation that persists after QR closes.
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
@@ -830,6 +868,16 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
           <Link
             href="/dashboard"
+            onClick={(e) => {
+              // Guard against silent loss of unsaved edits. The guard is
+              // intentionally NOT applied to the publish toggle, save
+              // submission, delete, or the post-save QR — only this
+              // explicit "leave the editor without saving" surface.
+              if (isDirty) {
+                e.preventDefault();
+                setPendingDiscardHref('/dashboard');
+              }
+            }}
             className="inline-flex min-h-[44px] items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -924,6 +972,42 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discard-changes guard — fires when the user clicks an in-editor
+          nav surface (today: "Back to dashboard") while `isDirty`. The
+          beforeunload listener covers tab close / refresh separately. */}
+      <Dialog
+        open={pendingDiscardHref !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDiscardHref(null);
+        }}
+      >
+        <DialogContent hideCloseButton>
+          <DialogTitle>Discard unsaved changes?</DialogTitle>
+          <DialogDescription className="mt-2">
+            You have unsaved edits on this share. Leaving now will lose them.
+          </DialogDescription>
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setPendingDiscardHref(null)}
+            >
+              Keep editing
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const target = pendingDiscardHref;
+                setIsDirty(false);
+                setPendingDiscardHref(null);
+                if (target) router.push(target);
+              }}
+            >
+              Discard
             </Button>
           </div>
         </DialogContent>
