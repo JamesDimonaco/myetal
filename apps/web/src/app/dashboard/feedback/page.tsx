@@ -10,7 +10,7 @@ export default async function FeedbackPage() {
   let userEmail: string | null = null;
 
   try {
-    const user = await serverFetch<UserResponse>('/auth/me', {
+    const user = await serverFetch<UserResponse>('/me', {
       cache: 'no-store',
     });
     userEmail = user.email;
@@ -22,8 +22,8 @@ export default async function FeedbackPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
-      <h1 className="font-serif text-4xl tracking-tight text-ink">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-14">
+      <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">
         Send us feedback
       </h1>
       <p className="mt-3 text-base text-ink-muted">

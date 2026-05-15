@@ -1,0 +1,145 @@
+name: deploy-staging
+
+# On every push to `staging`, build the API container image, publish it
+# to Docker Hub tagged `:staging-<sha>` + `:staging`, then SSH into the
+# Pi over Twingate and restart the staging compose stack.
+#
+# Required GitHub secrets (Settings → Secrets and variables → Actions):
+#
+#   DOCKERHUB_USERNAME       — your Docker Hub username
+#   DOCKERHUB_TOKEN          — Docker Hub access token (repo r/w)
+#   TWINGATE_SERVICE_KEY     — Twingate service-account JSON (single line).
+#                              Set the SA's "Resources" to include the Pi.
+#                              https://www.twingate.com/docs/services
+#   PI_DEPLOY_HOST           — Pi's hostname or IP as known to Twingate.
+#                              e.g. `myetal-pi.internal` or its Tailscale-style
+#                              short name set in Twingate's Resources tab.
+#   PI_DEPLOY_USER           — Linux user on the Pi for the deploy. Recommend
+#                              creating `ci-deploy` with passwordless sudo
+#                              ONLY for `docker compose` commands.
+#   PI_DEPLOY_KEY            — OpenSSH private key (whole file, including
+#                              -----BEGIN OPENSSH PRIVATE KEY-----).
+#                              Generate fresh: ssh-keygen -t ed25519 -C "ci-deploy"
+#                              Add the .pub to /home/ci-deploy/.ssh/authorized_keys.
+#   PI_DEPLOY_PATH           — absolute path on the Pi to the repo checkout
+#                              (e.g. /opt/myetal). The CI does `git pull`
+#                              there before running compose.
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - "apps/api/**"
+      - "docker-compose.staging.yml"
+      - ".github/workflows/deploy-staging.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serialise so two pushes in quick succession don't race the SSH deploy.
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.5.4"
+      - run: uv python install
+      - run: uv sync --all-groups --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      IMAGE_NAME: jamesdimonaco/myetal-api
+      IMAGE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        env:
+          STAGING_TAG_SHA: ${{ env.IMAGE_NAME }}:staging-${{ env.IMAGE_SHA }}
+          STAGING_TAG: ${{ env.IMAGE_NAME }}:staging
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          # Pi is arm64; build amd64 too for local debugging on dev machines.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.STAGING_TAG }}
+            ${{ env.STAGING_TAG_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-to-pi:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      # Connect this runner to the Twingate network. SSH to the Pi resolves
+      # via the Twingate connector running on the Pi side.
+      - name: Twingate connect
+        uses: twingate/github-action@v1
+        with:
+          service-key: ${{ secrets.TWINGATE_SERVICE_KEY }}
+
+      # Pull the new :staging image, run migrations, restart compose.
+      # Secrets are forwarded as env vars so they're never interpolated
+      # directly into the shell script (workflow-injection hardening).
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PI_DEPLOY_HOST }}
+          username: ${{ secrets.PI_DEPLOY_USER }}
+          key: ${{ secrets.PI_DEPLOY_KEY }}
+          timeout: 30s
+          command_timeout: 5m
+          envs: DEPLOY_PATH
+          script: |
+            set -euo pipefail
+            cd "$DEPLOY_PATH"
+            git fetch origin staging
+            git checkout staging
+            git reset --hard origin/staging
+            # Pull new image + recreate the stack. compose handles
+            # alembic upgrade head as the api container's startup command.
+            docker compose -p myetal-staging -f docker-compose.staging.yml pull
+            # --force-recreate so changes to .env.staging values get picked
+            # up — without it, compose only recreates when the YAML itself
+            # changes, and env_file content edits get silently ignored.
+            docker compose -p myetal-staging -f docker-compose.staging.yml up -d --force-recreate
+            docker compose -p myetal-staging -f docker-compose.staging.yml ps
+            # Wait up to 90s for the api to pass healthz. First boot on Pi
+            # includes alembic migration + uvicorn startup which can take
+            # 30-60s on cold start.
+            for i in $(seq 1 30); do
+              if curl -fsS --max-time 5 http://127.0.0.1:8001/healthz; then
+                echo "✅ api healthy after ${i} attempts"
+                exit 0
+              fi
+              echo "waiting for api... (attempt ${i}/30)"
+              sleep 3
+            done
+            echo "❌ api never came up — last 50 lines of api logs:"
+            docker compose -p myetal-staging -f docker-compose.staging.yml logs api --tail 50
+            exit 1
+        env:
+          DEPLOY_PATH: ${{ secrets.PI_DEPLOY_PATH }}

@@ -33,10 +33,30 @@ import httpx
 
 from myetal_api import __version__
 from myetal_api.core.config import settings
-from myetal_api.models import AuthProvider
-from myetal_api.oauth_providers import credentials_for
 
 logger = logging.getLogger(__name__)
+
+
+class OrcidClientNotConfigured(Exception):
+    """ORCID client_id/secret not set in env. Routes map this to 503."""
+
+
+def _orcid_credentials() -> tuple[str, str]:
+    """Return (client_id, client_secret) for the ORCID Public API.
+
+    The OAuth user-flow side of ORCID is now owned by Better Auth on
+    Next.js, but the read-public 2-legged client-credentials grant still
+    runs from FastAPI (used by the works-sync worker). The two flows
+    use the same registered application credentials, so we read them
+    directly from settings here.
+    """
+    cid = settings.orcid_client_id
+    secret = settings.orcid_client_secret.get_secret_value()
+    if not cid or not secret:
+        raise OrcidClientNotConfigured(
+            "orcid client_id/secret not set; check ORCID_CLIENT_ID env var"
+        )
+    return cid, secret
 
 
 # Polite-pool style User-Agent so ORCID sysadmins can identify our traffic.
@@ -107,7 +127,7 @@ def _reset_token_cache() -> None:
 
 async def _fetch_new_token(http: httpx.AsyncClient) -> str:
     """POST {orcid_base}/oauth/token with grant_type=client_credentials."""
-    client_id, client_secret = credentials_for(AuthProvider.ORCID)
+    client_id, client_secret = _orcid_credentials()
     url = f"{_orcid_oauth_base()}/oauth/token"
     try:
         response = await http.post(

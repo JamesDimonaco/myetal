@@ -16,7 +16,7 @@ export default async function LibraryPage() {
   try {
     [works, user] = await Promise.all([
       serverFetch<WorkResponse[]>('/me/works', { cache: 'no-store' }),
-      serverFetch<UserResponse>('/auth/me', { cache: 'no-store' }),
+      serverFetch<UserResponse>('/me', { cache: 'no-store' }),
     ]);
   } catch (err) {
     if (err instanceof ApiError && (err.isUnauthorized || err.isForbidden)) {
@@ -26,7 +26,7 @@ export default async function LibraryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">

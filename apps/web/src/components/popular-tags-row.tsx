@@ -20,7 +20,7 @@ interface Props {
 }
 
 const baseChip =
-  'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wider transition';
+  'inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wider transition';
 
 const inactiveChip =
   `${baseChip} border-rule bg-paper-soft text-ink-muted hover:border-ink/40 hover:text-ink`;

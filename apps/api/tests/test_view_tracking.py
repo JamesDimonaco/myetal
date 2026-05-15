@@ -11,14 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.models import Share, ShareView
 from myetal_api.schemas.share import ShareCreate, ShareItemCreate
-from myetal_api.services import auth as auth_service
 from myetal_api.services import share as share_service
 from myetal_api.services import share_view_dedup
+from tests.conftest import auth_headers, make_user, signed_jwt
 
 
 async def _make_user(db: AsyncSession, email: str = "researcher@example.com"):
-    user, _, _ = await auth_service.register_with_password(db, email, "hunter22", "Researcher")
-    return user
+    return await make_user(db, email=email, name="Researcher")
 
 
 async def _make_share(db: AsyncSession, user) -> Share:
@@ -67,14 +66,12 @@ async def test_anon_view_dedup_within_24h(db_session: AsyncSession, api_client) 
 async def test_owner_self_view_excluded(db_session: AsyncSession, api_client) -> None:
     """Owner viewing own share does NOT record (D-S-Iss3)."""
     share_view_dedup._reset_for_tests()
-    user, access, _ = await auth_service.register_with_password(
-        db_session, "owner@example.com", "hunter22", "Owner"
-    )
+    user = await make_user(db_session, email="owner@example.com", name="Owner")
     share = await _make_share(db_session, user)
 
     r = api_client.get(
         f"/public/c/{share.short_code}",
-        headers={"Authorization": f"Bearer {access}"},
+        headers=auth_headers(user),
     )
     assert r.status_code == 200
 
@@ -133,9 +130,8 @@ async def test_logged_in_view_uses_viewer_user_id_not_token(
     owner = await _make_user(db_session)
     share = await _make_share(db_session, owner)
 
-    viewer, viewer_access, _ = await auth_service.register_with_password(
-        db_session, "viewer@example.com", "hunter22", "Viewer"
-    )
+    viewer = await make_user(db_session, email="viewer@example.com", name="Viewer")
+    viewer_access = signed_jwt(viewer.id, email=viewer.email or "")
 
     r = api_client.get(
         f"/public/c/{share.short_code}",

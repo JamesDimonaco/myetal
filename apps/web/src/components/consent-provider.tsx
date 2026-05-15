@@ -84,7 +84,7 @@ function CookieBanner({
       role="dialog"
       aria-label="Cookie consent"
     >
-      <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-6 py-4 sm:flex-row">
+      <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-4 py-4 sm:flex-row sm:px-6">
         <p className="text-sm text-ink-muted">
           We use cookies for analytics and error tracking to improve MyEtAl.
         </p>
@@ -92,14 +92,14 @@ function CookieBanner({
           <button
             type="button"
             onClick={onDecline}
-            className="rounded border border-rule px-4 py-1.5 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
+            className="inline-flex min-h-[44px] items-center justify-center rounded border border-rule px-4 py-1.5 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
           >
             Decline
           </button>
           <button
             type="button"
             onClick={onAccept}
-            className="rounded bg-accent px-4 py-1.5 text-sm text-paper transition-colors hover:bg-accent/90"
+            className="inline-flex min-h-[44px] items-center justify-center rounded bg-accent px-4 py-1.5 text-sm text-paper transition-colors hover:bg-accent/90"
           >
             Accept
           </button>
@@ -162,16 +162,19 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
 
   const contextValue: ConsentContextValue = { consent, accept, decline };
 
+  // PostHogProvider is rendered unconditionally so that `children` keeps the
+  // same parent across consent flips. Toggling the wrapper used to remount the
+  // entire subtree on Accept, wiping in-progress local state (e.g. an
+  // unsaved share-editor draft). The posthog SDK itself stays uninitialised
+  // until `accept()` calls `initPostHog()`, so capture calls before consent
+  // remain no-ops. PostHogPageview, which fires `$pageview`, is still gated
+  // so declined users don't get pageview events.
   return (
     <ConsentContext.Provider value={contextValue}>
-      {consent === 'accepted' ? (
-        <PostHogProvider client={posthog}>
-          <PostHogPageview />
-          {children}
-        </PostHogProvider>
-      ) : (
-        children
-      )}
+      <PostHogProvider client={posthog}>
+        {consent === 'accepted' ? <PostHogPageview /> : null}
+        {children}
+      </PostHogProvider>
 
       {showBanner && <CookieBanner onAccept={accept} onDecline={decline} />}
     </ConsentContext.Provider>

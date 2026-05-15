@@ -1,13 +1,10 @@
 from myetal_api.models import (
-    AuthIdentity,
-    AuthProvider,
     Base,
     ItemKind,
     OrcidSyncRun,
     OrcidSyncStatus,
     Paper,
     PaperSource,
-    RefreshToken,
     Share,
     ShareItem,
     SharePaper,
@@ -27,10 +24,12 @@ from myetal_api.models import (
 
 
 def test_all_tables_registered_on_metadata() -> None:
+    # Phase 2 of the Better Auth migration deletes the legacy
+    # ``auth_identities`` and ``refresh_tokens`` SQLAlchemy models;
+    # Better Auth's ``session``, ``account``, ``verification``, and
+    # ``jwks`` tables are the replacement.
     assert set(Base.metadata.tables.keys()) == {
         "users",
-        "auth_identities",
-        "refresh_tokens",
         "shares",
         "share_items",
         "papers",
@@ -44,11 +43,11 @@ def test_all_tables_registered_on_metadata() -> None:
         "feedback",
         "tags",
         "share_tags",
+        "session",
+        "account",
+        "verification",
+        "jwks",
     }
-
-
-def test_auth_provider_values() -> None:
-    assert {p.value for p in AuthProvider} == {"orcid", "google", "github", "password"}
 
 
 def test_share_type_values() -> None:
@@ -101,8 +100,6 @@ def test_share_report_status_values() -> None:
 def test_models_are_classes() -> None:
     for cls in (
         User,
-        AuthIdentity,
-        RefreshToken,
         Share,
         ShareItem,
         Paper,
@@ -138,14 +135,16 @@ def test_share_tag_join_shape() -> None:
 
 async def test_share_tags_relationship_loads(db_session) -> None:  # type: ignore[no-untyped-def]
     """Share.tags relationship loads attached tags in label order."""
+    from myetal_api.models import User
     from myetal_api.schemas.share import ShareCreate
-    from myetal_api.services import auth as auth_service
     from myetal_api.services import share as share_service
     from myetal_api.services import tags as tags_service
 
-    user, _, _ = await auth_service.register_with_password(
-        db_session, "rel@example.com", "hunter22", "Rel"
-    )
+    user = User(email="rel@example.com", name="Rel")
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
     share = await share_service.create_share(db_session, user.id, ShareCreate(name="x"))
     await tags_service.set_share_tags(db_session, share.id, ["virology", "microbiome"])
 

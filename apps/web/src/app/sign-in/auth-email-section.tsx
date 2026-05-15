@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { authClient } from '@/lib/auth-client';
+
 const ALLOWED_RETURN_PREFIXES = ['/dashboard', '/'];
 
 function safeReturnTo(raw: string | null): string {
@@ -17,8 +19,11 @@ function safeReturnTo(raw: string | null): string {
 type Tab = 'sign-in' | 'create-account';
 
 /**
- * Collapsible email/password auth section with "Sign in" and "Create account"
- * tabs. Starts collapsed — user clicks "Sign in with email" to expand.
+ * Email/password auth section — Better Auth client helpers.
+ *
+ * Sign-in calls ``authClient.signIn.email``; sign-up calls
+ * ``authClient.signUp.email``. Both surface BA's structured error
+ * messages in the form's error region.
  */
 export function AuthEmailSection({
   searchParamsPromise: _searchParamsPromise,
@@ -32,13 +37,11 @@ export function AuthEmailSection({
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<Tab>('sign-in');
 
-  // Sign-in form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Create-account extra field
   const [name, setName] = useState('');
 
   async function handleSignIn(e: React.FormEvent<HTMLFormElement>) {
@@ -46,26 +49,20 @@ export function AuthEmailSection({
     setSubmitting(true);
     setError(null);
 
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+    const { error: signInError } = await authClient.signIn.email({
+      email,
+      password,
+      callbackURL: returnTo,
+    });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body?.error ?? `Sign-in failed (${res.status})`);
-        setSubmitting(false);
-        return;
-      }
-
-      router.replace(returnTo);
-      router.refresh();
-    } catch {
-      setError('Network error — is the API up?');
+    if (signInError) {
+      setError(signInError.message ?? 'Sign-in failed.');
       setSubmitting(false);
+      return;
     }
+
+    router.replace(returnTo);
+    router.refresh();
   }
 
   async function handleCreateAccount(e: React.FormEvent<HTMLFormElement>) {
@@ -73,26 +70,23 @@ export function AuthEmailSection({
     setSubmitting(true);
     setError(null);
 
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name: name || undefined }),
-      });
+    const { error: signUpError } = await authClient.signUp.email({
+      email,
+      password,
+      // BA requires `name` on email sign-up; default to email-localpart
+      // for users who skip the optional field.
+      name: name.trim() || email.split('@')[0],
+      callbackURL: returnTo,
+    });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body?.error ?? `Sign-up failed (${res.status})`);
-        setSubmitting(false);
-        return;
-      }
-
-      router.replace(returnTo);
-      router.refresh();
-    } catch {
-      setError('Network error — is the API up?');
+    if (signUpError) {
+      setError(signUpError.message ?? 'Sign-up failed.');
       setSubmitting(false);
+      return;
     }
+
+    router.replace(returnTo);
+    router.refresh();
   }
 
   if (!expanded) {
@@ -100,7 +94,7 @@ export function AuthEmailSection({
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="mt-4 text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+        className="mt-4 inline-flex min-h-[44px] items-center text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
       >
         Sign in with email
       </button>
@@ -117,7 +111,7 @@ export function AuthEmailSection({
             setTab('sign-in');
             setError(null);
           }}
-          className={`pb-2 transition ${
+          className={`inline-flex min-h-[44px] items-center pb-2 transition ${
             tab === 'sign-in'
               ? 'border-b-2 border-ink font-medium text-ink'
               : 'text-ink-muted hover:text-ink'
@@ -131,7 +125,7 @@ export function AuthEmailSection({
             setTab('create-account');
             setError(null);
           }}
-          className={`pb-2 transition ${
+          className={`inline-flex min-h-[44px] items-center pb-2 transition ${
             tab === 'create-account'
               ? 'border-b-2 border-ink font-medium text-ink'
               : 'text-ink-muted hover:text-ink'
@@ -155,7 +149,7 @@ export function AuthEmailSection({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
             />
           </label>
 
@@ -171,7 +165,7 @@ export function AuthEmailSection({
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
             />
           </label>
 
@@ -184,10 +178,19 @@ export function AuthEmailSection({
           <button
             type="submit"
             disabled={submitting}
-            className="mt-1 inline-flex items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+            className="mt-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
           >
-            {submitting ? 'Signing in\u2026' : 'Sign in'}
+            {submitting ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <p className="text-xs text-ink-faint">
+            <a
+              href="/forgot-password"
+              className="text-ink underline-offset-2 hover:underline"
+            >
+              Forgot your password?
+            </a>
+          </p>
 
           <p className="text-xs text-ink-faint">
             New here?{' '}
@@ -219,7 +222,7 @@ export function AuthEmailSection({
               autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
             />
           </label>
 
@@ -234,7 +237,7 @@ export function AuthEmailSection({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
             />
           </label>
 
@@ -252,7 +255,7 @@ export function AuthEmailSection({
               maxLength={128}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
             />
           </label>
 
@@ -265,9 +268,9 @@ export function AuthEmailSection({
           <button
             type="submit"
             disabled={submitting}
-            className="mt-1 inline-flex items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+            className="mt-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
           >
-            {submitting ? 'Creating\u2026' : 'Create account'}
+            {submitting ? 'Creating…' : 'Create account'}
           </button>
 
           <p className="text-xs text-ink-faint">
@@ -282,7 +285,8 @@ export function AuthEmailSection({
             >
               Sign in
             </button>
-            . Email/password is minimal — password reset coming soon.
+            . We&apos;ll email you a verification link — verifying is optional
+            for now.
           </p>
         </form>
       )}

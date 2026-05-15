@@ -9,7 +9,7 @@ import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 
 /**
- * Marketing landing. Server-rendered. Tries to fetch /auth/me — if the user
+ * Marketing landing. Server-rendered. Tries to fetch /me — if the user
  * has a valid session, the header swaps to "Go to dashboard" + sign-out and
  * the hero CTA changes to point at /dashboard. Anonymous users see the
  * original sign-in / try-the-demo flow.
@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic';
 
 async function getCurrentUser(): Promise<UserResponse | null> {
   try {
-    return await serverFetch<UserResponse>('/auth/me', { cache: 'no-store' });
+    return await serverFetch<UserResponse>('/me', { cache: 'no-store' });
   } catch {
     // 401/403 (not signed in) or API down — render the anonymous landing
     // rather than breaking the whole homepage.
@@ -37,15 +37,19 @@ export default async function LandingPage() {
   const displayName = user?.name?.trim() || user?.email || null;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-10 sm:py-16">
-      <header className="flex items-center justify-between">
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8 sm:px-6 sm:py-16">
+      <header className="flex items-center justify-between gap-3">
         <span className="font-serif text-xl tracking-tight text-ink">MyEtAl</span>
-        <nav className="flex items-center gap-6 text-sm">
+        <nav className="flex items-center gap-3 text-sm sm:gap-6">
           {signedIn ? (
             <>
+              {/* "Dashboard" hidden on mobile — avatar tap goes to profile,
+                  and the hero CTA below already says "Go to dashboard". This
+                  keeps the header to avatar + sign-out so the sign-out label
+                  doesn't wrap at 375px. */}
               <Link
                 href="/dashboard"
-                className="text-ink-muted hover:text-ink"
+                className="hidden whitespace-nowrap text-ink-muted hover:text-ink sm:inline"
               >
                 Dashboard
               </Link>
@@ -60,16 +64,19 @@ export default async function LandingPage() {
                   size={32}
                 />
               </Link>
-              <SignOutButton className="text-ink-muted hover:text-ink" />
+              <SignOutButton className="whitespace-nowrap text-ink-muted hover:text-ink" />
             </>
           ) : (
             <>
-              <Link href="/sign-in" className="rounded-md px-3 py-1.5 hover:text-ink">
+              <Link
+                href="/sign-in"
+                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
+              >
                 Sign in
               </Link>
               <Link
                 href="/sign-in"
-                className="rounded-md bg-ink px-3 py-1.5 text-paper transition hover:opacity-90"
+                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
               >
                 Get started
               </Link>
@@ -78,28 +85,28 @@ export default async function LandingPage() {
         </nav>
       </header>
 
-      <section className="mt-16 sm:mt-28">
-        <h1 className="font-serif text-5xl leading-[1.05] tracking-tight text-ink sm:text-6xl">
+      <section className="mt-12 sm:mt-28">
+        <h1 className="font-serif text-[clamp(2.25rem,9vw,3rem)] leading-[1.05] tracking-tight text-ink sm:text-6xl">
           Share your research with a QR.
         </h1>
-        <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-muted">
+        <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-muted sm:mt-6 sm:text-lg">
           A paper. A reading list. A poster you&apos;re standing in front of.
           One QR code that resolves to a clean, shareable page — works whether
           the scanner has the app or not.
         </p>
 
-        <div className="mt-10 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:flex-wrap">
           {signedIn ? (
             <>
               <Link
                 href="/dashboard"
-                className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
               >
                 Go to dashboard
               </Link>
               <Link
                 href="/dashboard/share/new"
-                className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
               >
                 + New share
               </Link>
@@ -108,13 +115,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/sign-in"
-                className="inline-flex items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
               >
                 Sign in
               </Link>
               <Link
                 href="/demo"
-                className="inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
               >
                 Try the demo
               </Link>

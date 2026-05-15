@@ -333,16 +333,14 @@ async def test_tag_autocomplete_q_min_length(api_client: TestClient) -> None:
 async def test_popular_tags_returns_top_by_usage(api_client: TestClient) -> None:
     from myetal_api.core.database import get_db
     from myetal_api.schemas.share import ShareCreate
-    from myetal_api.services import auth as auth_service
     from myetal_api.services import share as share_service
     from myetal_api.services import tags as tags_service
+    from tests.conftest import make_user
 
     override = api_client.app.dependency_overrides
 
     async for db in override[get_db]():
-        user, _, _ = await auth_service.register_with_password(
-            db, "pop@example.com", "hunter22", "Pop"
-        )
+        user = await make_user(db, email="pop@example.com", name="Pop")
         a = await share_service.create_share(db, user.id, ShareCreate(name="a"))
         b = await share_service.create_share(db, user.id, ShareCreate(name="b"))
         await tags_service.set_share_tags(db, a.id, ["virology"])
@@ -400,10 +398,10 @@ async def _seed_user(
     ``search_published_users``) can be exercised end-to-end on SQLite.
     """
     from myetal_api.schemas.share import ShareCreate
-    from myetal_api.services import auth as auth_service
     from myetal_api.services import share as share_service
+    from tests.conftest import make_user
 
-    user, _, _ = await auth_service.register_with_password(db_session, email, "hunter22", name)
+    user = await make_user(db_session, email=email, name=name)
     for i in range(published_count):
         s = await share_service.create_share(
             db_session, user.id, ShareCreate(name=f"{name} pub {i}")
@@ -736,12 +734,10 @@ async def test_search_excludes_users_with_no_published_shares(db_session) -> Non
 async def test_search_excludes_users_whose_shares_are_private(db_session) -> None:
     """Privacy filter respects ``is_public=false``."""
     from myetal_api.schemas.share import ShareCreate
-    from myetal_api.services import auth as auth_service
     from myetal_api.services import share as share_service
+    from tests.conftest import make_user
 
-    user, _, _ = await auth_service.register_with_password(
-        db_session, "private-svc@example.com", "hunter22", "Private Patty"
-    )
+    user = await make_user(db_session, email="private-svc@example.com", name="Private Patty")
     s = await share_service.create_share(
         db_session, user.id, ShareCreate(name="private", is_public=False)
     )
@@ -773,3 +769,93 @@ async def test_search_users_short_query_returns_empty(db_session) -> None:
 
     rows = await share_service.search_published_users(db_session, "a", limit=5)
     assert rows == []
+
+
+# ---------- pg_trgm operator regression guards (Bug 1 reproduction) ----------
+#
+# Background: a previous version of the user-search query and the tag
+# autocomplete query used ``%%`` where the intent was the pg_trgm
+# similarity operator ``%``. ``%%`` was likely written assuming
+# psycopg2-style ``%``-as-placeholder escaping, but we use asyncpg
+# which binds parameters via ``$1, $2, ...`` and treats ``%`` as a
+# literal — so ``%%`` becomes ``% %`` to Postgres, which rejects it as
+# a malformed operator chain and the route 500s.
+#
+# These tests run on SQLite (no pg_trgm), so we can't catch this at
+# query time. Instead we read the source of the Postgres branches and
+# assert no ``%%`` occurs inside trigram-similarity SQL, while the
+# correct single ``%`` operator IS present.
+
+
+async def test_search_users_postgres_sql_uses_single_percent_trigram_operator() -> None:
+    """Regression guard for ``%%`` -> ``%`` fix (Bug 1).
+
+    ``search_published_users``'s Postgres branch must use the pg_trgm
+    similarity operator ``%`` (single percent). Asyncpg does NOT
+    interpret ``%`` as a placeholder, so the old ``%%`` rendered as a
+    literal ``% %`` and Postgres rejected it as a malformed operator.
+    """
+    import inspect
+
+    from myetal_api.services import share as share_service
+
+    src = inspect.getsource(share_service.search_published_users)
+    # No double-percent anywhere in the SQL — single ``%`` only.
+    assert "%%" not in src, (
+        "search_published_users contains `%%`; asyncpg does not need "
+        "psycopg2-style escaping. Use single `%` for the pg_trgm operator."
+    )
+    # The trigram similarity operator IS present on users.name.
+    assert "u.name % :q" in src
+    # The similarity() function call is still used for ORDER BY.
+    assert "similarity(u.name, :q)" in src
+
+
+async def test_tag_autocomplete_postgres_sql_uses_single_percent_trigram_operator() -> None:
+    """Regression guard for ``%%`` -> ``%`` fix (Bug 1, tags side).
+
+    ``tags_service.autocomplete``'s Postgres branch must use single
+    ``%`` for the pg_trgm similarity operator. The ILIKE prefix
+    fallback (``slug ILIKE :prefix``) is a separate signal and is
+    unaffected by this bug.
+    """
+    import inspect
+
+    from myetal_api.services import tags as tags_service
+
+    src = inspect.getsource(tags_service.autocomplete)
+    assert "%%" not in src, (
+        "tags.autocomplete contains `%%`; asyncpg does not need "
+        "psycopg2-style escaping. Use single `%` for the pg_trgm operator."
+    )
+    # Trigram operator on slug is present.
+    assert "slug % :q" in src
+    # similarity() ORDER BY still wired in.
+    assert "similarity(slug, :q)" in src
+
+
+async def test_no_double_percent_in_any_trigram_sql_in_services() -> None:
+    """Cross-service sweep: no ``%%`` should appear in any SQL that
+    also mentions ``similarity(`` or ``pg_trgm``.
+
+    This is a defence-in-depth check: if a future contributor adds a
+    new pg_trgm query and writes ``%%`` (a habit from psycopg2-era
+    docs), this test fails immediately rather than at runtime in
+    staging. We scope to services that touch pg_trgm so unrelated ``%``
+    usage (formatting, modulo) doesn't trigger false positives.
+    """
+    import inspect
+
+    from myetal_api.services import share as share_service
+    from myetal_api.services import tags as tags_service
+
+    for module in (share_service, tags_service):
+        src = inspect.getsource(module)
+        # Only flag when trigram operator usage is present in the file.
+        if "similarity(" not in src and "pg_trgm" not in src:
+            continue
+        assert "%%" not in src, (
+            f"{module.__name__} contains `%%` in a module that uses "
+            "pg_trgm. asyncpg does not require `%%` escaping; use "
+            "single `%` for the trigram similarity operator."
+        )

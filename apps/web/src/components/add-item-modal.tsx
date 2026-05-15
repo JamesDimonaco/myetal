@@ -14,6 +14,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ApiError } from '@/lib/api';
 import { clientApi } from '@/lib/client-api';
 import type { RepoInfo } from '@/lib/github';
@@ -186,20 +191,6 @@ const DEBOUNCE_MS = 300;
 export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft }: Props) {
   const [kind, setKind] = useState<Kind>('paper');
 
-  // Lock body scroll + Escape to close — same UX contract as <QrModal>.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onClose]);
-
   const titleByKind: Record<Kind, string> = {
     paper: 'Add paper',
     repo: 'Add repo',
@@ -207,36 +198,21 @@ export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft }: Prop
     pdf: 'Upload a PDF',
   };
 
+  // Migrated from a hand-rolled `role="dialog"` + Escape useEffect to Radix's
+  // Dialog (via the shadcn-ui wrapper). Radix handles focus-trap, Escape and
+  // body scroll-lock, so this component no longer needs the manual
+  // `document.body.style.overflow` dance. The wide-modal styling is delegated
+  // to DialogContent's className override.
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="add-item-title"
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8 sm:items-center"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="flex w-full max-w-xl flex-col rounded-xl border border-rule bg-paper shadow-2xl sm:max-w-3xl" style={{ maxHeight: 'calc(100vh - 4rem)' }}>
-        <div className="flex items-start justify-between gap-3 border-b border-rule px-6 py-4">
-          <h2 id="add-item-title" className="font-serif text-xl text-ink">
-            {titleByKind[kind]}
-          </h2>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="-m-1 inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition hover:bg-paper-soft hover:text-ink"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
-              <path
-                d="M3 3l10 10M13 3L3 13"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="flex max-w-xl flex-col p-0 sm:max-w-3xl"
+        style={{ maxHeight: 'calc(100vh - 4rem)' }}
+      >
+        {/* Header bar — bordered, with room on the right for the close X
+            rendered by DialogContent's default close button. */}
+        <div className="flex items-start justify-between gap-3 border-b border-rule px-6 py-4 pr-14">
+          <DialogTitle>{titleByKind[kind]}</DialogTitle>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -276,8 +252,8 @@ export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft }: Prop
             ) : null}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

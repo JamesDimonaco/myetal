@@ -1,8 +1,7 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,6 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
+import { GitHubIcon } from '@/components/github-icon';
+import { GoogleIcon } from '@/components/google-icon';
 import { OrcidIcon } from '@/components/orcid-icon';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -22,6 +23,55 @@ import { useAuth } from '@/hooks/useAuth';
 import { ApiError } from '@/lib/api';
 
 type Mode = 'signin' | 'signup';
+
+/**
+ * Map raw error codes / messages to a friendly sentence — mirrors
+ * ``apps/web/src/app/sign-in/page.tsx::describeError`` so the sign-in
+ * UX is consistent across web and mobile. Unknown codes fall through
+ * to the raw message (better than silent).
+ *
+ * Sources of error strings we encounter:
+ * * ``ApiError.detail`` from ``readBetterAuthError`` (BA REST body
+ *   ``message``/``code``) — see ``hooks/useAuth.ts``.
+ * * ``Error.message`` thrown from ``runOAuthFlow`` for OAuth flows;
+ *   the bounce page passes ``?error=<code>`` through which becomes
+ *   the message.
+ */
+const ORCID_HIJACK_ERROR_CODES = new Set([
+  'orcid_already_linked',
+  'OrcidIdAlreadyLinkedError',
+]);
+
+function describeAuthError(raw: string): string {
+  const code = raw.trim();
+  if (!code) return 'Something went wrong — try again.';
+  if (ORCID_HIJACK_ERROR_CODES.has(code)) {
+    return 'This ORCID iD is already linked to another account. Sign in with that account instead.';
+  }
+  switch (code) {
+    case 'invalid_credentials':
+    case 'INVALID_EMAIL_OR_PASSWORD':
+      return 'Email or password is incorrect.';
+    case 'user_already_exists':
+    case 'USER_ALREADY_EXISTS':
+    case 'email_already_exists':
+      return 'An account with that email already exists.';
+    case 'account_not_linked':
+    case 'ACCOUNT_NOT_LINKED':
+      return 'That email is already in use under a different sign-in method.';
+    case 'no_session':
+      return "We couldn't complete sign-in — please try again.";
+    case 'jwt_unavailable':
+      return 'Sign-in succeeded but the session token was unavailable. Try again.';
+    case 'unknown_error':
+      return 'Something went wrong — try again.';
+    default:
+      // BA's snake_case codes read poorly raw; humanise lightly.
+      // Anything that already looks like a sentence (has a space)
+      // passes through untouched.
+      return code.includes(' ') ? code : code.replace(/_/g, ' ');
+  }
+}
 
 const signInSchema = z.object({
   email: z.string().trim().email('Enter a valid email'),
@@ -35,26 +85,18 @@ const signUpSchema = z.object({
 });
 
 /**
- * Real sign-in screen. Toggles between Sign In and Register, handles email +
- * password (zod-validated), and offers GitHub and Google OAuth. ORCID is
- * visible but disabled with a "Coming soon" subtitle.
+ * Sign-in / sign-up screen — Better Auth REST endpoints (Phase 4 cutover).
  *
- * OAuth flow (dev): see useAuth.signInWithGitHub / signInWithGoogle for the
- * rationale. Backend lacks Universal Links wiring, so we open the browser to
- * platform=devjson and the user pastes the resulting JSON into the debug
- * input below the OAuth button. This shortcut goes away once the EAS
- * dev-build agent ships the /auth/mobile-finish deep-link handler.
+ * OAuth uses ``WebBrowser.openAuthSessionAsync`` against the web app's
+ * ``/auth/mobile-bounce`` page, which receives the BA session, fetches a
+ * JWT, and deep-links back to ``myetal://auth/callback?token=...``. The
+ * legacy "manual paste" dev-only JSON fallback is gone — it was a workaround
+ * for the previous custom OAuth handler that didn't deep-link reliably.
  */
 export default function SignInScreen() {
   const c = Colors[useColorScheme() ?? 'light'];
-  const {
-    signIn,
-    signUp,
-    signInWithGitHub,
-    signInWithGoogle,
-    signInWithOrcid,
-    consumeDevJsonTokens,
-  } = useAuth();
+  const { signIn, signUp, signInWithGitHub, signInWithGoogle, signInWithOrcid } =
+    useAuth();
 
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -62,11 +104,17 @@ export default function SignInScreen() {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Tracks which OAuth provider is currently in-flight so we can
+  // disable the others and show "Redirecting…" copy. Mirrors the web
+  // pattern in apps/web/src/app/sign-in/oauth-buttons.tsx.
+  const [pendingProvider, setPendingProvider] = useState<
+    'google' | 'github' | 'orcid' | null
+  >(null);
 
-  // GitHub devjson manual-paste UI
-  const [showGithubPaste, setShowGithubPaste] = useState(false);
-  const [pasteValue, setPasteValue] = useState('');
-  const [pasteError, setPasteError] = useState<string | null>(null);
+  // Refs for chaining returnKey from email → password → submit, so users
+  // can complete the form without lifting their thumb to "Done"/"Submit".
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const goToDashboard = () => {
     // Dismiss the sign-in modal. The (authed) layout detects isAuthed
@@ -102,7 +150,7 @@ export default function SignInScreen() {
       goToDashboard();
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.detail);
+        setError(describeAuthError(err.detail));
       } else {
         setError('Network error — try again');
       }
@@ -111,79 +159,22 @@ export default function SignInScreen() {
     }
   };
 
-  const handleGithub = async () => {
+  const handleProvider = async (
+    fn: () => Promise<unknown>,
+    providerLabel: 'google' | 'github' | 'orcid',
+  ) => {
     setError(null);
+    setPendingProvider(providerLabel);
     try {
-      await signInWithGitHub();
+      await fn();
       goToDashboard();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'GitHub sign-in failed';
-      if (msg.startsWith('github_devjson_manual')) {
-        // Expected: the in-app browser landed on the JSON page. Dev-only
-        // shortcut — in release builds we surface the error instead so the
-        // paste UI never renders.
-        if (__DEV__) {
-          setShowGithubPaste(true);
-        } else {
-          Alert.alert('GitHub sign-in failed', msg);
-        }
-      } else if (msg === 'github_oauth_cancel' || msg === 'github_oauth_dismiss') {
-        // user backed out — silent
-      } else {
-        setError(msg);
-      }
-    }
-  };
-
-  const handleGoogle = async () => {
-    setError(null);
-    try {
-      await signInWithGoogle();
-      goToDashboard();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Google sign-in failed';
-      if (msg.startsWith('google_devjson_manual')) {
-        if (__DEV__) {
-          setShowGithubPaste(true);
-        } else {
-          Alert.alert('Google sign-in failed', msg);
-        }
-      } else if (msg === 'google_oauth_cancel' || msg === 'google_oauth_dismiss') {
-        // user backed out — silent
-      } else {
-        setError(msg);
-      }
-    }
-  };
-
-  const handleOrcid = async () => {
-    setError(null);
-    try {
-      await signInWithOrcid();
-      goToDashboard();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'ORCID sign-in failed';
-      if (msg.startsWith('orcid_devjson_manual')) {
-        if (__DEV__) {
-          setShowGithubPaste(true);
-        } else {
-          Alert.alert('ORCID sign-in failed', msg);
-        }
-      } else if (msg === 'orcid_oauth_cancel' || msg === 'orcid_oauth_dismiss') {
-        // user backed out — silent
-      } else {
-        setError(msg);
-      }
-    }
-  };
-
-  const handleConsumePaste = async () => {
-    setPasteError(null);
-    try {
-      await consumeDevJsonTokens(pasteValue);
-      goToDashboard();
-    } catch (err) {
-      setPasteError(err instanceof Error ? err.message : 'Could not parse');
+      const msg = err instanceof Error ? err.message : `${providerLabel} sign-in failed`;
+      // Cancel/dismiss is intentional user action — stay quiet.
+      if (msg.endsWith('_oauth_cancel') || msg.endsWith('_oauth_dismiss')) return;
+      setError(describeAuthError(msg));
+    } finally {
+      setPendingProvider(null);
     }
   };
 
@@ -210,54 +201,81 @@ export default function SignInScreen() {
           <View style={styles.providerStack}>
             <Pressable
               accessibilityRole="button"
-              onPress={handleGoogle}
+              accessibilityState={{ disabled: pendingProvider !== null }}
+              onPress={() => handleProvider(signInWithGoogle, 'google')}
+              disabled={pendingProvider !== null}
               style={({ pressed }) => [
                 styles.providerButton,
                 {
                   borderColor: c.border,
                   backgroundColor: c.surface,
-                  opacity: pressed ? 0.7 : 1,
+                  opacity:
+                    pendingProvider !== null && pendingProvider !== 'google'
+                      ? 0.5
+                      : pressed
+                        ? 0.7
+                        : 1,
                 },
               ]}
             >
-              <Text style={[styles.providerText, { color: c.text }]}>
-                Continue with Google
-              </Text>
+              <View style={styles.providerRow}>
+                <GoogleIcon size={18} />
+                <Text style={[styles.providerText, { color: c.text }]}>
+                  {pendingProvider === 'google' ? 'Redirecting…' : 'Continue with Google'}
+                </Text>
+              </View>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              onPress={handleGithub}
+              accessibilityState={{ disabled: pendingProvider !== null }}
+              onPress={() => handleProvider(signInWithGitHub, 'github')}
+              disabled={pendingProvider !== null}
               style={({ pressed }) => [
                 styles.providerButton,
                 {
                   borderColor: c.border,
                   backgroundColor: c.surface,
-                  opacity: pressed ? 0.7 : 1,
+                  opacity:
+                    pendingProvider !== null && pendingProvider !== 'github'
+                      ? 0.5
+                      : pressed
+                        ? 0.7
+                        : 1,
                 },
               ]}
             >
-              <Text style={[styles.providerText, { color: c.text }]}>
-                Continue with GitHub
-              </Text>
+              <View style={styles.providerRow}>
+                <GitHubIcon size={18} color={c.text} />
+                <Text style={[styles.providerText, { color: c.text }]}>
+                  {pendingProvider === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
+                </Text>
+              </View>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              onPress={handleOrcid}
+              accessibilityState={{ disabled: pendingProvider !== null }}
+              onPress={() => handleProvider(signInWithOrcid, 'orcid')}
+              disabled={pendingProvider !== null}
               style={({ pressed }) => [
                 styles.providerButton,
                 {
                   borderColor: c.border,
                   backgroundColor: c.surface,
-                  opacity: pressed ? 0.7 : 1,
+                  opacity:
+                    pendingProvider !== null && pendingProvider !== 'orcid'
+                      ? 0.5
+                      : pressed
+                        ? 0.7
+                        : 1,
                 },
               ]}
             >
               <View style={styles.providerRow}>
                 <OrcidIcon size={18} />
                 <Text style={[styles.providerText, { color: c.text }]}>
-                  Continue with ORCID
+                  {pendingProvider === 'orcid' ? 'Redirecting…' : 'Continue with ORCID'}
                 </Text>
               </View>
             </Pressable>
@@ -267,42 +285,6 @@ export default function SignInScreen() {
               separate account.
             </Text>
           </View>
-
-          {__DEV__ && showGithubPaste ? (
-            <View style={[styles.pasteBox, { borderColor: c.border, backgroundColor: c.surface }]}>
-              <Text style={[styles.pasteTitle, { color: c.text }]}>Finish OAuth sign-in</Text>
-              <Text style={[styles.pasteHint, { color: c.textMuted }]}>
-                The browser is showing a JSON response. Copy the entire body and paste it here.
-              </Text>
-              <TextInput
-                value={pasteValue}
-                onChangeText={setPasteValue}
-                placeholder='{"access_token":"...","refresh_token":"..."}'
-                placeholderTextColor={c.textMuted}
-                multiline
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={[
-                  styles.pasteInput,
-                  { color: c.text, borderColor: c.border, backgroundColor: c.background },
-                ]}
-              />
-              {pasteError ? (
-                <Text style={[styles.error, { color: '#B00020' }]}>{pasteError}</Text>
-              ) : null}
-              <Pressable
-                onPress={handleConsumePaste}
-                style={({ pressed }) => [
-                  styles.primary,
-                  { backgroundColor: c.text, opacity: pressed ? 0.85 : 1 },
-                ]}
-              >
-                <Text style={[styles.primaryText, { color: c.background }]}>
-                  Use these tokens
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
 
           <View style={[styles.divider, { backgroundColor: c.border }]} />
 
@@ -317,6 +299,9 @@ export default function SignInScreen() {
                 autoComplete="name"
                 placeholder="Ada Lovelace"
                 placeholderTextColor={c.textMuted}
+                returnKeyType="next"
+                onSubmitEditing={() => emailRef.current?.focus()}
+                submitBehavior="submit"
                 style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
               />
             </View>
@@ -325,6 +310,7 @@ export default function SignInScreen() {
           <View style={styles.field}>
             <Text style={[styles.label, { color: c.textMuted }]}>Email</Text>
             <TextInput
+              ref={emailRef}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -333,6 +319,9 @@ export default function SignInScreen() {
               inputMode="email"
               placeholder="you@university.edu"
               placeholderTextColor={c.textMuted}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              submitBehavior="submit"
               style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
             />
           </View>
@@ -340,12 +329,17 @@ export default function SignInScreen() {
           <View style={styles.field}>
             <Text style={[styles.label, { color: c.textMuted }]}>Password</Text>
             <TextInput
+              ref={passwordRef}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               placeholder={mode === 'signin' ? 'Your password' : 'At least 8 characters'}
               placeholderTextColor={c.textMuted}
+              returnKeyType={mode === 'signin' ? 'go' : 'done'}
+              onSubmitEditing={() => {
+                if (!submitting) handleSubmit();
+              }}
               style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
             />
           </View>
@@ -414,7 +408,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   providerText: { fontSize: 16, fontWeight: '500' },
-  providerSub: { fontSize: 12, marginTop: 2 },
   providerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -425,24 +418,6 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: Spacing.xs,
     paddingHorizontal: Spacing.xs,
-  },
-
-  pasteBox: {
-    marginTop: Spacing.md,
-    padding: Spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.md,
-    gap: Spacing.sm,
-  },
-  pasteTitle: { fontSize: 15, fontWeight: '600' },
-  pasteHint: { fontSize: 13, lineHeight: 18 },
-  pasteInput: {
-    minHeight: 90,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.sm,
-    padding: Spacing.sm,
-    fontSize: 13,
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
   },
 
   divider: {

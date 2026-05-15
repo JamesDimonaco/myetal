@@ -1,9 +1,18 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
-import { getSavedShares, type SavedShare } from '@/lib/saved-shares';
+import {
+  clearSavedShares as clearSavedSharesStorage,
+  getSavedShares,
+  type SavedShare,
+} from '@/lib/saved-shares';
 
-export function useSavedShares(): SavedShare[] | null {
+export interface UseSavedSharesResult {
+  items: SavedShare[] | null;
+  clear: () => Promise<void>;
+}
+
+export function useSavedShares(): UseSavedSharesResult {
   const [items, setItems] = useState<SavedShare[] | null>(null);
 
   useFocusEffect(
@@ -18,5 +27,10 @@ export function useSavedShares(): SavedShare[] | null {
     }, []),
   );
 
-  return items;
+  const clear = useCallback(async () => {
+    await clearSavedSharesStorage();
+    setItems([]);
+  }, []);
+
+  return { items, clear };
 }

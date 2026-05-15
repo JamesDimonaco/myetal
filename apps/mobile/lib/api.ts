@@ -1,7 +1,7 @@
-import { clearTokens, getTokens, setTokens } from './auth-storage';
+import { clearSession, getAccessToken } from './auth-storage';
 
 /**
- * Resolve the API base URL.
+ * Resolve the FastAPI base URL.
  *  1. Explicit override via EXPO_PUBLIC_API_URL (best for testing against
  *     staging, a tunneled backend, or localhost)
  *  2. Always use production API — local dev server is not needed
@@ -12,7 +12,20 @@ function resolveApiBaseUrl(): string {
   return 'https://api.myetal.app';
 }
 
+/**
+ * Resolve the Better Auth (Next.js web app) base URL — the host that owns
+ * /api/auth/*. Mobile hits this directly for sign-in/sign-up/social-OAuth.
+ *  1. Explicit override via EXPO_PUBLIC_WEB_URL.
+ *  2. Default to the canonical production web app.
+ */
+function resolveWebBaseUrl(): string {
+  const fromEnv = process.env.EXPO_PUBLIC_WEB_URL;
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  return 'https://myetal.app';
+}
+
 export const API_BASE_URL = resolveApiBaseUrl();
+export const WEB_BASE_URL = resolveWebBaseUrl();
 
 export class ApiError extends Error {
   constructor(public status: number, public detail: string) {
@@ -32,77 +45,29 @@ export interface RequestOptions extends Omit<RequestInit, 'body' | 'headers'> {
   json?: unknown;
   /**
    * Explicit bearer token override. When omitted (the common case), the client
-   * pulls the latest access token from secure storage on every request and
-   * transparently retries once on 401 after a refresh.
+   * pulls the latest access token from secure storage on every request.
    *
-   * Pass `auth: null` to opt OUT of attaching any token (used internally by the
-   * refresh path itself to avoid recursion, and useful for genuinely public
-   * endpoints like /public/c/{code}).
+   * Pass `auth: null` to opt OUT of attaching any token (useful for genuinely
+   * public endpoints like /public/c/{code}).
    */
   auth?: string | null;
   headers?: Record<string, string>;
 }
 
 /**
- * Single in-flight refresh promise. Multiple parallel requests that all see a
- * 401 should converge on ONE /auth/refresh call rather than each spending a
- * refresh token (and racing to revoke each other via reuse-detection).
- */
-let pendingRefresh: Promise<string | null> | null = null;
-
-/**
  * Hook the rest of the app uses to react to a forced sign-out — the auth hook
  * registers a callback here so the api client can yank the user back to
- * /sign-in when the refresh token has been revoked or expired.
+ * /sign-in when the JWT comes back rejected.
+ *
+ * Phase 4: there is no client-side refresh. The Better Auth session lives
+ * server-side and the cookie that refreshes it isn't accessible from native.
+ * On 401 with a token attached we wipe local state and bounce to sign-in.
  */
 type SignOutHandler = () => void;
 let onForcedSignOut: SignOutHandler | null = null;
 
 export function setForcedSignOutHandler(handler: SignOutHandler | null): void {
   onForcedSignOut = handler;
-}
-
-async function refreshAccessToken(): Promise<string | null> {
-  if (pendingRefresh) return pendingRefresh;
-
-  pendingRefresh = (async () => {
-    const tokens = await getTokens();
-    if (!tokens) return null;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refresh_token: tokens.refresh }),
-      });
-
-      if (!response.ok) {
-        // Refresh rejected — token was rotated or revoked. Don't clear
-        // tokens here; the auth hook will detect the 401 on /auth/me
-        // and redirect to sign-in. Clearing eagerly was causing forced
-        // logouts on every dev-mode restart (hot-reload loses the
-        // in-memory rotated token, SecureStore still has the old one).
-        onForcedSignOut?.();
-        return null;
-      }
-
-      const data = (await response.json()) as { access_token: string; refresh_token: string };
-      await setTokens(data.access_token, data.refresh_token);
-      return data.access_token;
-    } catch {
-      // Network blip; don't nuke tokens. Caller will surface the error.
-      return null;
-    }
-  })();
-
-  try {
-    return await pendingRefresh;
-  } finally {
-    pendingRefresh = null;
-  }
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -113,37 +78,30 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   let token: string | null;
   if (auth === null) token = null;
   else if (typeof auth === 'string') token = auth;
-  else {
-    const stored = await getTokens();
-    token = stored?.access ?? null;
-  }
+  else token = await getAccessToken();
 
-  const send = async (bearer: string | null): Promise<Response> => {
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-      ...extraHeaders,
-    };
-    let body: BodyInit | undefined;
-    if (json !== undefined) {
-      headers['Content-Type'] = 'application/json';
-      body = JSON.stringify(json);
-    }
-    if (bearer) headers.Authorization = `Bearer ${bearer}`;
-
-    const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
-    return fetch(url, { ...rest, headers, body });
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...extraHeaders,
   };
+  let body: BodyInit | undefined;
+  if (json !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(json);
+  }
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-  let response = await send(token);
+  const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  const response = await fetch(url, { ...rest, headers, body });
 
-  // ONE silent refresh attempt on 401 — but only when we had a token to begin
-  // with (otherwise the 401 means "this endpoint requires auth", not "your
-  // session expired") and the caller didn't explicitly opt out.
+  // 401 with a token attached means our JWT is dead (expired, revoked, or
+  // signed by a key BA has rotated past). Wipe local state and surface the
+  // forced-sign-out signal so the (authed) layout bounces to /sign-in. We
+  // do NOT attempt a refresh — Phase 4 locked decision: mobile doesn't hold
+  // a refresh secret, and BA's session cookie is not accessible from native.
   if (response.status === 401 && token && auth !== null) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
-      response = await send(refreshed);
-    }
+    await clearSession();
+    onForcedSignOut?.();
   }
 
   if (!response.ok) {

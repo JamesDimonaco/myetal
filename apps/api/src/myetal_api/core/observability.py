@@ -1,7 +1,12 @@
-"""Sentry + structlog initialization. Imported once from main.py at startup.
+"""structlog initialization + request-id middleware. Imported once from
+main.py at startup.
 
-Kept out of main.py so unit tests can exercise the init logic without booting
-the whole FastAPI app — and so a missing SENTRY_DSN is provably a no-op.
+Kept out of main.py so unit tests can exercise the init logic without
+booting the whole FastAPI app.
+
+(Sentry was removed — PostHog covers both product analytics + error
+tracking on the client side. The API no longer ships an error-tracking
+SDK; rely on Railway/Pi logs + PostHog's server-side capture if needed.)
 """
 
 from __future__ import annotations
@@ -11,43 +16,14 @@ import sys
 import uuid
 from collections.abc import Awaitable, Callable
 
-import sentry_sdk
 import structlog
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.starlette import StarletteIntegration
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from myetal_api import __version__
 from myetal_api.core.config import settings
 
 REQUEST_ID_HEADER = "x-request-id"
-
-
-def init_sentry() -> bool:
-    """Initialize the Sentry SDK if a DSN is configured.
-
-    Returns True if Sentry was initialized, False if it was a no-op (empty DSN).
-    Tests rely on the bool return value.
-    """
-    dsn = settings.sentry_dsn.strip()
-    if not dsn:
-        return False
-
-    sentry_sdk.init(
-        dsn=dsn,
-        environment=settings.env,
-        release=f"myetal-api@{__version__}",
-        traces_sample_rate=settings.sentry_traces_sample_rate,
-        # FastApi + Starlette integrations are auto-enabled when the libs are
-        # importable, but we list them explicitly to make intent visible.
-        integrations=[StarletteIntegration(), FastApiIntegration()],
-        # Don't send PII by default — request bodies can contain emails / refresh
-        # tokens. Flip to True only if a future debugging session needs it.
-        send_default_pii=False,
-    )
-    return True
 
 
 def configure_logging() -> None:

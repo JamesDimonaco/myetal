@@ -49,7 +49,7 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
   const maxCount = Math.max(1, ...analytics.daily_views.map((d) => d.count));
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-8">
         <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
           /c/{share.short_code}
@@ -60,8 +60,8 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
         <p className="mt-2 text-sm text-ink-muted">{share.name}</p>
       </header>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stat cards — stack on phones, 3-up on sm+ */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total views" value={analytics.total_views} />
         <StatCard label="Last 7 days" value={analytics.views_last_7d} />
         <StatCard label="Last 30 days" value={analytics.views_last_30d} />

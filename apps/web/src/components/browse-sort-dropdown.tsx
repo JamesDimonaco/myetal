@@ -50,7 +50,7 @@ export function BrowseSortDropdown({ current, tags, ownerId, options }: Props) {
         onChange={onChange}
         disabled={pending}
         aria-busy={pending}
-        className="rounded-md border border-rule bg-paper px-2 py-1 text-xs font-medium text-ink focus:border-accent focus:outline-none disabled:opacity-60"
+        className="min-h-[36px] rounded-md border border-rule bg-paper px-2 py-1 text-xs font-medium text-ink focus:border-accent focus:outline-none disabled:opacity-60"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>

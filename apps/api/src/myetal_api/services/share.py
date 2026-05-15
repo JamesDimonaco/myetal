@@ -285,6 +285,7 @@ async def publish_share(db: AsyncSession, share: Share) -> Share:
     if share.published_at is None:
         share.published_at = datetime.now(UTC)
         await db.commit()
+        return await _reload_with_items(db, share.id)
     return share
 
 
@@ -293,6 +294,7 @@ async def unpublish_share(db: AsyncSession, share: Share) -> Share:
     if share.published_at is not None:
         share.published_at = None
         await db.commit()
+        return await _reload_with_items(db, share.id)
     return share
 
 
@@ -928,7 +930,7 @@ async def search_published_users(
                       AND s.deleted_at IS NULL
                 ) AS share_count
             FROM users u
-            WHERE u.name %% :q
+            WHERE u.name % :q
               AND EXISTS (
                   SELECT 1 FROM shares s2
                   WHERE s2.owner_user_id = u.id

@@ -12,7 +12,15 @@ import {
 import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
 import { TagInput } from '@/components/tag-input';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ApiError } from '@/lib/api';
+import { clientApi } from '@/lib/client-api';
 import {
   useCreateShare,
   useDeleteShare,
@@ -60,7 +68,11 @@ const itemSchema = z
     image_url: z.string().trim().max(2000).optional().or(z.literal('')),
     file_url: z.string().trim().max(2000).optional().or(z.literal('')),
     thumbnail_url: z.string().trim().max(2000).optional().or(z.literal('')),
-    file_size_bytes: z.number().int().positive().optional(),
+    // nonnegative (not positive) — the empty-item placeholder defaults to 0
+    // for non-PDF items. Zod's `.positive()` rejects 0 with "too small;
+    // expected number to be greater than zero" and the whole share fails
+    // to validate. The API enforces ge=1 for real PDF uploads separately.
+    file_size_bytes: z.number().int().nonnegative().optional(),
     file_mime: z.string().trim().max(64).optional().or(z.literal('')),
   })
   .refine(
@@ -395,9 +407,35 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
 
     setSubmitting(true);
     try {
-      const saved = isNew
+      let saved = isNew
         ? await createMutation.mutateAsync(payload)
         : await updateMutation.mutateAsync(payload);
+
+      // First-save auto-publish: the create endpoint produces a draft
+      // (published_at = NULL), which makes both /c/{code} and the QR PNG
+      // return 404 — i.e. the share's URL "doesn't exist" the moment the
+      // user celebrates having saved it. Users overwhelmingly expect Save to
+      // produce a live, shareable share; the discovery toggle on the edit
+      // page is for opting OUT later. So when creating a new share, publish
+      // it in the same flow before opening the QR modal.
+      if (isNew && saved.published_at === null) {
+        try {
+          saved = await clientApi<typeof saved>(
+            `/shares/${saved.id}/publish`,
+            { method: 'POST' },
+          );
+        } catch (publishErr) {
+          // Don't fail the whole save if publish hiccups — the share row
+          // exists, the user can toggle Publish from the edit page. Surface
+          // a non-fatal warning instead.
+          setError(
+            publishErr instanceof ApiError
+              ? `Saved as draft — publish failed: ${publishErr.detail}`
+              : 'Saved as draft — publish failed',
+          );
+        }
+      }
+
       setSavedShare(saved);
       setShowQr(true);
       // Flash a brief "saved" confirmation that persists after QR closes.
@@ -514,7 +552,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             required
             maxLength={200}
             className={[
-              'rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
+              'min-h-[44px] rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
               fieldErrors['name'] ? 'border-danger' : 'border-rule',
             ].join(' ')}
           />
@@ -553,7 +591,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                   type="button"
                   onClick={() => setShareType(t)}
                   className={[
-                    'rounded-full border px-4 py-2 text-sm font-medium capitalize transition',
+                    'inline-flex min-h-[40px] items-center rounded-full border px-4 py-2 text-sm font-medium capitalize transition',
                     active
                       ? 'border-ink bg-ink text-paper'
                       : 'border-rule bg-paper text-ink hover:bg-paper-soft',
@@ -646,7 +684,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                 setSavedShare(initial);
                 setShowQr(true);
               }}
-              className="rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Show QR
             </button>
@@ -667,7 +705,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             <button
               type="button"
               onClick={() => setShowAddItem(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                 <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -695,7 +733,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowAddItem(true)}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+                  className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                     <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -779,19 +817,19 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
+            className="inline-flex min-h-[44px] items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
               <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Back to dashboard
           </Link>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             {!isNew ? (
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(true)}
-                className="rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
               >
                 Delete share
               </button>
@@ -799,7 +837,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             <button
               type="submit"
               disabled={submitting || !name.trim()}
-              className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
             >
               {submitting
                 ? 'Saving…'
@@ -832,44 +870,41 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         />
       ) : null}
 
-      {confirmingDelete ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 px-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setConfirmingDelete(false);
-          }}
-        >
-          <div className="w-full max-w-md rounded-lg border border-rule bg-paper p-6 shadow-xl">
-            <h3 className="font-serif text-xl text-ink">Delete this share?</h3>
-            <p className="mt-2 text-sm text-ink-muted">
-              <span className="font-medium text-ink">&quot;{name}&quot;</span>{' '}
-              will be permanently removed. The QR code will stop working
-              immediately and anyone who scans it will see an error. This cannot
-              be undone.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                className="rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink hover:bg-paper-soft"
-                disabled={deleteMutation.isPending}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-                className="rounded-md bg-danger px-4 py-2 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-60"
-              >
-                {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
-              </button>
-            </div>
+      {/* Delete-confirm — migrated from hand-rolled overlay to shadcn Dialog
+          so the focus-trap, Escape and outside-click logic comes from Radix
+          rather than this file. */}
+      <Dialog
+        open={confirmingDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingDelete(false);
+        }}
+      >
+        <DialogContent hideCloseButton>
+          <DialogTitle>Delete this share?</DialogTitle>
+          <DialogDescription className="mt-2">
+            <span className="font-medium text-ink">&quot;{name}&quot;</span>{' '}
+            will be permanently removed. The QR code will stop working
+            immediately and anyone who scans it will see an error. This cannot
+            be undone.
+          </DialogDescription>
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmingDelete(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            </Button>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -1178,7 +1213,7 @@ function IconBtn({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+      className="inline-flex h-10 w-10 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 sm:h-8 sm:w-8"
     >
       {children}
     </button>

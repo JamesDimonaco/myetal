@@ -35,7 +35,7 @@ export default async function DashboardPage() {
     // the dashboard down — fall back to 0.
     const [sharesRes, userRes, worksRes] = await Promise.all([
       serverFetch<ShareResponse[]>('/shares', { cache: 'no-store' }),
-      serverFetch<UserResponse>('/auth/me', { cache: 'no-store' }),
+      serverFetch<UserResponse>('/me', { cache: 'no-store' }),
       serverFetch<WorkResponse[]>('/me/works', { cache: 'no-store' }).catch(
         () => [] as WorkResponse[],
       ),
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
     !user.orcid_id && shares.length === 0 && libraryCount === 0;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-10">
       {showWelcomeBanner ? (
         <div
           role="status"
@@ -72,13 +72,13 @@ export default async function DashboardPage() {
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/dashboard/profile"
-              className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90"
             >
               Add ORCID
             </Link>
             <Link
               href="/dashboard/library"
-              className="inline-flex items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Open library
             </Link>
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
         </div>
         <Link
           href="/dashboard/share/new"
-          className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
         >
           + New share
         </Link>

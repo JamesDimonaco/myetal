@@ -89,7 +89,7 @@ async function fetchPopularTags(): Promise<Tag[]> {
 
 async function getCurrentUser(): Promise<UserResponse | null> {
   try {
-    return await serverFetch<UserResponse>('/auth/me', { cache: 'no-store' });
+    return await serverFetch<UserResponse>('/me', { cache: 'no-store' });
   } catch {
     // 401/403 = anonymous viewer. /browse is public.
     return null;
@@ -126,7 +126,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         <AnonymousHeader />
       )}
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10 sm:py-14">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 sm:py-14">
         {ownerNotFound ? <OwnerNotFound /> : null}
 
         {data ? (
@@ -154,20 +154,20 @@ export default async function BrowsePage({ searchParams }: PageProps) {
 function AnonymousHeader() {
   return (
     <header className="border-b border-rule bg-paper">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
         <Link href="/" className="font-serif text-xl tracking-tight text-ink">
           MyEtAl
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
+        <nav className="flex items-center gap-2 text-sm sm:gap-6">
           <Link
             href="/sign-in"
-            className="rounded-md px-3 py-1.5 hover:text-ink"
+            className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="rounded-md bg-ink px-3 py-1.5 text-paper transition hover:opacity-90"
+            className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
           >
             Get started
           </Link>
@@ -267,7 +267,7 @@ function BrowseHeader({
     <header>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-serif text-4xl tracking-tight text-ink">
+          <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">
             Browse public collections
           </h1>
           <p className="mt-3 text-base text-ink-muted">
@@ -450,7 +450,7 @@ function EmptyAppState() {
       </p>
       <Link
         href="/sign-up"
-        className="mt-6 inline-flex items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
       >
         Sign up
       </Link>
@@ -510,7 +510,7 @@ function OwnerNotFound() {
       </p>
       <Link
         href="/browse"
-        className="mt-6 inline-flex items-center justify-center rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
       >
         Browse all collections
       </Link>

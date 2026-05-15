@@ -9,12 +9,12 @@ import type { UserResponse } from '@/types/auth';
 
 /**
  * Authed shell: wraps every /dashboard/* page with the same header (wordmark,
- * nav, avatar). Server component — fetches /auth/me once per request so
+ * nav, avatar). Server component — fetches /me once per request so
  * the header can show a name/email without each child page re-doing it.
  *
- * If /auth/me 401s (cookie expired between proxy redirect and SSR), we bounce
- * back to /sign-in. The proxy already does the same check at the edge for the
- * UX-shortcut case; this is the defence-in-depth pass.
+ * If /me 401s (cookie expired between middleware redirect and SSR), we bounce
+ * back to /sign-in. The middleware already does the same check at the edge for
+ * the UX-shortcut case; this is the defence-in-depth pass.
  */
 export default async function DashboardLayout({
   children,
@@ -23,7 +23,7 @@ export default async function DashboardLayout({
 }) {
   let user: UserResponse;
   try {
-    user = await serverFetch<UserResponse>('/auth/me', { cache: 'no-store' });
+    user = await serverFetch<UserResponse>('/me', { cache: 'no-store' });
   } catch (err) {
     if (err instanceof ApiError && (err.isUnauthorized || err.isForbidden)) {
       redirect('/sign-in?return_to=/dashboard');

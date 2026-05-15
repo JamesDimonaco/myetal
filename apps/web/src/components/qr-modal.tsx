@@ -1,7 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { API_BASE_URL } from '@/lib/api';
 
 interface Props {
@@ -21,28 +28,17 @@ const SITE_URL = (
  * share link. Mirrors the mobile QrModal's intent — celebratory, focused,
  * one-job — but stripped down to a single web-friendly card.
  *
- * Closes on backdrop click and on Escape so it behaves like every other
- * modal in the world. Body scroll is locked while open so the underlying
- * dashboard doesn't scroll behind the dialog on mobile.
+ * Migrated from a hand-rolled `role="dialog"` div to Radix's Dialog (via our
+ * shadcn-ui wrapper). Radix handles focus-trap, Escape, outside-click and
+ * body scroll lock automatically, so this file no longer needs the
+ * `useEffect`-driven keydown listener and `document.body.style.overflow`
+ * dance it used to carry.
  */
 export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: Props) {
   const qrUrl = `${API_BASE_URL}/public/c/${encodeURIComponent(shortCode)}/qr.png`;
   const shareUrl = `${SITE_URL}/c/${shortCode}`;
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onClose]);
 
   const handleCopyLink = async () => {
     try {
@@ -66,48 +62,12 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="qr-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-4 py-8"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="w-full max-w-sm rounded-xl border border-rule bg-paper p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <h2
-            id="qr-modal-title"
-            className="font-serif text-xl leading-snug text-ink"
-          >
-            {collectionName}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-m-1 inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition hover:bg-paper-soft hover:text-ink"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M3 3l10 10M13 3L3 13"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-        <p className="mt-1 text-sm text-ink-muted">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogTitle className="pr-8">{collectionName}</DialogTitle>
+        <DialogDescription className="mt-1">
           Anyone with a phone can scan this.
-        </p>
+        </DialogDescription>
 
         <div className="mt-6 flex items-center justify-center">
           <div className="rounded-lg border border-rule bg-white p-3">
@@ -132,49 +92,42 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
 
         <div className="mt-4 grid gap-2">
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="flex-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-            >
+            <Button onClick={handleCopyCode} className="flex-1">
               {copiedCode ? 'Copied!' : 'Copy code'}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
               onClick={handleCopyLink}
-              className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="flex-1"
             >
               {copiedLink ? 'Copied!' : 'Copy link'}
-            </button>
-            <a
-              href={shareUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-            >
-              Open
-            </a>
+            </Button>
+            <Button variant="secondary" asChild>
+              <a href={shareUrl} target="_blank" rel="noreferrer">
+                Open
+              </a>
+            </Button>
           </div>
           {onKeepEditing ? (
             <div className="flex gap-2">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={onKeepEditing}
-                className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+                className="flex-1"
               >
                 Keep editing
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={onClose}
-                className="flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+                className="flex-1"
               >
                 Go to dashboard
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

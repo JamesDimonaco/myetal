@@ -3,7 +3,33 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**", "!.next/cache/**"]
+      "outputs": [".next/**", "dist/**", "!.next/cache/**"],
+      "env": [
+        "NODE_ENV",
+        "VERCEL_ENV",
+        "VERCEL_URL",
+        "API_URL",
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_APP_URL",
+        "NEXT_PUBLIC_SITE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "BETTER_AUTH_JWKS_URL",
+        "BETTER_AUTH_ISSUER",
+        "DATABASE_URL",
+        "DATABASE_URL_SYNC",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GITHUB_CLIENT_ID",
+        "GITHUB_CLIENT_SECRET",
+        "ORCID_CLIENT_ID",
+        "ORCID_CLIENT_SECRET",
+        "ORCID_USE_SANDBOX",
+        "RESEND_API_KEY",
+        "EMAIL_FROM",
+        "NEXT_PUBLIC_POSTHOG_KEY",
+        "NEXT_PUBLIC_POSTHOG_HOST"
+      ]
     },
     "dev": {
       "cache": false,

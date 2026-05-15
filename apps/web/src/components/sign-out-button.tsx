@@ -3,10 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { authClient } from '@/lib/auth-client';
+
 /**
- * Hits /api/auth/logout (revokes refresh token + clears cookies), then bounces
- * the caller to `redirectTo` (default '/'). Caller controls visual style via
- * className — we stay layout-agnostic.
+ * Calls Better Auth's ``signOut`` (revokes the session row + clears the
+ * session cookie), then bounces to ``redirectTo`` (default '/'). Caller
+ * controls visual style via className — we stay layout-agnostic.
  */
 export function SignOutButton({
   redirectTo = '/',
@@ -25,7 +27,7 @@ export function SignOutButton({
   const handleClick = async () => {
     setBusy(true);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await authClient.signOut();
     } catch {
       // Even if the network call failed, the user clicked sign-out — fall
       // through and refresh so the cookie state is re-read from the server.

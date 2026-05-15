@@ -1,6 +1,7 @@
 // TODO: Web parity gaps:
 //   - Web profile page shows "Active sessions" list with per-session revoke
-//     (GET /auth/me/sessions, POST /auth/me/sessions/:id/revoke)
+//     (Better Auth's session management — re-add post-cutover when the
+//     web side wires it up; today there's no `/me/sessions` route).
 
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -52,12 +53,12 @@ export default function ProfileScreen() {
   const [orcidError, setOrcidError] = useState<string | null>(null);
   // Tracks the last server value we seeded into the draft. Used to detect
   // whether the user has typed since the last seed — if they have, we leave
-  // their input alone when /auth/me refetches in the background.
+  // their input alone when /me refetches in the background.
   const lastSeededOrcidRef = useRef<string>(persistedOrcid ?? '');
 
   // Re-seed only when the user hasn't diverged from the last-seeded value
   // (i.e. they're not actively editing). This prevents a background refetch
-  // of /auth/me from clobbering in-progress input.
+  // of /me from clobbering in-progress input.
   useEffect(() => {
     const next = persistedOrcid ?? '';
     if (orcidDraft === lastSeededOrcidRef.current) {

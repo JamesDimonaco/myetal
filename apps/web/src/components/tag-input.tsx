@@ -244,7 +244,7 @@ export function TagInput({
     <div ref={containerRef} className="relative grid gap-1">
       <div
         className={[
-          'flex flex-wrap items-center gap-1.5 rounded-md border bg-paper px-2 py-1.5',
+          'flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-md border bg-paper px-2 py-1.5',
           atCap ? 'border-rule' : 'border-rule focus-within:border-accent',
           disabled ? 'opacity-60' : '',
         ].join(' ')}
@@ -296,7 +296,7 @@ export function TagInput({
               ? `${listboxId}-opt-${safeHighlight}`
               : undefined
           }
-          className="min-w-[8rem] flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed"
+          className="min-w-[8rem] flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed"
         />
       </div>
 

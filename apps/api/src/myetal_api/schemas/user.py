@@ -17,6 +17,11 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     name: str | None
     email: str | None
+    # Soft email verification (Phase 4 mobile banner): exposed so the
+    # mobile and web UIs can render an unverified-email reminder without
+    # a second round-trip to Better Auth's session endpoint. Backed by
+    # Better Auth's ``emailVerified`` core field on the ``users`` table.
+    email_verified: bool
     is_admin: bool
     avatar_url: str | None
     orcid_id: str | None

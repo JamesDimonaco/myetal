@@ -1,90 +1,38 @@
 /**
- * ORCID iD logo for React Native.
+ * ORCID iD logo — official brand SVG.
  *
- * NOTE: Web parity originally targeted `react-native-svg` so we could mirror
- * the official SVG path data exactly (the version after the `v48.4` removal,
- * with the white rectangle at `M86.3,186.2H70.9V79.1h15.4V186.2z`). That dep
- * is not currently installed in apps/mobile — the import-and-polish PR's
- * scope rule disallows adding new deps. Until SVG support lands we render an
- * approximation using pure RN primitives: ORCID brand green (#A6CE39) circle,
- * white "iD" text in a sans-serif, plus the small white dot above the "i".
+ * Replaces the earlier View+Text approximation now that react-native-svg
+ * is installed. Path data matches the web equivalent at
+ * apps/web/src/components/orcid-icon.tsx (single source of truth for the
+ * brand mark).
  *
- * The colour tokens match the web component exactly so swapping in the real
- * SVG later is purely cosmetic (no caller changes needed). When `react-native-svg`
- * is added, replace the body of this component with the path data from
- * apps/web/src/components/orcid-icon.tsx.
+ * Source: https://info.orcid.org/brand-guidelines/
  */
-import { StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 interface OrcidIconProps {
   size?: number;
 }
 
-export function OrcidIcon({ size = 16 }: OrcidIconProps) {
-  // Inner type sized relative to the disc so the glyph reads at any size.
-  const fontSize = Math.round(size * 0.6);
-  const dotSize = Math.max(2, Math.round(size * 0.1));
-  const dotOffset = Math.round(size * 0.14);
+const ORCID_GREEN = '#A6CE39';
 
+export function OrcidIcon({ size = 18 }: OrcidIconProps) {
   return (
-    <View
-      style={[
-        styles.disc,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-        },
-      ]}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      {/* The dot of the lower-case "i". Approximates the white circle in the
-          official mark (path: M88.7,56.8 …). */}
-      <View
-        style={[
-          styles.dot,
-          {
-            width: dotSize,
-            height: dotSize,
-            borderRadius: dotSize / 2,
-            top: dotOffset,
-            // Nudge left of centre to sit above the rendered "i".
-            left: size / 2 - dotSize - Math.round(size * 0.08),
-          },
-        ]}
+    <Svg width={size} height={size} viewBox="0 0 256 256">
+      {/* Brand-green disc */}
+      <Circle cx="128" cy="128" r="128" fill={ORCID_GREEN} />
+      {/* The 'i' stem */}
+      <Path fill="#FFFFFF" d="M86.3,186.2H70.9V79.1h15.4V186.2z" />
+      {/* The 'D' bowl */}
+      <Path
+        fill="#FFFFFF"
+        d="M108.9,79.1h41.6c39.6,0,57,28.3,57,53.6c0,27.5-21.5,53.6-56.8,53.6h-41.8V79.1z M124.3,172.4h24.5c34.9,0,42.9-26.5,42.9-39.7c0-21.5-13.7-39.7-43.7-39.7h-23.7V172.4z"
       />
-      <Text
-        style={[
-          styles.label,
-          {
-            fontSize,
-            lineHeight: fontSize * 1.05,
-          },
-        ]}
-        allowFontScaling={false}
-      >
-        iD
-      </Text>
-    </View>
+      {/* The 'i' dot */}
+      <Path
+        fill="#FFFFFF"
+        d="M88.7,56.8c0,5.5-4.5,10.1-10.1,10.1c-5.6,0-10.1-4.6-10.1-10.1c0-5.6,4.5-10.1,10.1-10.1C84.2,46.7,88.7,51.3,88.7,56.8z"
+      />
+    </Svg>
   );
 }
-
-const styles = StyleSheet.create({
-  disc: {
-    backgroundColor: '#A6CE39',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  dot: {
-    position: 'absolute',
-    backgroundColor: '#FFFFFF',
-  },
-  label: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    // Sans-serif to read like the geometric "iD" of the brand mark.
-    includeFontPadding: false,
-  },
-});

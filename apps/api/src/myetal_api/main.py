@@ -5,10 +5,9 @@ from slowapi.errors import RateLimitExceeded
 
 from myetal_api import __version__
 from myetal_api.api.routes import admin as admin_routes
-from myetal_api.api.routes import auth as auth_routes
 from myetal_api.api.routes import feedback as feedback_routes
 from myetal_api.api.routes import health as health_routes
-from myetal_api.api.routes import oauth as oauth_routes
+from myetal_api.api.routes import me as me_routes
 from myetal_api.api.routes import papers as papers_routes
 from myetal_api.api.routes import public as public_routes
 from myetal_api.api.routes import reports as reports_routes
@@ -19,14 +18,13 @@ from myetal_api.core.config import settings
 from myetal_api.core.observability import (
     RequestIDMiddleware,
     configure_logging,
-    init_sentry,
 )
 from myetal_api.core.rate_limit import limiter
 
-# Order matters: configure logging + init Sentry BEFORE the FastAPI() call so
-# any startup errors are captured and any import-time logs use the right format.
+# Configure logging BEFORE the FastAPI() call so import-time logs use the
+# right format. (Sentry SDK removed — PostHog covers error tracking on the
+# client; server logs go to Railway/Pi stdout.)
 configure_logging()
-init_sentry()
 
 app = FastAPI(title="MyEtAl API", version=__version__)
 
@@ -52,8 +50,7 @@ if settings.cors_origins:
 app.add_middleware(RequestIDMiddleware)
 
 app.include_router(health_routes.router)
-app.include_router(auth_routes.router)
-app.include_router(oauth_routes.router)
+app.include_router(me_routes.router)
 app.include_router(shares_routes.router)
 app.include_router(papers_routes.router)
 app.include_router(public_routes.router)

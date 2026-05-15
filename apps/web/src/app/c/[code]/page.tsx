@@ -179,9 +179,9 @@ export default async function PublicSharePage({ params }: PageProps) {
 
   if (!share && gone) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-10 text-center">
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
         <p className="text-xs uppercase tracking-widest text-ink-faint">410</p>
-        <h1 className="mt-4 font-serif text-4xl tracking-tight text-ink">
+        <h1 className="mt-4 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
           Collection removed
         </h1>
         <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted">
@@ -190,7 +190,7 @@ export default async function PublicSharePage({ params }: PageProps) {
         </p>
         <Link
           href="/"
-          className="mt-8 inline-flex items-center justify-center rounded-md border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink hover:border-ink/40"
+          className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink hover:border-ink/40"
         >
           Back to MyEtAl
         </Link>
@@ -222,7 +222,7 @@ export default async function PublicSharePage({ params }: PageProps) {
   const jsonLd = buildJsonLd(share, siteUrl);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10 sm:py-14">
+    <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-14">
       {/* eslint-disable-next-line react/no-danger -- JSON.stringify is XSS-safe */}
       <script
         type="application/ld+json"
@@ -234,8 +234,8 @@ export default async function PublicSharePage({ params }: PageProps) {
         </Link>
       </div>
 
-      <header className="mt-8">
-        <h1 className="font-serif text-4xl leading-tight tracking-tight text-ink sm:text-5xl">
+      <header className="mt-6 sm:mt-8">
+        <h1 className="break-words font-serif text-[clamp(1.875rem,7vw,2.25rem)] leading-tight tracking-tight text-ink sm:text-5xl">
           {share.name}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
@@ -350,7 +350,7 @@ export default async function PublicSharePage({ params }: PageProps) {
       ) : null}
 
       <aside className="mt-16 border-t border-rule pt-8">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:text-left">
           <div>
             <p className="font-serif text-lg text-ink">Scan to keep this</p>
             <p className="mt-1 text-sm text-ink-muted">
@@ -362,9 +362,9 @@ export default async function PublicSharePage({ params }: PageProps) {
           <img
             src={qrUrl}
             alt={`QR code for "${share.name}"`}
-            width={140}
-            height={140}
-            className="h-32 w-32 rounded-md border border-rule bg-white p-2 sm:h-36 sm:w-36"
+            width={160}
+            height={160}
+            className="h-40 w-40 rounded-md border border-rule bg-white p-2 sm:h-36 sm:w-36"
           />
         </div>
       </aside>
