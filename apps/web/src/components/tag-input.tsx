@@ -155,14 +155,31 @@ export function TagInput({
     return pool.filter((t) => !value.includes(t.slug));
   }, [trimmed, suggestions, popular, value]);
 
+  // "Create new" affordance: when the user has typed something that isn't
+  // an exact slug match in the suggestions AND isn't already attached, we
+  // synthesise a row at the bottom of the dropdown. Lets users discover that
+  // tags are freeform — they can type whatever they want.
+  const canonicalCandidate = trimmed ? canonicalise(trimmed) : '';
+  const alreadyAttached =
+    canonicalCandidate.length > 0 && value.includes(canonicalCandidate);
+  const exactMatch =
+    canonicalCandidate.length > 0 &&
+    visibleSuggestions.some((t) => t.slug === canonicalCandidate);
+  const showCreateNew =
+    canonicalCandidate.length > 0 && !exactMatch && !alreadyAttached;
+
+  // Total interactive rows (existing suggestions + the optional Create row)
+  // — used to clamp keyboard highlight + size the rendered list.
+  const totalRows = visibleSuggestions.length + (showCreateNew ? 1 : 0);
+
   // Clamp the highlight so it never points past the end of the current
   // suggestion list (which can shrink when the query changes or when the
   // user attaches a chip). Computed at read-time to avoid a setState-in-
   // effect dance.
-  const safeHighlight =
-    visibleSuggestions.length === 0
-      ? 0
-      : Math.min(highlight, visibleSuggestions.length - 1);
+  const safeHighlight = totalRows === 0 ? 0 : Math.min(highlight, totalRows - 1);
+  // True when the highlight is on the synthetic "Create" row.
+  const highlightOnCreate =
+    showCreateNew && safeHighlight === visibleSuggestions.length;
 
   const commit = useCallback(
     (slug: string) => {
@@ -191,8 +208,14 @@ export function TagInput({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
-      // Prefer the highlighted suggestion if the dropdown is open and has
-      // entries; otherwise commit the typed text as-is.
+      // Prefer the highlighted suggestion if the dropdown is open; fall back
+      // to the typed text. The synthetic Create row is just "commit the
+      // typed text" by another name.
+      if (open && highlightOnCreate && canonicalCandidate) {
+        e.preventDefault();
+        commit(canonicalCandidate);
+        return;
+      }
       if (open && visibleSuggestions[safeHighlight]) {
         e.preventDefault();
         commit(visibleSuggestions[safeHighlight].slug);
@@ -217,19 +240,17 @@ export function TagInput({
       return;
     }
     if (e.key === 'ArrowDown') {
-      if (visibleSuggestions.length === 0) return;
+      if (totalRows === 0) return;
       e.preventDefault();
       setOpen(true);
-      setHighlight((safeHighlight + 1) % visibleSuggestions.length);
+      setHighlight((safeHighlight + 1) % totalRows);
       return;
     }
     if (e.key === 'ArrowUp') {
-      if (visibleSuggestions.length === 0) return;
+      if (totalRows === 0) return;
       e.preventDefault();
       setOpen(true);
-      setHighlight(
-        safeHighlight === 0 ? visibleSuggestions.length - 1 : safeHighlight - 1,
-      );
+      setHighlight(safeHighlight === 0 ? totalRows - 1 : safeHighlight - 1);
       return;
     }
     if (e.key === 'Escape') {
@@ -238,7 +259,12 @@ export function TagInput({
     }
   };
 
-  const showDropdown = open && visibleSuggestions.length > 0;
+  // Keep the dropdown rendered as long as the input is focused. Hiding it
+  // when there were zero suggestions (the previous behaviour) made the
+  // input feel broken — users couldn't tell whether the search was working
+  // or whether they were allowed to type a freeform tag. The empty state
+  // below explains itself.
+  const showDropdown = open && !atCap;
 
   return (
     <div ref={containerRef} className="relative grid gap-1">
@@ -311,7 +337,7 @@ export function TagInput({
           role="listbox"
           className="absolute left-0 right-0 top-[calc(100%-1.25rem)] z-20 mt-2 max-h-64 overflow-y-auto rounded-md border border-rule bg-paper shadow-lg"
         >
-          {!trimmed ? (
+          {!trimmed && visibleSuggestions.length > 0 ? (
             <li
               className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-ink-faint"
               aria-hidden
@@ -346,6 +372,61 @@ export function TagInput({
               </li>
             );
           })}
+          {showCreateNew ? (
+            <li
+              id={`${listboxId}-opt-${visibleSuggestions.length}`}
+              role="option"
+              aria-selected={highlightOnCreate}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                commit(canonicalCandidate);
+              }}
+              onMouseEnter={() => setHighlight(visibleSuggestions.length)}
+              className={[
+                'flex cursor-pointer items-center justify-between gap-2 border-t border-rule px-3 py-2 text-sm',
+                highlightOnCreate ? 'bg-paper-soft text-ink' : 'text-ink',
+              ].join(' ')}
+            >
+              <span className="flex items-center gap-2 truncate">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  aria-hidden
+                  className="flex-shrink-0 text-ink-muted"
+                >
+                  <path
+                    d="M6 2v8M2 6h8"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <span className="truncate">
+                  Create{' '}
+                  <span className="font-medium">
+                    &ldquo;{labelFromSlug(canonicalCandidate)}&rdquo;
+                  </span>
+                </span>
+              </span>
+              <span className="flex-shrink-0 text-[10px] uppercase tracking-wider text-ink-faint">
+                New
+              </span>
+            </li>
+          ) : null}
+          {visibleSuggestions.length === 0 && !showCreateNew ? (
+            <li
+              className="px-3 py-2.5 text-xs text-ink-faint"
+              aria-hidden
+            >
+              {trimmed
+                ? loading
+                  ? 'Searching…'
+                  : 'No matches — keep typing to create a new tag'
+                : 'Start typing to search. Add up to 5 tags.'}
+            </li>
+          ) : null}
         </ul>
       ) : null}
     </div>
