@@ -13,6 +13,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, useState, type ReactNode } from 'react';
+import { Toaster } from 'sonner';
 
 import { ConsentProvider } from '@/components/consent-provider';
 
@@ -38,6 +39,24 @@ export function Providers({ children }: { children: ReactNode }) {
       <Suspense fallback={null}>
         <ConsentProvider>{children}</ConsentProvider>
       </Suspense>
+      {/* Bottom-right matches the cookie banner's bottom-anchor, doesn't
+          collide with the dashboard header dropdown, and is the standard
+          desktop convention. Light theme to match the paper palette. */}
+      <Toaster
+        position="bottom-right"
+        theme="light"
+        richColors={false}
+        toastOptions={{
+          classNames: {
+            toast:
+              'border border-rule bg-paper text-ink shadow-md rounded-md',
+            title: 'text-sm font-medium text-ink',
+            description: 'text-xs text-ink-muted',
+            success: 'border-accent/30',
+            error: 'border-danger/40',
+          },
+        }}
+      />
     </QueryClientProvider>
   );
 }

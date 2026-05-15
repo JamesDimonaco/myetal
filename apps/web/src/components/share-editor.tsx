@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { z } from 'zod';
 
 import {
@@ -381,10 +382,17 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   const appendItem = (payload: AddItemPayload) => {
     const draft = fromAddPayload(payload);
     setItems((prev) => [...prev, draft]);
+    toast.success(`Added "${draft.title || 'item'}"`);
   };
 
   const removeItem = (key: string) => {
-    setItems((prev) => prev.filter((it) => it._key !== key));
+    setItems((prev) => {
+      const removed = prev.find((it) => it._key === key);
+      if (removed) {
+        toast.success(`Removed "${removed.title || 'item'}"`);
+      }
+      return prev.filter((it) => it._key !== key);
+    });
   };
 
   const moveItem = (key: string, direction: -1 | 1) => {
@@ -732,15 +740,19 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                   : unpublishMutation;
                 mutation.mutateAsync().then(
                   () => {
-                    // Optimistic value is already correct
+                    toast.success(
+                      newValue
+                        ? 'Now in discovery'
+                        : 'Hidden from discovery',
+                    );
                   },
                   (err) => {
                     setPublishedAt(previousValue);
-                    setError(
+                    const message =
                       err instanceof ApiError
                         ? err.detail
-                        : 'Failed to update discovery status',
-                    );
+                        : 'Failed to update discovery status';
+                    toast.error(message);
                   },
                 );
               }}
