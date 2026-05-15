@@ -406,13 +406,17 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   };
 
   const removeItem = (key: string) => {
-    setItems((prev) => {
-      const removed = prev.find((it) => it._key === key);
-      if (removed) {
-        toast.success(`Removed "${removed.title || 'item'}"`);
-      }
-      return prev.filter((it) => it._key !== key);
-    });
+    // Read `items` from the closure rather than the setItems updater so the
+    // toast side-effect lives OUTSIDE React's state-update path. React's
+    // StrictMode intentionally double-invokes state updaters in dev to
+    // surface impurity — firing a toast inside the updater produced
+    // duplicate notifications. The closure value is captured at click time,
+    // which is the correct semantic for a "removed X" confirmation.
+    const removed = items.find((it) => it._key === key);
+    setItems((prev) => prev.filter((it) => it._key !== key));
+    if (removed) {
+      toast.success(`Removed "${removed.title || 'item'}"`);
+    }
   };
 
   const moveItem = (key: string, direction: -1 | 1) => {

@@ -318,8 +318,17 @@ export function TagInput({
           aria-expanded={showDropdown}
           aria-controls={showDropdown ? listboxId : undefined}
           aria-activedescendant={
-            showDropdown && visibleSuggestions[safeHighlight]
-              ? `${listboxId}-opt-${safeHighlight}`
+            showDropdown
+              ? highlightOnCreate
+                ? // The synthetic Create row's id mirrors its rendered
+                  // position (after all real suggestions). Screen readers
+                  // need this pointer to announce the row when the user
+                  // arrows down onto it; without it, the input goes silent
+                  // even though the row is visually highlighted.
+                  `${listboxId}-opt-${visibleSuggestions.length}`
+                : visibleSuggestions[safeHighlight]
+                  ? `${listboxId}-opt-${safeHighlight}`
+                  : undefined
               : undefined
           }
           className="min-w-[8rem] flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed"

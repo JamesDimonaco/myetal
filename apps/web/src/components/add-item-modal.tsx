@@ -1298,16 +1298,36 @@ function PdfKindPane({
     );
   }
 
-  // No share yet AND no auto-save handler — surface the legacy hint. Should
-  // not happen in the editor flow (the parent always passes onAutoSaveDraft).
+  // No share yet AND not auto-saving AND no draft error. Should be
+  // unreachable in the editor flow (the parent always passes
+  // onAutoSaveDraft, which sets draftSaving=true on first tab open). If
+  // this branch ever fires, the previous "Saving draft…" message lied —
+  // nothing was being saved and the spinner ran forever. Surface a
+  // diagnostic-friendly error and a retry that triggers the autosave
+  // (no-op when onAutoSaveDraft is undefined, so the user can at least
+  // close the modal). Captures the case where onAutoSaveDraft is wired
+  // through but the parent state means the auto-save bailed early.
   if (!shareId) {
     return (
       <div className="grid gap-3">
-        <p className="text-xs text-ink-faint">
-          Upload a PDF (poster, slide deck, preprint) and we&apos;ll attach it
-          to this share.
-        </p>
-        <LoadingRow text="Saving draft…" />
+        <div className="rounded-md border border-danger/30 bg-danger/5 px-4 py-3">
+          <p className="text-sm font-semibold text-danger">
+            Couldn&apos;t start the upload draft.
+          </p>
+          <p className="mt-1 text-xs text-ink-muted">
+            Save the share from the main form first, then come back and
+            attach a PDF.
+          </p>
+        </div>
+        {onAutoSaveDraft ? (
+          <button
+            type="button"
+            onClick={() => void tryAutoSaveDraft()}
+            className="self-start rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+          >
+            Retry
+          </button>
+        ) : null}
       </div>
     );
   }
