@@ -1134,12 +1134,15 @@ function PdfKindPane({
     setProgress(0);
   };
 
+  // Retry must be available after a transport error too — leaving Retry
+  // disabled when phase === 'error' meant a transient CORS/network blip
+  // locked the picker until the user removed and re-picked the file.
   const canUpload =
     !!file &&
     !!shareId &&
     title.trim().length > 0 &&
     copyrightAck &&
-    phase === 'idle';
+    (phase === 'idle' || phase === 'error');
 
   const handleUpload = async () => {
     if (!file || !shareId) return;
@@ -1188,7 +1191,28 @@ function PdfKindPane({
         };
         xhr.onerror = () => {
           xhrRef.current = null;
-          reject(new Error(PDF_NETWORK_ERR));
+          // xhr.onerror fires for transport-level failures — most commonly
+          // a CORS preflight rejection, occasionally true offline. The
+          // browser refuses to expose more detail for security reasons,
+          // but `navigator.onLine` lets us distinguish the two cases.
+          const offline =
+            typeof navigator !== 'undefined' && navigator.onLine === false;
+          if (!offline) {
+            // Useful breadcrumb for the next time this regresses — the
+            // upload host doesn't show up in any other log line.
+            console.warn(
+              '[pdf-upload] xhr.onerror on POST to',
+              presign.upload_url,
+              '— if this is a CORS issue, check the R2 bucket allow-list',
+            );
+          }
+          reject(
+            new Error(
+              offline
+                ? "You're offline. Reconnect and try again."
+                : PDF_NETWORK_ERR,
+            ),
+          );
         };
         xhr.onabort = () => {
           xhrRef.current = null;
