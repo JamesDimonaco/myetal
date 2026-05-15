@@ -2,3 +2,15 @@ packages:
   - "apps/web"
   - "apps/mobile"
   - "packages/*"
+# Approved postinstall scripts. pnpm 10+ requires explicit opt-in;
+# unapproved builds become a hard install failure. Everything in this
+# list is a well-known native/build-script-using dep that we trust.
+allowBuilds:
+  argon2: true
+  core-js: true
+  cpu-features: true
+  dtrace-provider: true
+  protobufjs: true
+  sharp: true
+  ssh2: true
+  unrs-resolver: true

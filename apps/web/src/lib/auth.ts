@@ -99,9 +99,30 @@ async function sendMail(args: {
 // expects to receive deep-link callbacks at ``myetal://``. Both schemes
 // are listed so BA accepts the ``Origin``/``callbackURL`` they appear in.
 const NATIVE_DEEP_LINK_ORIGINS = ['myetal://', 'exp+myetal://', 'exp://'];
+
+// Auto-include both apex and www variants of BETTER_AUTH_URL so a user
+// landing on https://www.myetal.app (or vice versa) doesn't get
+// "Invalid origin" from BA. Vercel may serve both hostnames until the
+// www → apex 308-redirect is wired at the domain layer.
+function withWwwVariant(url: string): string[] {
+  try {
+    const u = new URL(url);
+    const variants = new Set<string>([url]);
+    if (u.host.startsWith('www.')) {
+      const apex = u.host.slice(4);
+      variants.add(`${u.protocol}//${apex}`);
+    } else {
+      variants.add(`${u.protocol}//www.${u.host}`);
+    }
+    return Array.from(variants);
+  } catch {
+    return [url];
+  }
+}
+
 const trustedOrigins =
   process.env.NODE_ENV === 'production'
-    ? [BA_URL, ...NATIVE_DEEP_LINK_ORIGINS]
+    ? [...withWwwVariant(BA_URL), ...NATIVE_DEEP_LINK_ORIGINS]
     : [
         BA_URL,
         'http://localhost:3000',

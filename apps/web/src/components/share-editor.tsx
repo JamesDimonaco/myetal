@@ -1,8 +1,26 @@
 'use client';
 
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { z } from 'zod';
 
 import {
@@ -93,6 +111,26 @@ const shareSchema = z.object({
   type: z.enum(['paper', 'collection', 'bundle', 'grant', 'project']),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
+
+// Validation paths the user has a visible field for. Anything else
+// (file_size_bytes, file_mime, thumbnail_url, etc.) routes through the
+// hidden-field banner instead of leaking raw Zod messages — see
+// docs/tickets/to-do/form-error-surfacing.md.
+const USER_EDITABLE_FIELDS = new Set([
+  'name',
+  'description',
+  'type',
+  'items',
+  'items.*.title',
+  'items.*.scholar_url',
+  'items.*.doi',
+  'items.*.authors',
+  'items.*.year',
+  'items.*.notes',
+  'items.*.url',
+  'items.*.subtitle',
+  'items.*.image_url',
+]);
 
 interface DraftItem {
   _key: string;
@@ -308,9 +346,51 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [savedShare, setSavedShare] = useState<ShareResponse | null>(null);
   const [showQr, setShowQr] = useState(false);
+  // Distinguishes the post-save celebratory QR (close → dashboard) from the
+  // quick-access "Show QR" button on the edit page (close → stay here).
+  // Without this, closing the quick-access modal navigated the user away
+  // from the share they were editing.
+  const [qrMode, setQrMode] = useState<'post-save' | 'quick-access'>(
+    'post-save',
+  );
   const [showAddItem, setShowAddItem] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  // Unsaved-changes guard. `isDirty` flips true the first time any tracked
+  // form field changes after mount; flips back to false on successful save
+  // or explicit discard. Used by both the beforeunload listener and the
+  // in-editor "Back to dashboard" confirmation.
+  const [isDirty, setIsDirty] = useState(false);
+  const mountedRef = useRef(false);
+  const [pendingDiscardHref, setPendingDiscardHref] = useState<string | null>(
+    null,
+  );
+
+  // Mark the form dirty whenever a tracked field changes (skipping the
+  // initial mount-time set). The deep-equal check on items/tags isn't
+  // necessary because we only flip true; a clean revert would still mark
+  // dirty, but that's safer than the opposite.
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    setIsDirty(true);
+  }, [name, description, shareType, items, tags]);
+
+  // Browser-level guard: tab close, refresh, external nav. App-level
+  // intra-MyEtAl nav is intercepted by the discard dialog below.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers ignore the custom string and show their own
+      // confirmation. Setting returnValue is required for legacy support.
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   const updateItem = (key: string, patch: Partial<DraftItem>) => {
     setItems((prev) =>
@@ -322,10 +402,21 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   const appendItem = (payload: AddItemPayload) => {
     const draft = fromAddPayload(payload);
     setItems((prev) => [...prev, draft]);
+    toast.success(`Added "${draft.title || 'item'}"`);
   };
 
   const removeItem = (key: string) => {
+    // Read `items` from the closure rather than the setItems updater so the
+    // toast side-effect lives OUTSIDE React's state-update path. React's
+    // StrictMode intentionally double-invokes state updaters in dev to
+    // surface impurity — firing a toast inside the updater produced
+    // duplicate notifications. The closure value is captured at click time,
+    // which is the correct semantic for a "removed X" confirmation.
+    const removed = items.find((it) => it._key === key);
     setItems((prev) => prev.filter((it) => it._key !== key));
+    if (removed) {
+      toast.success(`Removed "${removed.title || 'item'}"`);
+    }
   };
 
   const moveItem = (key: string, direction: -1 | 1) => {
@@ -337,6 +428,30 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       const next = [...prev];
       [next[idx], next[target]] = [next[target], next[idx]];
       return next;
+    });
+  };
+
+  // dnd-kit sensors — pointer for mouse/touch, keyboard for accessibility.
+  // PointerSensor's activation distance keeps the up/down icon buttons and
+  // form inputs click-targets usable; a drag only kicks in once the cursor
+  // has moved a few pixels.
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setItems((prev) => {
+      const fromIdx = prev.findIndex((it) => it._key === active.id);
+      const toIdx = prev.findIndex((it) => it._key === over.id);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      return arrayMove(prev, fromIdx, toIdx);
     });
   };
 
@@ -352,14 +467,38 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       items,
     });
     if (!parsed.success) {
-      // Map zod issues to field-level errors for inline display.
-      const errs: Record<string, string> = {};
+      // Partition zod issues: anything on a user-editable field renders
+      // inline under that field; anything on a hidden/computed field
+      // (e.g. `items.*.file_size_bytes`, which the user can't see) routes
+      // to the top-of-form banner with friendly copy. The raw message is
+      // still console.warn'd so future hidden-field validations are easy
+      // to spot in DevTools without leaking the technical detail to the UI.
+      const inline: Record<string, string> = {};
+      const hidden: string[] = [];
       for (const issue of parsed.error.issues) {
-        const key = issue.path.join('.');
-        if (!errs[key]) errs[key] = issue.message;
+        const path = issue.path.join('.');
+        const pathPattern = path.replace(/\d+/g, '*');
+        if (USER_EDITABLE_FIELDS.has(pathPattern)) {
+          if (!inline[path]) inline[path] = issue.message;
+        } else {
+          hidden.push(`${path}: ${issue.message}`);
+        }
       }
-      setFieldErrors(errs);
-      setError(parsed.error.issues[0]?.message ?? 'Invalid input');
+      setFieldErrors(inline);
+      // Prefer surfacing a user-editable message (clear, actionable). Fall
+      // back to a generic banner only when every issue is on a hidden field
+      // — the previous code leaked raw Zod text in that case.
+      const firstInline = Object.values(inline)[0];
+      if (firstInline) {
+        setError(firstInline);
+      } else if (hidden.length > 0) {
+        console.warn('[share-editor] hidden-field validation failed:', hidden);
+        setError(
+          "Something didn't validate. Try again, or remove and re-add the last item.",
+        );
+      } else {
+        setError('Invalid input');
+      }
       // Scroll error into view so the user sees what went wrong.
       setTimeout(() => {
         document.querySelector('[role="alert"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -437,7 +576,11 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       }
 
       setSavedShare(saved);
+      setQrMode('post-save');
       setShowQr(true);
+      // Save succeeded — wipe the dirty flag so the discard guard doesn't
+      // fire on the post-save navigation to dashboard.
+      setIsDirty(false);
       // Flash a brief "saved" confirmation that persists after QR closes.
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 3000);
@@ -496,12 +639,16 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     // Carry over any tags / published_at the server returned (server may
     // canonicalise tags). Items are empty so nothing to merge there.
     if (created.tags) setTags(created.tags.map((t) => t.slug));
-    // W-FIX-3 — sync the URL to the new id so refresh doesn't drop the user
-    // back on a fresh /share/new form. router.replace doesn't push history.
-    // The QR-modal "keep editing" flow at closeQrAndKeepEditing also calls
-    // replace, but only when `savedShare` is set — which only happens on
-    // explicit Save, never via this auto-save path — so they don't collide.
-    router.replace(`/dashboard/share/${created.id}`);
+    // Sync the URL to the new id so refresh doesn't drop the user back on a
+    // fresh /share/new form. Use window.history.replaceState rather than
+    // router.replace because /dashboard/share/new and /dashboard/share/[id]
+    // are separate route segments in App Router — router.replace would
+    // unmount the entire editor tree, including the Add Item modal the user
+    // just opened. history.replaceState updates the URL bar without
+    // touching React; refresh still correctly loads the [id] route.
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/dashboard/share/${created.id}`);
+    }
     return created.id;
   }, [
     effectiveId,
@@ -641,15 +788,19 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                   : unpublishMutation;
                 mutation.mutateAsync().then(
                   () => {
-                    // Optimistic value is already correct
+                    toast.success(
+                      newValue
+                        ? 'Now in discovery'
+                        : 'Hidden from discovery',
+                    );
                   },
                   (err) => {
                     setPublishedAt(previousValue);
-                    setError(
+                    const message =
                       err instanceof ApiError
                         ? err.detail
-                        : 'Failed to update discovery status',
-                    );
+                        : 'Failed to update discovery status';
+                    toast.error(message);
                   },
                 );
               }}
@@ -682,6 +833,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               type="button"
               onClick={() => {
                 setSavedShare(initial);
+                setQrMode('quick-access');
                 setShowQr(true);
               }}
               className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
@@ -743,62 +895,28 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               </div>
             ) : null}
 
-            {items.map((it, idx) => (
-              <div
-                key={it._key}
-                className="rounded-md border border-rule bg-paper-soft p-4"
+            <DndContext
+              sensors={dragSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={items.map((it) => it._key)}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-                      #{idx + 1}
-                    </span>
-                    <KindBadge kind={it.kind} />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <IconBtn
-                      label="Move up"
-                      disabled={idx === 0}
-                      onClick={() => moveItem(it._key, -1)}
-                    >
-                      <ArrowIcon direction="up" />
-                    </IconBtn>
-                    <IconBtn
-                      label="Move down"
-                      disabled={idx === items.length - 1}
-                      onClick={() => moveItem(it._key, 1)}
-                    >
-                      <ArrowIcon direction="down" />
-                    </IconBtn>
-                    <IconBtn
-                      label="Remove item"
-                      onClick={() => removeItem(it._key)}
-                    >
-                      <TrashIcon />
-                    </IconBtn>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-3">
-                  {it.kind === 'paper' ? (
-                    <PaperFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  ) : it.kind === 'repo' ? (
-                    <RepoFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  ) : it.kind === 'pdf' ? (
-                    <PdfFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  ) : (
-                    <LinkFields item={it} onChange={(p) => updateItem(it._key, p)} />
-                  )}
-                  <ItemField
-                    label="Notes"
-                    value={it.notes}
-                    onChange={(v) => updateItem(it._key, { notes: v })}
-                    placeholder="Why this matters"
-                    multiline
+                {items.map((it, idx) => (
+                  <SortableItemRow
+                    key={it._key}
+                    item={it}
+                    idx={idx}
+                    total={items.length}
+                    onMove={moveItem}
+                    onRemove={removeItem}
+                    onUpdate={updateItem}
                   />
-                </div>
-              </div>
-            ))}
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
 
@@ -817,6 +935,16 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
           <Link
             href="/dashboard"
+            onClick={(e) => {
+              // Guard against silent loss of unsaved edits. The guard is
+              // intentionally NOT applied to the publish toggle, save
+              // submission, delete, or the post-save QR — only this
+              // explicit "leave the editor without saving" surface.
+              if (isDirty) {
+                e.preventDefault();
+                setPendingDiscardHref('/dashboard');
+              }
+            }}
             className="inline-flex min-h-[44px] items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -865,8 +993,18 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         <QrModal
           shortCode={savedShare.short_code}
           collectionName={savedShare.name}
-          onClose={closeQrAndGoToDashboard}
-          onKeepEditing={closeQrAndKeepEditing}
+          onClose={
+            qrMode === 'post-save'
+              ? closeQrAndGoToDashboard
+              : closeQrAndKeepEditing
+          }
+          // The secondary "Keep editing" button only makes sense on the
+          // celebratory post-save modal — there's no "go to dashboard"
+          // alternative to differentiate from when the user is already
+          // editing.
+          onKeepEditing={
+            qrMode === 'post-save' ? closeQrAndKeepEditing : undefined
+          }
         />
       ) : null}
 
@@ -905,7 +1043,173 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Discard-changes guard — fires when the user clicks an in-editor
+          nav surface (today: "Back to dashboard") while `isDirty`. The
+          beforeunload listener covers tab close / refresh separately. */}
+      <Dialog
+        open={pendingDiscardHref !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDiscardHref(null);
+        }}
+      >
+        <DialogContent hideCloseButton>
+          <DialogTitle>Discard unsaved changes?</DialogTitle>
+          <DialogDescription className="mt-2">
+            You have unsaved edits on this share. Leaving now will lose them.
+          </DialogDescription>
+          <div className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setPendingDiscardHref(null)}
+            >
+              Keep editing
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                const target = pendingDiscardHref;
+                setIsDirty(false);
+                setPendingDiscardHref(null);
+                if (target) router.push(target);
+              }}
+            >
+              Discard
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
+  );
+}
+
+// --- sortable item row ---
+
+/**
+ * One row of the items list. `useSortable` wires up the drag transform
+ * for dnd-kit. The drag handle is only visible on hover at sm+ widths;
+ * touch devices keep the up/down arrow buttons as the reorder path.
+ *
+ * Extracted so we can call the hook (which can't run inside a .map).
+ */
+function SortableItemRow({
+  item,
+  idx,
+  total,
+  onMove,
+  onRemove,
+  onUpdate,
+}: {
+  item: DraftItem;
+  idx: number;
+  total: number;
+  onMove: (key: string, direction: -1 | 1) => void;
+  onRemove: (key: string) => void;
+  onUpdate: (key: string, patch: Partial<DraftItem>) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item._key });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    // Lift the dragged card visually so it reads as detached.
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-md border border-rule bg-paper-soft p-4"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {/* Drag handle — sm:flex hides on phones, where arrow buttons
+              and a11y keyboard sortable cover reordering instead. */}
+          <button
+            type="button"
+            aria-label={`Drag to reorder item ${idx + 1}`}
+            className="hidden h-8 w-6 cursor-grab touch-none items-center justify-center text-ink-faint transition hover:text-ink active:cursor-grabbing sm:flex"
+            {...attributes}
+            {...listeners}
+          >
+            <GripIcon />
+          </button>
+          <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+            #{idx + 1}
+          </span>
+          <KindBadge kind={item.kind} />
+        </div>
+        <div className="flex items-center gap-1">
+          <IconBtn
+            label="Move up"
+            disabled={idx === 0}
+            onClick={() => onMove(item._key, -1)}
+          >
+            <ArrowIcon direction="up" />
+          </IconBtn>
+          <IconBtn
+            label="Move down"
+            disabled={idx === total - 1}
+            onClick={() => onMove(item._key, 1)}
+          >
+            <ArrowIcon direction="down" />
+          </IconBtn>
+          <IconBtn label="Remove item" onClick={() => onRemove(item._key)}>
+            <TrashIcon />
+          </IconBtn>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        {item.kind === 'paper' ? (
+          <PaperFields
+            item={item}
+            onChange={(p) => onUpdate(item._key, p)}
+          />
+        ) : item.kind === 'repo' ? (
+          <RepoFields item={item} onChange={(p) => onUpdate(item._key, p)} />
+        ) : item.kind === 'pdf' ? (
+          <PdfFields item={item} onChange={(p) => onUpdate(item._key, p)} />
+        ) : (
+          <LinkFields item={item} onChange={(p) => onUpdate(item._key, p)} />
+        )}
+        <ItemField
+          label="Notes"
+          value={item.notes}
+          onChange={(v) => onUpdate(item._key, { notes: v })}
+          placeholder="Why this matters"
+          multiline
+        />
+      </div>
+    </div>
+  );
+}
+
+function GripIcon() {
+  return (
+    <svg
+      width="12"
+      height="16"
+      viewBox="0 0 12 16"
+      fill="currentColor"
+      aria-hidden
+    >
+      <circle cx="3.5" cy="3" r="1.25" />
+      <circle cx="8.5" cy="3" r="1.25" />
+      <circle cx="3.5" cy="8" r="1.25" />
+      <circle cx="8.5" cy="8" r="1.25" />
+      <circle cx="3.5" cy="13" r="1.25" />
+      <circle cx="8.5" cy="13" r="1.25" />
+    </svg>
   );
 }
 
