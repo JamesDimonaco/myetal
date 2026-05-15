@@ -30,7 +30,7 @@ When both docs disagree, the cutover checklist wins for ordering; this doc wins 
 
 ### Build settings
 
-- [ ] Node version = `>= 20` (root `package.json` `engines.node`). Vercel default is fine; pin to `20.x` if Vercel offers a dropdown
+- [ ] Node version = `>= 22.13` (root `package.json` `engines.node`). Vercel auto-detects from engines; sanity-check the build log shows `Detected Node.js version: 22.x` on next deploy. Bumped from 20 → 22 on 2026-05-15 because pnpm 11/10 needs it — see `pnpm-node-toolchain-stability.md`.
 - [ ] Build Command = default (`pnpm build` via turbo) — pnpm is detected from `pnpm-lock.yaml`
 - [ ] Install Command = `pnpm install --frozen-lockfile`
 - [ ] Output mode = Next.js default (Vercel handles this; do NOT set `output: 'export'`)

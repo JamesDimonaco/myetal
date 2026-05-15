@@ -106,6 +106,17 @@ Don't follow pnpm major versions until they're at least one minor release in. Pn
 - [ ] CI prelude asserts the Node major matches the file.
 - [ ] `apps/web/AGENTS.md` (or root `CLAUDE.md`) has a "Toolchain" section: how to bump Node, how to bump pnpm, how to add a postinstall approval, how the lockfile is regenerated.
 
+### Stale Node 20 references to clean up (sub-acceptance)
+
+These exist in the repo today and need to be brought in line with the new Node 22 baseline:
+
+- [ ] `apps/web/package.json:42` — `"@types/node": "^20"` → bump to `"^22"`. Types-only, no runtime risk; the gain is accurate typings for Node 22-only APIs (`node:sqlite`, `fetch` flags, etc.).
+- [ ] `docs/tickets/to-do/prod-env-setup-checklist.md:33` — currently reads `"Node version = >= 20"`. Update to `>= 22` so the prod-cutover dry-run doesn't suggest pinning Vercel to 20.x. (Done inline with this ticket — minor.)
+- [ ] `docs/tickets/to-do/gha-node20-deprecation.md` → per INDEX.md, status is "done in commit `a9f84e8`" but the file is still in `to-do/`. `git mv` to `done/`. (Done inline with this ticket — minor.)
+- [ ] Audit Vercel project settings → Node Version → confirm it follows `engines.node` (it should pick up `>=22.13` automatically; sanity-check the build log for a `Detected Node.js version: 22.x` line on next deploy).
+- [ ] Audit Railway service settings → Build → Node Version (if exposed; Python service so likely irrelevant — but the api-image workflow building the Docker image runs Node in the worker, so any cached image must use Node 22+).
+- [ ] Audit `apps/mobile` Expo SDK 54 minimum Node — Expo 54 requires Node 20, supports 22. No bump needed but confirm the dev-build agent uses 22+ when it next runs.
+
 ---
 
 ## Triggers to revisit
