@@ -504,12 +504,16 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     // Carry over any tags / published_at the server returned (server may
     // canonicalise tags). Items are empty so nothing to merge there.
     if (created.tags) setTags(created.tags.map((t) => t.slug));
-    // W-FIX-3 — sync the URL to the new id so refresh doesn't drop the user
-    // back on a fresh /share/new form. router.replace doesn't push history.
-    // The QR-modal "keep editing" flow at closeQrAndKeepEditing also calls
-    // replace, but only when `savedShare` is set — which only happens on
-    // explicit Save, never via this auto-save path — so they don't collide.
-    router.replace(`/dashboard/share/${created.id}`);
+    // Sync the URL to the new id so refresh doesn't drop the user back on a
+    // fresh /share/new form. Use window.history.replaceState rather than
+    // router.replace because /dashboard/share/new and /dashboard/share/[id]
+    // are separate route segments in App Router — router.replace would
+    // unmount the entire editor tree, including the Add Item modal the user
+    // just opened. history.replaceState updates the URL bar without
+    // touching React; refresh still correctly loads the [id] route.
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/dashboard/share/${created.id}`);
+    }
     return created.id;
   }, [
     effectiveId,
