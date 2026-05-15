@@ -78,38 +78,47 @@ def _reset_client_for_tests() -> None:
 def presign_upload(
     key: str,
     content_type: str,
-    max_size_bytes: int,
+    max_size_bytes: int,  # noqa: ARG001 — kept for API stability
     expires_in: int = 300,
 ) -> dict[str, Any]:
-    """Generate a presigned POST policy for direct-from-client uploads.
+    """Generate a presigned PUT URL for direct-from-client uploads.
 
-    The returned ``{url, fields}`` dict is what the client uses as the
-    ``action`` URL and form fields of a ``multipart/form-data`` POST.
-    Conditions:
+    Returns ``{"url": <signed PUT url>, "fields": {}}`` so existing
+    callers that iterate over the fields dict don't blow up. The client
+    sends a PUT request to the URL with the raw file bytes as the body
+    and ``Content-Type`` header set to the value passed in here.
 
-    * ``content-length-range`` — R2 rejects bodies outside this range
-      at upload time, so a malicious client can't post a 1 GB file
-      regardless of what they claimed at presign time.
-    * ``Content-Type`` equality — the client must send the same
-      content-type they declared. This is informational (the
-      authoritative MIME check is the server-side first-8-byte sniff
-      after upload, per Q3) but it's free defence-in-depth.
+    Switched from presigned POST to PUT after Cloudflare R2 started
+    returning 501 Not Implemented on the multipart-form flow in
+    production. R2 has rock-solid support for presigned PUTs.
+
+    Trade-offs:
+
+    * No server-side ``content-length-range`` enforcement at upload
+      time — the client could in principle send a much larger body.
+      Mitigated by: (a) the presign route already validated declared
+      ``size_bytes`` against MAX_PDF_BYTES, (b) the record-pdf-upload
+      route re-reads the object and re-validates size + magic bytes
+      before recording the ShareItem row, (c) R2 itself enforces
+      bucket-level size limits.
+    * The client MUST send Content-Type that matches what was signed.
+      The route returns the required value as ``required_content_type``.
 
     ``expires_in`` defaults to 300 s (5 min) — long enough for slow
     mobile uploads, short enough that an issued presign can't be
     replayed for hours.
     """
     s3 = _get_client()
-    return s3.generate_presigned_post(
-        Bucket=_settings().r2_bucket,
-        Key=key,
-        Fields={"Content-Type": content_type},
-        Conditions=[
-            ["content-length-range", 0, max_size_bytes],
-            ["eq", "$Content-Type", content_type],
-        ],
+    url = s3.generate_presigned_url(
+        ClientMethod="put_object",
+        Params={
+            "Bucket": _settings().r2_bucket,
+            "Key": key,
+            "ContentType": content_type,
+        },
         ExpiresIn=expires_in,
     )
+    return {"url": url, "fields": {}}
 
 
 def public_url(key: str) -> str:

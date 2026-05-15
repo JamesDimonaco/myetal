@@ -292,6 +292,7 @@ async def create_pdf_upload_url(
         upload_url=presigned["url"],
         fields=presigned["fields"],
         file_key=file_key,
+        required_content_type=PDF_MIME,
         expires_at=expires_at,
     )
 

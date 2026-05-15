@@ -143,15 +143,20 @@ export interface ShareUpdateInput {
 // ---------------------------------------------------------------------------
 
 /**
- * Returned by `POST /shares/{share_id}/items/upload-url`. The client posts
- * `multipart/form-data` to `upload_url` with all `fields` plus a `file` field;
- * R2 responds 204 on success. Then the client calls `record-pdf-upload` with
- * `file_key` to materialise the ShareItem.
+ * Returned by `POST /shares/{share_id}/items/upload-url`. The client sends
+ * an HTTP PUT to `upload_url` with the raw file bytes as the body and
+ * `Content-Type: <required_content_type>` as a header. R2 responds 200 on
+ * success. The client then calls `record-pdf-upload` with `file_key` to
+ * materialise the ShareItem.
+ *
+ * Switched from presigned POST to PUT after R2 returned 501 in prod.
+ * `fields` is retained as an empty Record for transitional callers.
  */
 export interface PresignResponse {
   upload_url: string;
   fields: Record<string, string>;
   file_key: string;
+  required_content_type: string;
   expires_at: string;
 }
 

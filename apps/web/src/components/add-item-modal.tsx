@@ -1165,15 +1165,14 @@ function PdfKindPane({
         },
       );
 
-      // 2. Multipart POST to R2 (XHR for progress events)
+      // 2. Direct PUT to R2 with the file as the body. R2 started
+      // returning 501 Not Implemented on the previous multipart-POST
+      // flow in prod; the presigned-PUT path is well-supported and
+      // simpler. Content-Type MUST match what the API signed for; the
+      // route returns this as `required_content_type` to remove the
+      // implicit-string-coupling risk.
       setPhase('uploading');
       await new Promise<void>((resolve, reject) => {
-        const formData = new FormData();
-        for (const [k, v] of Object.entries(presign.fields)) {
-          formData.append(k, v);
-        }
-        formData.append('file', file);
-
         const xhr = new XMLHttpRequest();
         xhrRef.current = xhr;
         xhr.upload.onprogress = (ev) => {
@@ -1201,7 +1200,7 @@ function PdfKindPane({
             // Useful breadcrumb for the next time this regresses — the
             // upload host doesn't show up in any other log line.
             console.warn(
-              '[pdf-upload] xhr.onerror on POST to',
+              '[pdf-upload] xhr.onerror on PUT to',
               presign.upload_url,
               '— if this is a CORS issue, check the R2 bucket allow-list',
             );
@@ -1218,8 +1217,13 @@ function PdfKindPane({
           xhrRef.current = null;
           reject(new Error('Upload cancelled.'));
         };
-        xhr.open('POST', presign.upload_url);
-        xhr.send(formData);
+        xhr.open('PUT', presign.upload_url);
+        // Must match the Content-Type the API used when signing.
+        xhr.setRequestHeader(
+          'Content-Type',
+          presign.required_content_type ?? 'application/pdf',
+        );
+        xhr.send(file);
       });
 
       // 3. Record
