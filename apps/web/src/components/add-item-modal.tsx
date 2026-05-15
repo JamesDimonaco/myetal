@@ -140,6 +140,12 @@ export type AddItemLink = {
  */
 export type AddItemPdf = {
   kind: 'pdf';
+  /** Server-assigned ShareItem.id from record-pdf-upload. Required so
+   *  the editor's subsequent PATCH /shares/{id} round-trips the item by
+   *  id (the server's update_share merges PDF items by id; a missing id
+   *  would re-fall into the "create a new item" path which rejects
+   *  kind='pdf' from clients as a forgery defence → 422). */
+  id: string;
   title: string;
   file_url: string;
   thumbnail_url: string;
@@ -1243,6 +1249,11 @@ function PdfKindPane({
       setPhase('done');
       onPick({
         kind: 'pdf',
+        // record-pdf-upload already wrote the ShareItem to the DB. Pass
+        // the id through so the editor's eventual save PATCHes by id
+        // (preserving the four server-managed PDF columns) instead of
+        // attempting a forbidden client-side kind='pdf' create.
+        id: item.id,
         title: item.title,
         file_url: item.file_url ?? '',
         thumbnail_url: item.thumbnail_url ?? '',
