@@ -92,7 +92,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # pnpm 11.x requires Node >= 22.13 (uses node:sqlite). Keep this
+          # >= the floor pnpm needs OR pin pnpm back to a pre-11 version.
+          node-version: 22
           cache: pnpm
 
       - name: Install web dependencies
