@@ -110,7 +110,12 @@ def _fetch_jwks(force: bool = False) -> dict[str, Any]:
         # Synchronous on purpose — JWKS verification runs from a sync
         # FastAPI dep, and the JWKS request is tiny. Wrap in
         # asyncio.to_thread if perf ever bites.
-        resp = httpx.get(url, timeout=5.0)
+        # follow_redirects=True is required when BETTER_AUTH_URL points
+        # at a host that 30x-redirects to a canonical hostname (e.g. apex
+        # ↔ www). Without it httpx returns the redirect body (empty) and
+        # JWT verification silently fails on every request — see the
+        # prod-cutover incident on 2026-05-15.
+        resp = httpx.get(url, timeout=5.0, follow_redirects=True)
         resp.raise_for_status()
         doc = resp.json()
     except (httpx.HTTPError, ValueError) as exc:
