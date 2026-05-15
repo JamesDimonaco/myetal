@@ -41,6 +41,8 @@ export interface PresignResponse {
   upload_url: string;
   fields: Record<string, string>;
   file_key: string;
+  /** Content-Type the API signed for — client MUST send the same. */
+  required_content_type: string;
   expires_at: string;
 }
 
@@ -192,11 +194,15 @@ export function runPdfUpload(params: RunUploadParams): {
         presign.upload_url,
         fileUri,
         {
-          httpMethod: 'POST',
-          uploadType: FileSystemUploadType.MULTIPART,
-          fieldName: 'file',
-          mimeType: PDF_MIME,
-          parameters: presign.fields,
+          // PUT-with-binary-body — the API now signs PUT URLs because
+          // Cloudflare R2 returns 501 on presigned POST. See
+          // apps/api/src/myetal_api/services/r2_client.py.
+          httpMethod: 'PUT',
+          uploadType: FileSystemUploadType.BINARY_CONTENT,
+          mimeType: presign.required_content_type ?? PDF_MIME,
+          headers: {
+            'Content-Type': presign.required_content_type ?? PDF_MIME,
+          },
         },
         (data: UploadProgressData) => {
           if (cancelled) return;

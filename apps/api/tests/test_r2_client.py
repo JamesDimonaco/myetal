@@ -31,11 +31,16 @@ def fake_s3() -> Iterator[MagicMock]:
         r2_client._reset_client_for_tests()
 
 
-def test_presign_upload_passes_correct_conditions(fake_s3: MagicMock) -> None:
-    fake_s3.generate_presigned_post.return_value = {
-        "url": "https://example.r2.cloudflarestorage.com/myetal-uploads",
-        "fields": {"key": "pending/abc.pdf", "Content-Type": "application/pdf"},
-    }
+def test_presign_upload_uses_put_url(fake_s3: MagicMock) -> None:
+    """R2 returned 501 on the previous presigned-POST flow; we switched
+    to presigned PUT. Wiring assertions: presign_upload calls
+    generate_presigned_url with put_object + the right Bucket/Key/CT,
+    returns the URL and an empty fields dict (kept for API stability
+    so iterating callers don't crash)."""
+    fake_s3.generate_presigned_url.return_value = (
+        "https://example.r2.cloudflarestorage.com/myetal-uploads/"
+        "pending/abc.pdf?X-Amz-Signature=...&X-Amz-Algorithm=AWS4-HMAC-SHA256"
+    )
 
     result = r2_client.presign_upload(
         key="pending/abc.pdf",
@@ -45,18 +50,16 @@ def test_presign_upload_passes_correct_conditions(fake_s3: MagicMock) -> None:
     )
 
     assert result["url"].startswith("https://")
-    assert result["fields"]["Content-Type"] == "application/pdf"
+    assert result["fields"] == {}
 
-    fake_s3.generate_presigned_post.assert_called_once()
-    kwargs = fake_s3.generate_presigned_post.call_args.kwargs
-    assert kwargs["Key"] == "pending/abc.pdf"
-    assert kwargs["Fields"] == {"Content-Type": "application/pdf"}
+    fake_s3.generate_presigned_url.assert_called_once()
+    kwargs = fake_s3.generate_presigned_url.call_args.kwargs
+    assert kwargs["ClientMethod"] == "put_object"
+    assert kwargs["Params"]["Key"] == "pending/abc.pdf"
+    assert kwargs["Params"]["ContentType"] == "application/pdf"
     assert kwargs["ExpiresIn"] == 300
-    # content-length-range condition baked in (Bug 5 — R2 enforces at
-    # upload time so a malicious client can't post a 1GB body).
-    assert ["content-length-range", 0, 25 * 1024 * 1024] in kwargs["Conditions"]
-    # eq Content-Type condition pinned to the requested mime.
-    assert ["eq", "$Content-Type", "application/pdf"] in kwargs["Conditions"]
+    # Old presigned-POST flow is no longer used.
+    fake_s3.generate_presigned_post.assert_not_called()
 
 
 def test_public_url_concatenates_settings_host(fake_s3: MagicMock) -> None:

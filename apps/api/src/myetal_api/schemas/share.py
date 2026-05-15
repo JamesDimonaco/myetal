@@ -282,15 +282,24 @@ class PdfUploadUrlRequest(BaseModel):
 
 
 class PdfUploadUrlResponse(BaseModel):
-    """Presigned POST policy returned to the client. The client posts a
-    ``multipart/form-data`` body to ``upload_url`` containing every
-    key/value in ``fields`` plus a final ``file`` part with the PDF
-    bytes. ``file_key`` is what the client sends to the record-upload
-    route once R2 returns 204."""
+    """Presigned PUT URL returned to the client. The client sends an
+    HTTP PUT to ``upload_url`` with the raw PDF bytes as the request
+    body and ``Content-Type: <required_content_type>`` as a header.
+    ``file_key`` is what the client sends to the record-upload route
+    once R2 returns 200.
+
+    Switched from presigned POST to presigned PUT after R2 started
+    returning 501 Not Implemented on the multipart-form flow in prod
+    (Cloudflare's POST-object support has had multiple regressions;
+    PUT is well-supported). ``fields`` is retained as an empty dict
+    for transitional callers that still iterate over it before sending,
+    but it always carries no entries now.
+    """
 
     upload_url: str
-    fields: dict[str, str]
+    fields: dict[str, str] = Field(default_factory=dict)
     file_key: str
+    required_content_type: str
     expires_at: datetime
 
 

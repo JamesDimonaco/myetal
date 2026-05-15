@@ -328,8 +328,11 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [shareType, setShareType] = useState<ShareType>(initial?.type ?? 'paper');
+  // Default-on for new shares: the dominant intent is "save and share";
+  // owners who want a draft can untick the Publish toggle before clicking
+  // Save. For existing shares we honour whatever the backend has on file.
   const [publishedAt, setPublishedAt] = useState<string | null>(
-    initial?.published_at ?? null,
+    initial?.published_at ?? (initial ? null : new Date().toISOString()),
   );
   const [items, setItems] = useState<DraftItem[]>(
     initial && initial.items.length
@@ -550,14 +553,14 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         ? await createMutation.mutateAsync(payload)
         : await updateMutation.mutateAsync(payload);
 
-      // First-save auto-publish: the create endpoint produces a draft
-      // (published_at = NULL), which makes both /c/{code} and the QR PNG
-      // return 404 — i.e. the share's URL "doesn't exist" the moment the
-      // user celebrates having saved it. Users overwhelmingly expect Save to
-      // produce a live, shareable share; the discovery toggle on the edit
-      // page is for opting OUT later. So when creating a new share, publish
-      // it in the same flow before opening the QR modal.
-      if (isNew && saved.published_at === null) {
+      // First-save publish: the create endpoint always produces a draft
+      // (published_at = NULL). Honour the in-editor Publish toggle to
+      // decide whether to publish in the same round-trip. Default state
+      // is "on" (see publishedAt initialiser above), so the common case
+      // is: user clicks Save → share is created + published in one go,
+      // QR modal opens against a live URL. Users who deliberately turned
+      // the toggle off get a draft.
+      if (isNew && publishedAt !== null && saved.published_at === null) {
         try {
           saved = await clientApi<typeof saved>(
             `/shares/${saved.id}/publish`,
@@ -751,73 +754,82 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           </div>
         </Field>
 
-        {/* Publish to discovery toggle — only shown for existing shares */}
-        {!isNew ? (
-          <div
+        {/* Publish toggle — shown on both new and existing shares. For new
+            shares, it pre-checks (publishedAt defaulted to a placeholder
+            timestamp at mount) and the post-save flow honours its state
+            instead of always auto-publishing. For existing shares, toggling
+            fires publish / unpublish mutations immediately (optimistic). */}
+        <div
+          className={[
+            'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors',
+            publishedAt
+              ? 'border-accent bg-accent-soft'
+              : 'border-rule bg-paper-soft',
+          ].join(' ')}
+        >
+          <div>
+            <p className="text-sm font-semibold text-ink">
+              {publishedAt ? 'Published' : 'Publish to discovery'}
+            </p>
+            <p className="mt-1 text-sm text-ink-muted">
+              {publishedAt
+                ? 'Visible in search, similar shares, and Google.'
+                : isNew
+                  ? "Off — the share will save as a draft. Anyone with the link won't see it."
+                  : 'Make this share searchable and visible on Google.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={publishedAt !== null}
+            onClick={() => {
+              const previousValue = publishedAt;
+              const newValue = publishedAt
+                ? null
+                : new Date().toISOString();
+              setPublishedAt(newValue);
+
+              // New shares don't exist on the server yet — handleSave
+              // honours `publishedAt` to decide whether to call publish
+              // after create. No mutation to fire here.
+              if (isNew) return;
+
+              // Existing shares: optimistic toggle, revert on error.
+              const mutation = newValue
+                ? publishMutation
+                : unpublishMutation;
+              mutation.mutateAsync().then(
+                () => {
+                  toast.success(
+                    newValue
+                      ? 'Now in discovery'
+                      : 'Hidden from discovery',
+                  );
+                },
+                (err) => {
+                  setPublishedAt(previousValue);
+                  const message =
+                    err instanceof ApiError
+                      ? err.detail
+                      : 'Failed to update discovery status';
+                  toast.error(message);
+                },
+              );
+            }}
             className={[
-              'flex items-start justify-between gap-4 rounded-md border p-4 transition-colors',
-              publishedAt
-                ? 'border-accent bg-accent-soft'
-                : 'border-rule bg-paper-soft',
+              'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition',
+              publishedAt ? 'bg-accent' : 'bg-ink-faint',
             ].join(' ')}
           >
-            <div>
-              <p className="text-sm font-semibold text-ink">
-                {publishedAt ? 'Published' : 'Publish to discovery'}
-              </p>
-              <p className="mt-1 text-sm text-ink-muted">
-                {publishedAt
-                  ? 'Visible in search, similar shares, and Google.'
-                  : 'Make this share searchable and visible on Google.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={publishedAt !== null}
-              onClick={() => {
-                // Optimistic update — toggle immediately, revert on error
-                const previousValue = publishedAt;
-                const newValue = publishedAt
-                  ? null
-                  : new Date().toISOString();
-                setPublishedAt(newValue);
-
-                const mutation = newValue
-                  ? publishMutation
-                  : unpublishMutation;
-                mutation.mutateAsync().then(
-                  () => {
-                    toast.success(
-                      newValue
-                        ? 'Now in discovery'
-                        : 'Hidden from discovery',
-                    );
-                  },
-                  (err) => {
-                    setPublishedAt(previousValue);
-                    const message =
-                      err instanceof ApiError
-                        ? err.detail
-                        : 'Failed to update discovery status';
-                    toast.error(message);
-                  },
-                );
-              }}
+            <span
               className={[
-                'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition',
-                publishedAt ? 'bg-accent' : 'bg-ink-faint',
+                'inline-block h-5 w-5 transform rounded-full bg-paper shadow transition',
+                publishedAt ? 'translate-x-5' : 'translate-x-0.5',
               ].join(' ')}
-            >
-              <span
-                className={[
-                  'inline-block h-5 w-5 transform rounded-full bg-paper shadow transition',
-                  publishedAt ? 'translate-x-5' : 'translate-x-0.5',
-                ].join(' ')}
-              />
-            </button>
-          </div>
-        ) : null}
+            />
+          </button>
+        </div>
 
         {/* Quick-access QR button — edit mode only, lets you view the QR
             without re-saving. */}
