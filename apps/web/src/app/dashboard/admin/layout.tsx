@@ -27,7 +27,9 @@ export const dynamic = 'force-dynamic';
 const ADMIN_NAV: Array<{ href: string; label: string }> = [
   { href: '/dashboard/admin', label: 'Overview' },
   { href: '/dashboard/admin/users', label: 'Users' },
+  { href: '/dashboard/admin/shares', label: 'Shares' },
   { href: '/dashboard/admin/reports', label: 'Reports' },
+  { href: '/dashboard/admin/system', label: 'System' },
 ];
 
 export default async function AdminLayout({

@@ -208,3 +208,159 @@ export interface AdminActionResponse {
   audit_id: string;
   message: string;
 }
+
+// ---- Stage 3: shares -------------------------------------------------------
+
+export type AdminShareFilter = 'all' | 'published' | 'draft' | 'tombstoned';
+export type AdminShareSort = 'created_desc' | 'created_asc' | 'views_30d_desc';
+export type AdminShareAgeBucket = 'all' | '7d' | '30d' | '90d' | 'older';
+
+export interface AdminShareListItem {
+  id: string;
+  short_code: string;
+  name: string;
+  type: string;
+  owner_user_id: string;
+  owner_email: string | null;
+  owner_name: string | null;
+  is_public: boolean;
+  published_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  item_count: number;
+  view_count_30d: number;
+  tag_slugs: string[];
+}
+
+export interface AdminShareListResponse {
+  items: AdminShareListItem[];
+  next_cursor: string | null;
+  total: number;
+}
+
+export interface AdminShareItemOut {
+  id: string;
+  kind: string;
+  title: string;
+  subtitle: string | null;
+  url: string | null;
+  doi: string | null;
+  authors: string | null;
+  year: number | null;
+  notes: string | null;
+  file_url: string | null;
+  file_size_bytes: number | null;
+  file_mime: string | null;
+  thumbnail_url: string | null;
+  copyright_ack_at: string | null;
+}
+
+export interface AdminShareReport {
+  id: string;
+  reporter_user_id: string | null;
+  reason: string;
+  details: string | null;
+  status: string;
+  created_at: string;
+  actioned_at: string | null;
+  actioned_by: string | null;
+}
+
+export interface AdminSimilarShareSnapshot {
+  similar_share_id: string;
+  short_code: string;
+  name: string;
+  papers_in_common: number;
+  refreshed_at: string;
+}
+
+export interface AdminShareTag {
+  slug: string;
+  label: string;
+}
+
+export interface AdminShareDetail {
+  id: string;
+  short_code: string;
+  name: string;
+  description: string | null;
+  type: string;
+  is_public: boolean;
+  published_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_user_id: string;
+  owner_email: string | null;
+  owner_name: string | null;
+  item_count: number;
+  view_count_total: number;
+  view_count_7d: number;
+  view_count_30d: number;
+  items: AdminShareItemOut[];
+  tags: AdminShareTag[];
+  daily_views_90d: AdminDailyBucket[];
+  reports: AdminShareReport[];
+  similar_snapshot: AdminSimilarShareSnapshot[];
+  audit: AdminAuditEntry[];
+}
+
+// ---- Stage 4: system metrics ----------------------------------------------
+
+export interface AdminSystemRouteMetric {
+  route_prefix: string;
+  request_count: number;
+  error_count: number;
+  p_error: number;
+}
+
+export interface AdminSystemScriptRun {
+  name: string;
+  last_run_at: string | null;
+  duration_ms: number | null;
+  row_count: number | null;
+  next_run_schedule: string;
+  last_status: string | null;
+}
+
+export interface AdminSystemDbPool {
+  in_use: number;
+  size: number;
+  overflow: number;
+  slow_query_count_1h: number | null;
+}
+
+export interface AdminSystemR2Prefix {
+  prefix: string;
+  object_count: number;
+  bytes: number;
+}
+
+export interface AdminSystemR2Storage {
+  total_objects: number;
+  total_bytes: number;
+  by_prefix: AdminSystemR2Prefix[];
+  fetched_at: string;
+  cached: boolean;
+}
+
+export interface AdminSystemAuthProvider {
+  provider: string;
+  attempts_24h: number;
+  completions_24h: number;
+}
+
+export interface AdminSystemAuthHealth {
+  providers: AdminSystemAuthProvider[];
+  placeholder: boolean;
+  note: string | null;
+}
+
+export interface AdminSystemMetricsResponse {
+  routes_24h: AdminSystemRouteMetric[];
+  scripts: AdminSystemScriptRun[];
+  db_pool: AdminSystemDbPool;
+  r2: AdminSystemR2Storage;
+  auth: AdminSystemAuthHealth;
+  generated_at: string;
+}
