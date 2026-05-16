@@ -210,10 +210,14 @@ function ConfirmDialog({
                 rows={3}
                 placeholder="e.g. DMCA takedown 2026-05-11 — Springer Nature"
                 aria-label="Tombstone reason"
+                aria-describedby="tombstone-reason-hint"
                 className="mt-1 w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:outline-none"
               />
             </label>
-            <p className="mt-1 text-xs text-ink-faint">
+            <p
+              id="tombstone-reason-hint"
+              className="mt-1 text-xs text-ink-faint"
+            >
               3–500 characters. Stored in the audit log; visible to all
               admins.
             </p>

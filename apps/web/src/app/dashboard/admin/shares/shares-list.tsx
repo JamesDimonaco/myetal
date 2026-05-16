@@ -264,6 +264,7 @@ export function SharesList({
             type="button"
             onClick={loadMore}
             disabled={loading}
+            aria-busy={loading}
             className="rounded-md border border-rule bg-paper px-4 py-2 text-sm text-ink hover:bg-paper-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
           >
             {loading ? 'Loading…' : 'Load more'}

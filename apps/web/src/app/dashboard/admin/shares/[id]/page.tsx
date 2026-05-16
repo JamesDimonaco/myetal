@@ -158,7 +158,10 @@ export default async function AdminShareDetailPage({
         </div>
 
         {/* Right rail: actions */}
-        <aside className="lg:sticky lg:top-6">
+        <aside
+          aria-label="Share moderation actions"
+          className="lg:sticky lg:top-6"
+        >
           <ShareActions detail={detail} />
         </aside>
       </div>

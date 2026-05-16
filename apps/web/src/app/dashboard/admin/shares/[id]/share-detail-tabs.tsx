@@ -27,7 +27,11 @@ export function ShareDetailTabs({ detail }: { detail: AdminShareDetail }) {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 border-b border-rule">
+      {/* Horizontal scroll on overflow (mirrors AdminSubNav). flex-wrap
+          used to push the active-tab underline above the lower row when
+          tab labels wrapped at 375px width — the underline read as
+          detached from the section's bottom border. */}
+      <div className="flex gap-1 overflow-x-auto border-b border-rule">
         <TabButton
           active={tab === 'items'}
           onClick={() => setTab('items')}

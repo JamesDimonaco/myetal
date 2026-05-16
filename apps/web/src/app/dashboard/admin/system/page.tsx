@@ -127,8 +127,11 @@ export default async function AdminSystemPage() {
         <h2 className="font-serif text-xl text-ink">Auth health</h2>
         {metrics.auth.placeholder ? (
           <div
+            // role="note" not "status": the banner is server-rendered
+            // static copy, not a live region. Using role="status" would
+            // re-announce it on every page revisit for SR users.
             className="mt-3 rounded-md border border-rule bg-paper-soft p-4 text-sm text-ink-muted"
-            role="status"
+            role="note"
           >
             <p className="font-medium text-ink">
               Approximated — wire BA event hook before this surface lights
