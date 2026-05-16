@@ -24,9 +24,14 @@ import type { AdminDailyBucket } from '@/types/admin';
 export function GrowthCharts({
   data,
   fill,
+  label,
 }: {
   data: AdminDailyBucket[];
   fill: string;
+  /** Short SR-only summary of what the chart shows. The caller already
+   *  renders a visible heading; this is read INSTEAD of silence for
+   *  screen-reader users since recharts emits unlabelled SVG. */
+  label: string;
 }) {
   // Show only month-day on the x-axis to keep ticks readable in the small
   // chart frame. The full date is in the tooltip.
@@ -35,9 +40,32 @@ export function GrowthCharts({
     return { ...d, label: `${m}/${day}` };
   });
 
+  // Compose a one-sentence summary for the SR fallback: total, peak, and
+  // when the peak landed. recharts ≥2.12 honours `accessibilityLayer` +
+  // `role` / `aria-label` props directly on chart components, which we
+  // pass below. The figcaption is the belt to the accessibilityLayer
+  // braces — guarantees SR users get the data even on older Safari /
+  // screen-reader combos that don't read `aria-label` on SVG.
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  const peak = data.reduce(
+    (acc, d) => (d.count > acc.count ? d : acc),
+    { date: '', count: 0 },
+  );
+  const summary = peak.count
+    ? `${label}: ${total} total, peak ${peak.count} on ${peak.date}.`
+    : `${label}: no activity in window.`;
+
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={formatted} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+    <figure className="h-full w-full" role="group" aria-label={label}>
+      <figcaption className="sr-only">{summary}</figcaption>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={formatted}
+          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          accessibilityLayer
+          role="img"
+          aria-label={summary}
+        >
         <CartesianGrid stroke="var(--color-rule)" strokeDasharray="3 3" vertical={false} />
         <XAxis
           dataKey="label"
@@ -70,8 +98,9 @@ export function GrowthCharts({
             return entry?.date ?? '';
           }}
         />
-        <Bar dataKey="count" fill={fill} radius={[2, 2, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+          <Bar dataKey="count" fill={fill} radius={[2, 2, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </figure>
   );
 }

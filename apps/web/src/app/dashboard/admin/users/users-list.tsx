@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { clientApi } from '@/lib/client-api';
 import { formatRelativeTime } from '@/lib/format';
@@ -44,6 +45,12 @@ export function UsersList({
   );
   const [total, setTotal] = useState<number>(initialPage.total);
   const [loading, setLoading] = useState(false);
+  // Request token, bumped on every search/filter/sort fetch kickoff.
+  // Both the search effect AND `loadMore` capture the current value at
+  // the start of their async work and bail on resolve if the token has
+  // moved on. Prevents a stale `loadMore` append after the user changed
+  // filter mid-flight (race flagged by the functional reviewer).
+  const requestTokenRef = useRef(0);
 
   // Search debounce
   useEffect(() => {
@@ -61,6 +68,7 @@ export function UsersList({
     if (debounced) params.set('q', debounced);
     if (filter !== 'all') params.set('filter', filter);
     if (sort !== 'created_desc') params.set('sort', sort);
+    const token = ++requestTokenRef.current;
     let cancelled = false;
     void (async () => {
       setLoading(true);
@@ -68,14 +76,24 @@ export function UsersList({
         const page = await clientApi<AdminUserListResponse>(
           `/admin/users${params.toString() ? `?${params}` : ''}`,
         );
-        if (cancelled) return;
+        if (cancelled || token !== requestTokenRef.current) return;
         setItems(page.items);
         setNextCursor(page.next_cursor);
         setTotal(page.total);
-      } catch {
-        // Keep stale data on error; the page header still works.
+      } catch (err) {
+        if (cancelled || token !== requestTokenRef.current) return;
+        // Keep stale data on error so the operator still has something
+        // to act on, but surface the failure — the previous silent
+        // catch left admins guessing whether the page was up to date.
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : 'Failed to refresh users list';
+        toast.error(message);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && token === requestTokenRef.current) {
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -83,7 +101,9 @@ export function UsersList({
     };
   }, [debounced, filter, sort]);
 
-  // Append next page on "load more"
+  // Append next page on "load more". Token-gated so a slow loadMore
+  // response that lands after the user changed filter doesn't append
+  // stale-filter rows on top of the new-filter list.
   const loadMore = async () => {
     if (!nextCursor || loading) return;
     const params = new URLSearchParams();
@@ -91,15 +111,24 @@ export function UsersList({
     if (filter !== 'all') params.set('filter', filter);
     if (sort !== 'created_desc') params.set('sort', sort);
     params.set('cursor', nextCursor);
+    const token = requestTokenRef.current;
     setLoading(true);
     try {
       const page = await clientApi<AdminUserListResponse>(
         `/admin/users?${params}`,
       );
+      if (token !== requestTokenRef.current) return;
       setItems((existing) => [...existing, ...page.items]);
       setNextCursor(page.next_cursor);
+    } catch (err) {
+      if (token !== requestTokenRef.current) return;
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to load more users';
+      toast.error(message);
     } finally {
-      setLoading(false);
+      if (token === requestTokenRef.current) setLoading(false);
     }
   };
 
@@ -142,31 +171,52 @@ export function UsersList({
       {/* Search + sort */}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <label className="relative flex-1 min-w-[240px]">
+          <span className="sr-only">Search users</span>
           <input
-            type="text"
+            type="search"
             placeholder="Search email, name, or ORCID iD…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search users"
             className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:outline-none"
           />
         </label>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as AdminUserSort)}
-          className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
-        >
-          <option value="created_desc">Newest first</option>
-          <option value="created_asc">Oldest first</option>
-          <option value="last_seen_desc">Recently active</option>
-        </select>
+        <label>
+          <span className="sr-only">Sort users</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as AdminUserSort)}
+            aria-label="Sort users"
+            className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink"
+          >
+            <option value="created_desc">Newest first</option>
+            <option value="created_asc">Oldest first</option>
+            <option value="last_seen_desc">Recently active</option>
+          </select>
+        </label>
         <span className="text-xs text-ink-faint">
           {items.length} of {total.toLocaleString()}
         </span>
       </div>
 
-      {/* Table */}
-      <div className="mt-6 overflow-x-auto rounded-md border border-rule">
+      {/* Table — aria-live + aria-busy lets SR users hear when the row
+          set changes (debounced type-search would otherwise silently
+          mutate underneath them). The sr-only summary below restates
+          the count after each refetch. */}
+      <div
+        className="mt-6 overflow-x-auto rounded-md border border-rule"
+        aria-live="polite"
+        aria-busy={loading}
+      >
+        <p className="sr-only" aria-live="polite">
+          {loading
+            ? 'Loading users…'
+            : `${items.length} of ${total.toLocaleString()} users match.`}
+        </p>
         <table className="w-full text-sm">
+          <caption className="sr-only">
+            User accounts (filterable, sortable). Click a row to view detail.
+          </caption>
           <thead>
             <tr className="border-b border-rule bg-paper-soft text-left text-xs uppercase tracking-wider text-ink-muted">
               <th className="px-4 py-3 font-medium">User</th>
@@ -222,7 +272,8 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+      aria-pressed={active}
+      className={`rounded-full px-3 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
         active
           ? 'bg-ink text-paper'
           : 'border border-rule bg-paper text-ink-muted hover:border-ink/40 hover:text-ink'

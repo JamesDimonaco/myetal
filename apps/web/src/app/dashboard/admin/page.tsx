@@ -43,7 +43,7 @@ export default async function AdminOverviewPage() {
             Platform overview
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
-            How is MyEtAl doing right now. Refreshes every minute.
+            How is MyEtAl doing right now. Refresh the page to recompute.
           </p>
         </div>
         <p className="text-xs text-ink-faint">
@@ -79,10 +79,18 @@ export default async function AdminOverviewPage() {
       {/* ---- Growth charts ------------------------------------------------- */}
       <section className="mt-12 grid gap-6 lg:grid-cols-2">
         <ChartCard title="Daily signups (30d)">
-          <GrowthCharts data={growth.daily_signups_30d} fill="var(--color-accent)" />
+          <GrowthCharts
+            data={growth.daily_signups_30d}
+            fill="var(--color-accent)"
+            label="Daily signups over the last 30 days"
+          />
         </ChartCard>
         <ChartCard title="Daily share creates (30d)">
-          <GrowthCharts data={growth.daily_share_creates_30d} fill="var(--color-ink)" />
+          <GrowthCharts
+            data={growth.daily_share_creates_30d}
+            fill="var(--color-ink-muted)"
+            label="Daily share creates over the last 30 days"
+          />
         </ChartCard>
       </section>
 
@@ -241,6 +249,9 @@ export default async function AdminOverviewPage() {
         </div>
         <div className="mt-6 rounded-md border border-rule">
           <table className="w-full text-sm">
+            <caption className="sr-only">
+              Top Postgres tables by on-disk size.
+            </caption>
             <thead>
               <tr className="border-b border-rule bg-paper-soft text-left text-xs uppercase tracking-wider text-ink-muted">
                 <th className="px-4 py-2 font-medium">Top Postgres tables</th>

@@ -1,9 +1,10 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
+
+import { AdminSubNav } from './admin-sub-nav';
 
 /**
  * Admin section layout — wraps every `/dashboard/admin/*` page with a
@@ -54,17 +55,7 @@ export default async function AdminLayout({
         <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
           Admin
         </p>
-        <nav className="mt-2 flex flex-wrap gap-1 text-sm">
-          {ADMIN_NAV.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-md px-3 py-1.5 text-ink-muted transition hover:bg-paper-soft hover:text-ink"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        <AdminSubNav links={ADMIN_NAV} />
       </div>
       <div className="mt-8">{children}</div>
     </div>
