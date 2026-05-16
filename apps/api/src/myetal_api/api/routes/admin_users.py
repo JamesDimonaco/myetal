@@ -23,7 +23,6 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from sqlalchemy import select
 
 from myetal_api.api.deps import AdminUser, DbSession
 from myetal_api.api.routes.admin import reset_overview_cache

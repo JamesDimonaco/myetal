@@ -27,10 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.core.config import settings
 from myetal_api.models import (
-    Account,
     AdminAudit,
     Session,
-    Share,
     User,
 )
 from myetal_api.schemas.share import ShareCreate
@@ -159,7 +157,11 @@ async def test_users_list_pagination_emits_cursor(
     flaky in-process doesn't bite Postgres in prod (proper TIMESTAMPTZ
     comparison) — see `_encode_cursor` notes.
     """
-    admin = await _admin(db_session)
+    # Admin row is created for symmetry with the other tests in this
+    # module (the service doesn't require an admin to be present, but
+    # the fixture invariant is "an admin exists when admin endpoints
+    # are exercised").
+    await _admin(db_session)
     # Force the page to be small so we exercise the cursor path.
     for i in range(5):
         await make_user(db_session, email=f"u{i}@example.com")

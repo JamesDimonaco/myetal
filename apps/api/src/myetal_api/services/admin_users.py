@@ -20,7 +20,7 @@ from __future__ import annotations
 import base64
 import binascii
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import desc, func, or_, select
@@ -239,9 +239,7 @@ def _has_deleted_at(model_cls: type[User]):
     not exist at import time on a stale checkout — return ``False`` so
     the filter silently no-ops rather than 500ing.
     """
-    return getattr(model_cls, "deleted_at", None) is not None and getattr(
-        model_cls, "deleted_at"
-    ).is_not(None)
+    return getattr(model_cls, "deleted_at", None) is not None and model_cls.deleted_at.is_not(None)
 
 
 def _get_deleted_at(user: User) -> datetime | None:
@@ -527,7 +525,7 @@ async def soft_delete_user(db: AsyncSession, user: User) -> None:
     supports it).
     """
     now = datetime.now(UTC)
-    setattr(user, "deleted_at", now)
+    user.deleted_at = now
 
     # Cascade-tombstone shares (per ticket: "tombstones all their shares").
     shares = (

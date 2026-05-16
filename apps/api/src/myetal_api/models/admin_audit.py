@@ -88,9 +88,9 @@ class AdminAudit(Base):
         index=True,
     )
 
-    admin: Mapped["User"] = relationship(foreign_keys=[admin_user_id])
-    target_user: Mapped["User | None"] = relationship(foreign_keys=[target_user_id])
-    target_share: Mapped["Share | None"] = relationship(foreign_keys=[target_share_id])
+    admin: Mapped[User] = relationship(foreign_keys=[admin_user_id])
+    target_user: Mapped[User | None] = relationship(foreign_keys=[target_user_id])
+    target_share: Mapped[Share | None] = relationship(foreign_keys=[target_share_id])
 
     __table_args__ = (
         # Read pattern on user detail page: "audit log for this user,

@@ -14,7 +14,7 @@ recent / storage. Tests cover:
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.api.routes.admin import _reset_overview_cache_for_tests
 from myetal_api.core.config import settings
-from myetal_api.models import Feedback, Share, ShareItem, ShareReport, ShareReportReason, ShareView
+from myetal_api.models import Feedback, ShareItem, ShareReport, ShareReportReason, ShareView
 from myetal_api.schemas.share import ShareCreate
 from myetal_api.services import share as share_service
 from tests.conftest import make_user, signed_jwt
