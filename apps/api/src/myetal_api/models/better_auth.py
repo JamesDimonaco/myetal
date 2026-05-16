@@ -98,6 +98,15 @@ class User(Base):
     last_orcid_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Admin soft-delete (Stage 2 of `admin-analytics-dashboard.md`). NULL =
+    # active. Flipping this excludes the user from search/list paths AND
+    # tombstones every share they own in the same transaction. Reversible —
+    # null it back to undo.
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
 
     # Relationships -----------------------------------------------------------
     # Federated identities + password rows live in Better Auth's

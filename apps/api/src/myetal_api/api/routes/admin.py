@@ -1,30 +1,100 @@
-"""/admin/* — minimal moderation surface.
+"""/admin/* — overview dashboard + moderation surface.
 
-Per discovery ticket D16. Currently just the take-down/abuse report queue
-(GET list, POST action). All routes gated by `AdminUser` dep — email
-allowlist via `settings.admin_emails`.
+Stage 1 of `docs/tickets/to-do/admin-analytics-dashboard.md` lives in
+this file (`GET /admin/overview`); Stage 2 user management lives in
+`api/routes/admin_users.py`. The legacy moderation queue
+(`GET /admin/reports`, `POST /admin/reports/{id}/action`) stays here —
+the ticket's Stage 3 will absorb it into a wider share-moderation
+section, but for v1 it keeps working as-is.
 
-This is intentionally bare — at this stage of the product the admin is
-the dev (James). Once we have multiple admins or actual abuse volume,
-the right move is a proper admin UI (separate Next.js app, role-based
-permissions, audit log per action). For v1: a JSON queue and a button.
+All routes are gated by ``AdminUser`` (email allowlist via
+``settings.admin_emails`` — see ``api/deps.py::require_admin``) and
+rate-limited at ``ADMIN_LIMIT`` to defend against compromised admin
+tokens.
 """
 
 from __future__ import annotations
 
+import time
 import uuid
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from myetal_api.api.deps import AdminUser, DbSession
+from myetal_api.core.rate_limit import authed_user_key, limiter
 from myetal_api.models import Share, ShareReport, ShareReportReason, ShareReportStatus
+from myetal_api.schemas.admin import OverviewResponse
+from myetal_api.services import admin_audit as admin_audit_service
+from myetal_api.services import admin_overview as overview_service
 from myetal_api.services import share as share_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+# Rate limit chosen per the ticket ("600/min/admin"). slowapi can't currently
+# resolve a per-user key without a Request param being explicit on every route
+# handler, so each handler that opts in declares it directly.
+ADMIN_LIMIT = "600/minute"
+
+
+# ---- Overview (Stage 1) -----------------------------------------------------
+
+# In-process TTL cache. 60-second window per the ticket; the dashboard is
+# read-heavy and the underlying COUNT(*) WHERE… queries are index-friendly
+# but still touch every published row, so caching saves real planner work
+# under refresh-storms.
+_OVERVIEW_CACHE: dict[str, Any] = {"at": 0.0, "payload": None}
+_OVERVIEW_TTL_SECONDS = 60.0
+
+
+@router.get("/overview", response_model=OverviewResponse)
+@limiter.limit(ADMIN_LIMIT, key_func=authed_user_key)
+async def get_overview(
+    request: Request,
+    response: Response,
+    _admin: AdminUser,
+    db: DbSession,
+) -> dict[str, Any]:
+    """Return the Stage 1 overview payload in one shot."""
+    now = time.monotonic()
+    if (
+        _OVERVIEW_CACHE["payload"] is not None
+        and now - _OVERVIEW_CACHE["at"] < _OVERVIEW_TTL_SECONDS
+    ):
+        # Surface cache-hit through a Cache-Control header so a reverse
+        # proxy could in theory short-circuit too. We're not behind one
+        # for the admin path today, so the in-process cache is doing the
+        # real work.
+        response.headers["Cache-Control"] = (
+            f"private, max-age={int(_OVERVIEW_TTL_SECONDS)}"
+        )
+        return _OVERVIEW_CACHE["payload"]
+
+    payload = await overview_service.build_overview(db)
+    _OVERVIEW_CACHE["at"] = now
+    _OVERVIEW_CACHE["payload"] = payload
+    response.headers["Cache-Control"] = (
+        f"private, max-age={int(_OVERVIEW_TTL_SECONDS)}"
+    )
+    return payload
+
+
+def _reset_overview_cache_for_tests() -> None:
+    """Test hook — flushes the in-memory TTL cache.
+
+    Test fixtures create + verify counts within a single second; the
+    cache would otherwise hand them stale zeros across subsequent
+    requests. Mirrors the same-named helpers in `share_view_dedup.py`
+    and `ba_security.py`.
+    """
+    _OVERVIEW_CACHE["at"] = 0.0
+    _OVERVIEW_CACHE["payload"] = None
+
+
+# ---- Moderation queue (legacy — same shape as PR-D / D16) ------------------
 
 
 class ReportOut(BaseModel):
@@ -63,7 +133,9 @@ class ReportAction(BaseModel):
 
 
 @router.get("/reports", response_model=list[ReportOut])
+@limiter.limit(ADMIN_LIMIT, key_func=authed_user_key)
 async def list_reports(
+    request: Request,
     _admin: AdminUser,
     db: DbSession,
     status_filter: ShareReportStatus | None = Query(
@@ -100,7 +172,9 @@ async def list_reports(
 
 
 @router.post("/reports/{report_id}/action", response_model=ReportOut)
+@limiter.limit(ADMIN_LIMIT, key_func=authed_user_key)
 async def action_report(
+    request: Request,
     report_id: uuid.UUID,
     body: ReportAction,
     admin: AdminUser,
@@ -126,12 +200,27 @@ async def action_report(
             detail="report's share no longer exists",
         )
 
+    tombstoned = False
     if body.tombstone_share and share.deleted_at is None:
         await share_service.tombstone_share(db, share)
+        tombstoned = True
 
     report.status = ShareReportStatus(body.decision)
     report.actioned_at = datetime.now(UTC)
     report.actioned_by = admin.id
+
+    # Audit row — single transaction with the status flip.
+    await admin_audit_service.record_action(
+        db,
+        admin_user_id=admin.id,
+        action="action_report",
+        target_share_id=share.id,
+        details={
+            "decision": body.decision,
+            "tombstoned": tombstoned,
+            "report_id": str(report.id),
+        },
+    )
     await db.commit()
     await db.refresh(report)
     await db.refresh(share)

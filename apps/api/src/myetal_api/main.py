@@ -5,6 +5,7 @@ from slowapi.errors import RateLimitExceeded
 
 from myetal_api import __version__
 from myetal_api.api.routes import admin as admin_routes
+from myetal_api.api.routes import admin_users as admin_users_routes
 from myetal_api.api.routes import feedback as feedback_routes
 from myetal_api.api.routes import health as health_routes
 from myetal_api.api.routes import me as me_routes
@@ -59,3 +60,4 @@ app.include_router(reports_routes.router)
 app.include_router(works_routes.router)
 app.include_router(feedback_routes.router)
 app.include_router(admin_routes.router)
+app.include_router(admin_users_routes.router)

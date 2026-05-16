@@ -47,6 +47,8 @@ def test_all_tables_registered_on_metadata() -> None:
         "account",
         "verification",
         "jwks",
+        # `admin_audit` — Stage 2 of admin-analytics-dashboard ticket.
+        "admin_audit",
     }
 
 

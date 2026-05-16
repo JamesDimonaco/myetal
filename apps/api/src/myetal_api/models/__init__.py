@@ -1,3 +1,4 @@
+from myetal_api.models.admin_audit import AdminAudit
 from myetal_api.models.base import Base
 from myetal_api.models.better_auth import Account, Jwks, Session, User, Verification
 from myetal_api.models.feedback import Feedback, FeedbackType
@@ -14,6 +15,7 @@ from myetal_api.models.user_paper import UserPaper, UserPaperAddedVia
 
 __all__ = [
     "Account",
+    "AdminAudit",
     "Base",
     "Feedback",
     "FeedbackType",
