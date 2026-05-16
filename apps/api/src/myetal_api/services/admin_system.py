@@ -154,7 +154,10 @@ async def _db_pool(db: AsyncSession) -> dict[str, Any]:
         in_use = int(getattr(pool, "checkedout", lambda: 0)() or 0)
         size = int(getattr(pool, "size", lambda: 0)() or 0)
         try:
-            overflow = int(pool.overflow())  # type: ignore[attr-defined]
+            # SQLAlchemy's AsyncAdaptedQueuePool.overflow() can return -1
+            # under low load (current - max_overflow). The UI surfaces
+            # this verbatim and "Overflow: -1" reads as a bug. Clamp.
+            overflow = max(0, int(pool.overflow()))  # type: ignore[attr-defined]
         except (AttributeError, TypeError):
             overflow = 0
     return {
@@ -186,12 +189,23 @@ def _r2_storage_uncached() -> dict[str, Any]:
     total_bytes = 0
     by_prefix: dict[str, dict[str, int]] = {}
 
+    # Hard cap on LIST pages: each page is up to 1000 keys, so 50 pages
+    # = 50,000 keys. On a bucket with N > 50k objects we report the
+    # truncated tally + `truncated=True`; the dashboard surfaces a
+    # subtle "≥" prefix and the prod admin team should move the tally
+    # to a periodic background job. Without this cap a cold cache miss
+    # on a 1M-object bucket would block the admin request for ~1k
+    # sequential round-trips (~30s+) before responding.
+    _MAX_LIST_PAGES = 50
+    truncated = False
     continuation: str | None = None
+    pages = 0
     while True:
         kwargs: dict[str, Any] = {"Bucket": bucket}
         if continuation:
             kwargs["ContinuationToken"] = continuation
         response = s3.list_objects_v2(**kwargs)
+        pages += 1
         for obj in response.get("Contents", []) or []:
             key = obj.get("Key", "")
             size = int(obj.get("Size", 0) or 0)
@@ -208,6 +222,9 @@ def _r2_storage_uncached() -> dict[str, Any]:
         continuation = response.get("NextContinuationToken")
         if not continuation:
             break
+        if pages >= _MAX_LIST_PAGES:
+            truncated = True
+            break
 
     return {
         "total_objects": total_objects,
@@ -218,6 +235,7 @@ def _r2_storage_uncached() -> dict[str, Any]:
         ],
         "fetched_at": datetime.now(UTC),
         "cached": False,
+        "truncated": truncated,
     }
 
 

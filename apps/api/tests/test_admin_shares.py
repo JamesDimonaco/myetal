@@ -458,9 +458,17 @@ async def test_unpublish_clears_published_at_and_audits(
     assert any(a.action == "unpublish_share" for a in audit)
 
 
-async def test_unpublish_rejects_draft(
+async def test_unpublish_on_draft_is_idempotent(
     db_session: AsyncSession, api_client: TestClient
 ) -> None:
+    """Calling unpublish on an already-draft share is a logged no-op.
+
+    Previously the route 409'd, which mismatched the UI (the button is
+    hidden when the share is already a draft) and meant a forged
+    direct hit left no audit trail. The functional reviewer flagged
+    this. Now: 200 with `noop=True` in audit details, share state
+    unchanged, audit row recorded so the attempt is durable.
+    """
     admin = await _admin(db_session)
     owner = await make_user(db_session, email="owner@example.com")
     share = await _share_owned_by(db_session, owner)  # not published
@@ -468,7 +476,17 @@ async def test_unpublish_rejects_draft(
         f"/admin/shares/{share.id}/unpublish",
         headers=_admin_headers(admin),
     )
-    assert r.status_code == 409
+    assert r.status_code == 200
+    body = r.json()
+    assert "already unpublished" in body["message"].lower()
+    audits = (
+        await db_session.execute(
+            select(AdminAudit).where(AdminAudit.target_share_id == share.id)
+        )
+    ).scalars().all()
+    assert len(audits) == 1
+    assert audits[0].action == "unpublish_share"
+    assert audits[0].details.get("noop") is True
 
 
 # ---- Rebuild similar -------------------------------------------------------

@@ -105,7 +105,15 @@ class RequestMetricsMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             elapsed_ms = int((time.perf_counter() - start) * 1000)
-            await _record(prefix, status_code, elapsed_ms)
+            # Defensive wrap: _record is async-locked + does a dict bump,
+            # so it's practically inert, but if it ever raised the
+            # exception would propagate out of `finally` and lose the
+            # response. Operational telemetry must never break the
+            # request hot path.
+            try:
+                await _record(prefix, status_code, elapsed_ms)
+            except Exception:
+                logger.exception("RequestMetricsMiddleware._record failed")
 
 
 async def _record(prefix: str, status_code: int, elapsed_ms: int) -> None:

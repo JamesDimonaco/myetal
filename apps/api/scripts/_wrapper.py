@@ -31,6 +31,7 @@ down the work.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -45,6 +46,27 @@ from myetal_api.models import ScriptRun
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+# Cheap defence-in-depth: scrub anything that looks like a secret (DB
+# connection strings, AWS-style key=value pairs, bearer tokens) out of
+# the exception text before persisting to script_runs.error. The audit
+# row isn't currently exposed via the admin API, but a postgres exception
+# can embed `password=...` from the DSN and we'd rather not write that
+# even to a column that's only readable by admins.
+_SECRET_PATTERNS = (
+    re.compile(r"(password|passwd|pwd)\s*=\s*\S+", re.IGNORECASE),
+    re.compile(r"(secret|token|api[_-]?key)\s*=\s*\S+", re.IGNORECASE),
+    re.compile(r"://[^/@:]+:[^/@]+@", re.IGNORECASE),  # user:pass@host
+    re.compile(r"\bBearer\s+[A-Za-z0-9._\-]+", re.IGNORECASE),
+)
+
+
+def _scrub_error_text(text: str) -> str:
+    """Best-effort secret redaction. Replaces matches with [REDACTED]."""
+    out = text
+    for pat in _SECRET_PATTERNS:
+        out = pat.sub("[REDACTED]", out)
+    return out
 
 
 async def run_script(name: str, body: Callable[[], Awaitable[int]]) -> int:
@@ -99,7 +121,7 @@ async def run_script(name: str, body: Callable[[], Awaitable[int]]) -> int:
                         row.finished_at = datetime.now(UTC)
                         row.duration_ms = elapsed_ms
                         row.status = "failed"
-                        row.error = str(exc)[:1000]
+                        row.error = _scrub_error_text(str(exc))[:1000]
                         await session.commit()
             except Exception as inner:  # noqa: BLE001
                 logger.warning("script_runs failure-finalise blew up: %s", inner)

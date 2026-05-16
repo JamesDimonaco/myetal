@@ -195,28 +195,41 @@ async def unpublish(
     admin: AdminUser,
     db: DbSession,
 ) -> AdminActionResponse:
-    """Drop from discovery — keep the URL alive (no tombstone)."""
+    """Drop from discovery — keep the URL alive (no tombstone).
+
+    Idempotent: calling on an already-unpublished share writes an
+    audit row (so the attempt is logged) and returns 200 with a
+    `noop=True` flag in the details. Previously this 409'd, which
+    mismatched the UI (the button is hidden when the share is already
+    a draft) so a forged request got an unlogged 409.
+    """
     share = await _load_share(db, share_id)
-    if share.published_at is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="share is not published",
-        )
+    # Capture BEFORE the mutator runs so the audit detail is correct
+    # even if the service is later refactored.
     previous = share.published_at.isoformat() if share.published_at else None
-    await admin_shares_service.unpublish_share_row(db, share)
+    already_unpublished = share.published_at is None
+    if not already_unpublished:
+        await admin_shares_service.unpublish_share_row(db, share)
     audit = await admin_audit_service.record_action(
         db,
         admin_user_id=admin.id,
         action="unpublish_share",
         target_share_id=share.id,
         target_user_id=share.owner_user_id,
-        details={"previous_published_at": previous},
+        details={
+            "previous_published_at": previous,
+            "noop": already_unpublished,
+        },
     )
     await db.commit()
     reset_overview_cache()
     return AdminActionResponse(
         audit_id=audit.id,
-        message=f"Share /c/{share.short_code} unpublished.",
+        message=(
+            f"Share /c/{share.short_code} already unpublished — audit recorded."
+            if already_unpublished
+            else f"Share /c/{share.short_code} unpublished."
+        ),
     )
 
 
