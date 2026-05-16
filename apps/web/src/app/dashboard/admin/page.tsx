@@ -117,8 +117,10 @@ export default async function AdminOverviewPage() {
             primary: s.name,
             secondary: s.short_code,
             value: s.view_count_30d,
-            href: `/c/${s.short_code}`,
-            external: true,
+            // Stage 3 adds a real admin share-detail page; route there
+            // instead of /c/ so the click lands on a moderation surface
+            // rather than the public viewer.
+            href: `/dashboard/admin/shares/${s.share_id}`,
           }))}
         />
         <TopList

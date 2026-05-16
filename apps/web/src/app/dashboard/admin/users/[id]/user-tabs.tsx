@@ -110,15 +110,21 @@ function SharesTab({ shares }: { shares: AdminUserShareRow[] }) {
         >
           <div className="min-w-0 flex-1">
             <Link
-              href={`/c/${s.short_code}`}
-              target="_blank"
-              rel="noreferrer noopener"
+              href={`/dashboard/admin/shares/${s.id}`}
               className="block truncate font-medium text-ink hover:underline"
             >
               {s.name}
             </Link>
             <p className="truncate text-xs text-ink-faint">
-              /c/{s.short_code} · {s.item_count} item
+              <a
+                href={`/c/${s.short_code}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="hover:underline"
+              >
+                /c/{s.short_code}
+              </a>{' '}
+              · {s.item_count} item
               {s.item_count === 1 ? '' : 's'} · created{' '}
               {formatRelativeTime(s.created_at)}
             </p>

@@ -27,6 +27,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from myetal_api.core.config import settings
+from scripts._wrapper import run_script
 
 _REBUILD_SQL = text(
     """
@@ -71,7 +72,7 @@ async def refresh() -> int:
 
 def main() -> int:
     try:
-        rows = asyncio.run(refresh())
+        rows = asyncio.run(run_script("refresh_similar_shares", refresh))
     except Exception as exc:  # noqa: BLE001
         print(f"refresh_similar_shares FAILED: {exc}", file=sys.stderr)
         return 1
