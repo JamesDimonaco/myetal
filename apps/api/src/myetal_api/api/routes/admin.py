@@ -82,16 +82,25 @@ async def get_overview(
     return payload
 
 
-def _reset_overview_cache_for_tests() -> None:
-    """Test hook — flushes the in-memory TTL cache.
+def reset_overview_cache() -> None:
+    """Flush the in-memory TTL cache.
 
-    Test fixtures create + verify counts within a single second; the
-    cache would otherwise hand them stale zeros across subsequent
-    requests. Mirrors the same-named helpers in `share_view_dedup.py`
-    and `ba_security.py`.
+    Called from two surfaces:
+    - Test fixtures that create + verify counts within a single second
+      (the cache would otherwise hand them stale zeros).
+    - Every admin write action (toggle-admin, soft-delete, etc.) so the
+      counters/lists on the overview reflect changes the admin just
+      made when they navigate back to /dashboard/admin.
+
+    Mirrors the same-named helpers in `share_view_dedup.py` and
+    `ba_security.py`.
     """
     _OVERVIEW_CACHE["at"] = 0.0
     _OVERVIEW_CACHE["payload"] = None
+
+
+# Back-compat alias for the test fixture import path.
+_reset_overview_cache_for_tests = reset_overview_cache
 
 
 # ---- Moderation queue (legacy — same shape as PR-D / D16) ------------------

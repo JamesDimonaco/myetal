@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
 from myetal_api.api.deps import AdminUser, DbSession
+from myetal_api.api.routes.admin import reset_overview_cache
 from myetal_api.core.config import settings
 from myetal_api.core.rate_limit import authed_user_key, limiter
 from myetal_api.models import User
@@ -115,7 +116,17 @@ async def force_sign_out(
     BA JWTs the user already has stay valid until expiry — by design,
     revocation lists weren't worth the complexity (DEPLOY.md). 15-min
     JWT TTL is the bound.
+
+    Self-sign-out is rejected — an admin's session cookie is what's
+    keeping their tab usable. The UI also disables the button when
+    `target.id === currentUser.id`, but the backend is the source of
+    truth so a forged request still 400s.
     """
+    if admin.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="cannot force-sign-out your own account",
+        )
     target = await _load_target(db, user_id)
     count = await admin_users_service.revoke_user_sessions(db, target.id)
     audit = await admin_audit_service.record_action(
@@ -126,6 +137,11 @@ async def force_sign_out(
         details={"sessions_revoked": count},
     )
     await db.commit()
+    # The /admin/overview counters/lists may now be stale (user changed
+    # underneath them). Cheaper to bust the cache than to invalidate
+    # selectively — overview hits are infrequent and the recompute is
+    # ~8 quick queries.
+    reset_overview_cache()
     return AdminActionResponse(
         audit_id=audit.id,
         message=f"Revoked {count} session{'s' if count != 1 else ''}.",
@@ -164,6 +180,11 @@ async def toggle_admin(
         details={"from": previous, "to": value},
     )
     await db.commit()
+    # The /admin/overview counters/lists may now be stale (user changed
+    # underneath them). Cheaper to bust the cache than to invalidate
+    # selectively — overview hits are infrequent and the recompute is
+    # ~8 quick queries.
+    reset_overview_cache()
     return AdminActionResponse(
         audit_id=audit.id,
         message=f"Admin set to {value}.",
@@ -195,6 +216,11 @@ async def verify_email(
         details={"from": previous, "to": True},
     )
     await db.commit()
+    # The /admin/overview counters/lists may now be stale (user changed
+    # underneath them). Cheaper to bust the cache than to invalidate
+    # selectively — overview hits are infrequent and the recompute is
+    # ~8 quick queries.
+    reset_overview_cache()
     return AdminActionResponse(audit_id=audit.id, message="Email marked verified.")
 
 
@@ -233,6 +259,11 @@ async def soft_delete(
         details={"at": datetime.now(UTC).isoformat()},
     )
     await db.commit()
+    # The /admin/overview counters/lists may now be stale (user changed
+    # underneath them). Cheaper to bust the cache than to invalidate
+    # selectively — overview hits are infrequent and the recompute is
+    # ~8 quick queries.
+    reset_overview_cache()
     return AdminActionResponse(
         audit_id=audit.id,
         message="User soft-deleted; shares tombstoned.",
@@ -279,22 +310,37 @@ async def send_password_reset(
         # doesn't leak existence). Treat anything that isn't a network
         # error as success — we already validated the email exists locally.
         ba_ok = resp.is_success
-    except (httpx.HTTPError, httpx.TimeoutException) as exc:
+    except Exception as exc:  # noqa: BLE001 — defensive catch around external call
+        # Catching `Exception` (not just httpx.HTTPError) because SSL /
+        # socket-level failures that don't inherit HTTPError would
+        # previously bubble before the audit row was staged. We still
+        # want the attempt logged even if the network primitive blew
+        # up unexpectedly.
         logger.warning("send_password_reset: BA proxy failed %s", exc)
         ba_ok = False
 
+    # Drop `email` from details (already reachable via target_user_id;
+    # the admin_audit model docstring explicitly says not to duplicate
+    # PII into details).
     audit = await admin_audit_service.record_action(
         db,
         admin_user_id=admin.id,
         action="send_password_reset",
         target_user_id=target.id,
-        details={"ba_ok": ba_ok, "email": target.email},
+        details={"ba_ok": ba_ok},
     )
     await db.commit()
+    # The /admin/overview counters/lists may now be stale (user changed
+    # underneath them). Cheaper to bust the cache than to invalidate
+    # selectively — overview hits are infrequent and the recompute is
+    # ~8 quick queries.
+    reset_overview_cache()
 
     if not ba_ok:
-        # We still recorded the audit row before raising so the attempt
-        # is logged. Surface the failure to the UI so the admin can retry.
+        # Audit row already committed: the attempt is logged whether or
+        # not the email landed. Surface the failure so the admin can
+        # retry; details.ba_ok=false is the durable record of the
+        # failed try.
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Better Auth refused or was unreachable; please retry.",
