@@ -44,7 +44,13 @@ const NAV_LINKS: Array<{ href: string; label: string }> = [
   { href: '/dashboard/feedback', label: 'Feedback' },
 ];
 
+// `Admin` is appended dynamically when `user.is_admin === true`. Web-only
+// per the admin dashboard ticket's cross-stage acceptance (mobile hides
+// the entry).
+const ADMIN_LINK = { href: '/dashboard/admin', label: 'Admin' };
+
 export function DashboardHeader({ user }: { user: UserResponse }) {
+  const navLinks = user.is_admin ? [...NAV_LINKS, ADMIN_LINK] : NAV_LINKS;
   return (
     <header className="border-b border-rule bg-paper">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
@@ -57,7 +63,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
 
         {/* Desktop nav — original layout, hidden on mobile */}
         <nav className="hidden items-center gap-6 text-sm sm:flex">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <Link key={link.href} href={link.href} className={NAV_LINK_CLASS}>
               {link.label}
             </Link>
@@ -131,7 +137,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
               </svg>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8} className="w-56">
-              {NAV_LINKS.map((link) => (
+              {navLinks.map((link) => (
                 <DropdownMenuItem key={link.href} asChild>
                   <Link href={link.href}>{link.label}</Link>
                 </DropdownMenuItem>
