@@ -4,6 +4,8 @@ from myetal_api.models.better_auth import Account, Jwks, Session, User, Verifica
 from myetal_api.models.feedback import Feedback, FeedbackType
 from myetal_api.models.orcid_sync_run import OrcidSyncRun, OrcidSyncStatus
 from myetal_api.models.paper import Paper, PaperSource
+from myetal_api.models.request_metrics import RequestMetric
+from myetal_api.models.script_run import ScriptRun
 from myetal_api.models.share import ItemKind, Share, ShareItem, ShareType
 from myetal_api.models.share_paper import SharePaper
 from myetal_api.models.share_report import ShareReport, ShareReportReason, ShareReportStatus
@@ -25,6 +27,8 @@ __all__ = [
     "OrcidSyncStatus",
     "Paper",
     "PaperSource",
+    "RequestMetric",
+    "ScriptRun",
     "Session",
     "Share",
     "ShareItem",

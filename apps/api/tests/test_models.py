@@ -49,6 +49,9 @@ def test_all_tables_registered_on_metadata() -> None:
         "jwks",
         # `admin_audit` — Stage 2 of admin-analytics-dashboard ticket.
         "admin_audit",
+        # `request_metrics` + `script_runs` — Stage 4 operational tables.
+        "request_metrics",
+        "script_runs",
     }
 
 

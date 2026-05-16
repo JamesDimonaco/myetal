@@ -5,6 +5,8 @@ from slowapi.errors import RateLimitExceeded
 
 from myetal_api import __version__
 from myetal_api.api.routes import admin as admin_routes
+from myetal_api.api.routes import admin_shares as admin_shares_routes
+from myetal_api.api.routes import admin_system as admin_system_routes
 from myetal_api.api.routes import admin_users as admin_users_routes
 from myetal_api.api.routes import feedback as feedback_routes
 from myetal_api.api.routes import health as health_routes
@@ -21,6 +23,7 @@ from myetal_api.core.observability import (
     configure_logging,
 )
 from myetal_api.core.rate_limit import limiter
+from myetal_api.core.request_metrics import RequestMetricsMiddleware
 
 # Configure logging BEFORE the FastAPI() call so import-time logs use the
 # right format. (Sentry SDK removed — PostHog covers error tracking on the
@@ -49,6 +52,11 @@ if settings.cors_origins:
 # Request-ID middleware is added AFTER CORS so the ID exists before logging
 # runs, but the response header is still set on the final response.
 app.add_middleware(RequestIDMiddleware)
+# Request-metrics middleware (Stage 4) — buckets per-minute request +
+# error counts into the in-process aggregator; flushes to
+# ``request_metrics`` once per minute. Operational hint, not audit;
+# restart-loss is tolerated by design.
+app.add_middleware(RequestMetricsMiddleware)
 
 app.include_router(health_routes.router)
 app.include_router(me_routes.router)
@@ -61,3 +69,5 @@ app.include_router(works_routes.router)
 app.include_router(feedback_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(admin_users_routes.router)
+app.include_router(admin_shares_routes.router)
+app.include_router(admin_system_routes.router)
