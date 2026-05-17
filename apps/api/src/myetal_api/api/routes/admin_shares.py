@@ -236,9 +236,7 @@ async def unpublish(
 # ---- Rebuild similar/trending (debug helper) -------------------------------
 
 
-async def _rebuild_similar_for_share(
-    db: DbSession, share_id: uuid.UUID
-) -> int:
+async def _rebuild_similar_for_share(db: DbSession, share_id: uuid.UUID) -> int:
     """Recompute ``share_similar`` rows touching the given share.
 
     Deletes the existing rows where the share appears on either side,
@@ -312,9 +310,7 @@ async def _rebuild_similar_for_share(
     return inserted
 
 
-async def _rebuild_trending_for_share(
-    db: DbSession, share_id: uuid.UUID
-) -> None:
+async def _rebuild_trending_for_share(db: DbSession, share_id: uuid.UUID) -> None:
     """Recompute the single ``trending_shares`` row for the given share.
 
     Same time-decayed score as the global cron, scoped to one share.

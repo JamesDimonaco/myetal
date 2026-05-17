@@ -81,9 +81,7 @@ async def get_user_detail(
 ) -> dict[str, Any]:
     detail = await admin_users_service.get_user_detail(db, user_id)
     if detail is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="user not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
     return detail
 
 
@@ -94,9 +92,7 @@ async def _load_target(db: DbSession, user_id: uuid.UUID) -> User:
     """Common 404 path for every write endpoint."""
     target = await db.get(User, user_id)
     if target is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="user not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
     return target
 
 

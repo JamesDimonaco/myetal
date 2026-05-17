@@ -253,11 +253,7 @@ async def list_shares(
         next_cursor = _encode_cursor(last["created_at"], last["id"])
 
     # Total with the same filter set (without cursor).
-    count_stmt = (
-        select(func.count())
-        .select_from(Share)
-        .join(User, User.id == Share.owner_user_id)
-    )
+    count_stmt = select(func.count()).select_from(Share).join(User, User.id == Share.owner_user_id)
     if q:
         term = q.strip()
         like = f"{term.lower()}%"
@@ -289,13 +285,9 @@ async def list_shares(
             )
         )
     if filter_ == "published":
-        count_stmt = count_stmt.where(
-            Share.published_at.is_not(None), Share.deleted_at.is_(None)
-        )
+        count_stmt = count_stmt.where(Share.published_at.is_not(None), Share.deleted_at.is_(None))
     elif filter_ == "draft":
-        count_stmt = count_stmt.where(
-            Share.published_at.is_(None), Share.deleted_at.is_(None)
-        )
+        count_stmt = count_stmt.where(Share.published_at.is_(None), Share.deleted_at.is_(None))
     elif filter_ == "tombstoned":
         count_stmt = count_stmt.where(Share.deleted_at.is_not(None))
     if type_:
@@ -324,12 +316,14 @@ async def get_share_detail(
 
     # Items
     item_rows = (
-        await db.execute(
-            select(ShareItem)
-            .where(ShareItem.share_id == share_id)
-            .order_by(ShareItem.position)
+        (
+            await db.execute(
+                select(ShareItem).where(ShareItem.share_id == share_id).order_by(ShareItem.position)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     items: list[dict[str, Any]] = []
     for it in item_rows:
         items.append(
@@ -414,12 +408,16 @@ async def get_share_detail(
 
     # Reports against this share
     report_rows = (
-        await db.execute(
-            select(ShareReport)
-            .where(ShareReport.share_id == share_id)
-            .order_by(ShareReport.created_at.desc())
+        (
+            await db.execute(
+                select(ShareReport)
+                .where(ShareReport.share_id == share_id)
+                .order_by(ShareReport.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     reports: list[dict[str, Any]] = []
     for rep in report_rows:
         reports.append(
@@ -466,9 +464,7 @@ async def get_share_detail(
         ).all()
         shares_map = {row.id: row for row in shares_map_rows}
         # Sort by papers_in_common desc to mirror the public read pattern.
-        sim_rows_sorted = sorted(
-            sim_rows, key=lambda r: r.papers_in_common, reverse=True
-        )
+        sim_rows_sorted = sorted(sim_rows, key=lambda r: r.papers_in_common, reverse=True)
         for sim in sim_rows_sorted:
             other = shares_map.get(sim.other_id)
             if other is None:

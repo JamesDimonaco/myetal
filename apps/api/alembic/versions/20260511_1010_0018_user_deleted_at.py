@@ -41,8 +41,7 @@ def upgrade() -> None:
     # Partial index — only soft-deleted rows. Postgres-specific syntax;
     # SQLite ignores the WHERE clause and creates a regular index.
     op.execute(
-        "CREATE INDEX ix_users_deleted_at ON users (deleted_at) "
-        "WHERE deleted_at IS NOT NULL"
+        "CREATE INDEX ix_users_deleted_at ON users (deleted_at) WHERE deleted_at IS NOT NULL"
     )
 
 

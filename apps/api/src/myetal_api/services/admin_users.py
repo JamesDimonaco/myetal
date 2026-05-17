@@ -225,9 +225,7 @@ async def list_users(
 
 
 async def _list_providers(db: AsyncSession, user_id: uuid.UUID) -> list[str]:
-    rows = await db.scalars(
-        select(Account.provider_id).where(Account.user_id == user_id)
-    )
+    rows = await db.scalars(select(Account.provider_id).where(Account.user_id == user_id))
     return sorted({r for r in rows.all() if r})
 
 
@@ -283,12 +281,16 @@ async def get_user_detail(db: AsyncSession, user_id: uuid.UUID) -> dict[str, Any
 
     # Tabs ------------------------------------------------------------------
     share_rows = (
-        await db.execute(
-            select(Share)
-            .where(Share.owner_user_id == user_id)
-            .order_by(Share.created_at.desc())
+        (
+            await db.execute(
+                select(Share)
+                .where(Share.owner_user_id == user_id)
+                .order_by(Share.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     shares: list[dict[str, Any]] = []
     for s in share_rows:
         item_count = int(
@@ -409,13 +411,17 @@ async def _activity_timeline(
 
     # Share creates + publishes
     shares = (
-        await db.execute(
-            select(Share)
-            .where(Share.owner_user_id == user_id)
-            .order_by(Share.created_at.desc())
-            .limit(limit)
+        (
+            await db.execute(
+                select(Share)
+                .where(Share.owner_user_id == user_id)
+                .order_by(Share.created_at.desc())
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for s in shares:
         events.append(
             {
@@ -437,13 +443,17 @@ async def _activity_timeline(
 
     # Feedback
     feedback = (
-        await db.execute(
-            select(Feedback)
-            .where(Feedback.user_id == user_id)
-            .order_by(Feedback.created_at.desc())
-            .limit(limit)
+        (
+            await db.execute(
+                select(Feedback)
+                .where(Feedback.user_id == user_id)
+                .order_by(Feedback.created_at.desc())
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for f in feedback:
         events.append(
             {
@@ -470,9 +480,7 @@ async def _activity_timeline(
             {
                 "kind": "report_submit",
                 "at": rep.created_at,
-                "detail": (
-                    rep.reason.value if hasattr(rep.reason, "value") else str(rep.reason)
-                ),
+                "detail": (rep.reason.value if hasattr(rep.reason, "value") else str(rep.reason)),
                 "link": f"/c/{row.short_code}",
             }
         )
@@ -505,9 +513,7 @@ async def revoke_user_sessions(db: AsyncSession, user_id: uuid.UUID) -> int:
     `require_admin` dep — short JWT TTL is the answer to "what about
     in-flight tokens?" rather than a server-side revocation list.
     """
-    sessions = (
-        await db.scalars(select(Session).where(Session.user_id == user_id))
-    ).all()
+    sessions = (await db.scalars(select(Session).where(Session.user_id == user_id))).all()
     count = len(sessions)
     for s in sessions:
         await db.delete(s)

@@ -48,10 +48,7 @@ async def get_system_metrics(
 ) -> dict[str, Any]:
     """Return the full Stage 4 system-metrics payload."""
     now = time.monotonic()
-    if (
-        _METRICS_CACHE["payload"] is not None
-        and now - _METRICS_CACHE["at"] < _METRICS_TTL
-    ):
+    if _METRICS_CACHE["payload"] is not None and now - _METRICS_CACHE["at"] < _METRICS_TTL:
         response.headers["Cache-Control"] = f"private, max-age={int(_METRICS_TTL)}"
         return _METRICS_CACHE["payload"]
 

@@ -73,9 +73,7 @@ def _stub_r2(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 def _admin_headers(admin: User) -> dict[str, str]:
     return {
-        "Authorization": (
-            f"Bearer {signed_jwt(admin.id, email=admin.email or '', is_admin=True)}"
-        )
+        "Authorization": (f"Bearer {signed_jwt(admin.id, email=admin.email or '', is_admin=True)}")
     }
 
 
@@ -91,9 +89,7 @@ async def test_metrics_requires_auth(api_client: TestClient) -> None:
     assert r.status_code == 401
 
 
-async def test_metrics_rejects_non_admin(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_metrics_rejects_non_admin(db_session: AsyncSession, api_client: TestClient) -> None:
     rando = await make_user(db_session, email="rando@example.com")
     r = api_client.get(
         "/admin/system/metrics",
@@ -102,13 +98,9 @@ async def test_metrics_rejects_non_admin(
     assert r.status_code == 403
 
 
-async def test_metrics_returns_full_shape(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_metrics_returns_full_shape(db_session: AsyncSession, api_client: TestClient) -> None:
     admin = await _admin(db_session)
-    r = api_client.get(
-        "/admin/system/metrics", headers=_admin_headers(admin)
-    )
+    r = api_client.get("/admin/system/metrics", headers=_admin_headers(admin))
     assert r.status_code == 200
     body = r.json()
     # Top-level sections per the spec.
@@ -168,9 +160,7 @@ async def test_routes_24h_aggregates_request_metrics_by_prefix(
     )
     await db_session.commit()
 
-    r = api_client.get(
-        "/admin/system/metrics", headers=_admin_headers(admin)
-    )
+    r = api_client.get("/admin/system/metrics", headers=_admin_headers(admin))
     body = r.json()
     routes = {row["route_prefix"]: row for row in body["routes_24h"]}
     assert routes["/admin"]["request_count"] == 15
@@ -212,9 +202,7 @@ async def test_scripts_section_surfaces_latest_run(
     )
     await db_session.commit()
 
-    r = api_client.get(
-        "/admin/system/metrics", headers=_admin_headers(admin)
-    )
+    r = api_client.get("/admin/system/metrics", headers=_admin_headers(admin))
     body = r.json()
     by_name = {s["name"]: s for s in body["scripts"]}
     # Latest run wins — row_count from the `newer` row.
@@ -231,9 +219,7 @@ async def test_db_pool_section_has_expected_shape(
     db_session: AsyncSession, api_client: TestClient
 ) -> None:
     admin = await _admin(db_session)
-    r = api_client.get(
-        "/admin/system/metrics", headers=_admin_headers(admin)
-    )
+    r = api_client.get("/admin/system/metrics", headers=_admin_headers(admin))
     body = r.json()
     pool = body["db_pool"]
     # SQLite test pool may not expose all counters; we just verify the
@@ -280,9 +266,7 @@ async def test_r2_section_caches_for_5_minutes(
 
     # Reset only the route's cache, keep the R2-section cache warm.
     reset_metrics_cache()
-    r2 = api_client.get(
-        "/admin/system/metrics", headers=_admin_headers(admin)
-    ).json()["r2"]
+    r2 = api_client.get("/admin/system/metrics", headers=_admin_headers(admin)).json()["r2"]
     # R2 LIST was NOT re-invoked — payload came from the 5-min cache.
     assert call_count["n"] == 1
     assert r2["cached"] is True
@@ -319,9 +303,7 @@ async def test_auth_health_is_placeholder_with_session_approximation(
     )
     await db_session.commit()
 
-    r = api_client.get(
-        "/admin/system/metrics", headers=_admin_headers(admin)
-    )
+    r = api_client.get("/admin/system/metrics", headers=_admin_headers(admin))
     body = r.json()["auth"]
     assert body["placeholder"] is True
     # Google provider appears.

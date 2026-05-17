@@ -130,9 +130,7 @@ async def run_script(name: str, body: Callable[[], Awaitable[int]]) -> int:
         await engine.dispose()
 
 
-async def get_latest_run(
-    session: AsyncSession, name: str
-) -> ScriptRun | None:
+async def get_latest_run(session: AsyncSession, name: str) -> ScriptRun | None:
     """Return the most recent ``script_runs`` row for the named script.
 
     Reused by the admin-system metrics endpoint to render last-run

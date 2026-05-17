@@ -117,8 +117,6 @@ def downgrade() -> None:
     op.drop_index("ix_script_runs_started_at", table_name="script_runs")
     op.drop_index("ix_script_runs_name_started", table_name="script_runs")
     op.drop_table("script_runs")
-    op.drop_index(
-        "ix_request_metrics_bucket_prefix", table_name="request_metrics"
-    )
+    op.drop_index("ix_request_metrics_bucket_prefix", table_name="request_metrics")
     op.drop_index("ix_request_metrics_bucket_start", table_name="request_metrics")
     op.drop_table("request_metrics")

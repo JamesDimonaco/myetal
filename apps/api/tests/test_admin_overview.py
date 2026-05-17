@@ -48,9 +48,7 @@ async def test_overview_requires_auth(api_client: TestClient) -> None:
     assert r.status_code == 401
 
 
-async def test_overview_rejects_non_admin(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_overview_rejects_non_admin(db_session: AsyncSession, api_client: TestClient) -> None:
     user = await make_user(db_session, email="rando@example.com")
     r = api_client.get(
         "/admin/overview",

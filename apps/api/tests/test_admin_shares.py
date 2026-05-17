@@ -52,9 +52,7 @@ def _admin_allowlist(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 def _admin_headers(admin: User) -> dict[str, str]:
     return {
-        "Authorization": (
-            f"Bearer {signed_jwt(admin.id, email=admin.email or '', is_admin=True)}"
-        )
+        "Authorization": (f"Bearer {signed_jwt(admin.id, email=admin.email or '', is_admin=True)}")
     }
 
 
@@ -79,9 +77,7 @@ async def _share_owned_by(
                 doi=item_doi,
             )
         )
-    share = await share_service.create_share(
-        db, owner.id, ShareCreate(name=name, items=items)
-    )
+    share = await share_service.create_share(db, owner.id, ShareCreate(name=name, items=items))
     if publish:
         await share_service.publish_share(db, share)
     return share
@@ -126,9 +122,7 @@ async def test_each_write_endpoint_requires_admin(
     rando = await make_user(db_session, email="rando@example.com")
     owner = await make_user(db_session, email="owner@example.com")
     share = await _share_owned_by(db_session, owner, publish=True)
-    headers = {
-        "Authorization": f"Bearer {signed_jwt(rando.id, email=rando.email or '')}"
-    }
+    headers = {"Authorization": f"Bearer {signed_jwt(rando.id, email=rando.email or '')}"}
     for path, body in (
         (f"/admin/shares/{share.id}/tombstone", {"reason": "abc"}),
         (f"/admin/shares/{share.id}/restore", None),
@@ -216,9 +210,7 @@ async def test_shares_list_search_by_paper_doi(
 ) -> None:
     admin = await _admin(db_session)
     owner = await make_user(db_session, email="owner@example.com")
-    await _share_owned_by(
-        db_session, owner, name="with doi", item_doi="10.1234/abc.xyz"
-    )
+    await _share_owned_by(db_session, owner, name="with doi", item_doi="10.1234/abc.xyz")
     await _share_owned_by(db_session, owner, name="no doi")
 
     r = api_client.get(
@@ -291,9 +283,7 @@ async def test_shares_detail_404_when_missing(
     db_session: AsyncSession, api_client: TestClient
 ) -> None:
     admin = await _admin(db_session)
-    r = api_client.get(
-        f"/admin/shares/{uuid.uuid4()}", headers=_admin_headers(admin)
-    )
+    r = api_client.get(f"/admin/shares/{uuid.uuid4()}", headers=_admin_headers(admin))
     assert r.status_code == 404
 
 
@@ -302,9 +292,7 @@ async def test_shares_detail_includes_items_reports_audit(
 ) -> None:
     admin = await _admin(db_session)
     owner = await make_user(db_session, email="owner@example.com")
-    share = await _share_owned_by(
-        db_session, owner, name="x", publish=True, item_doi="10.1/abc"
-    )
+    share = await _share_owned_by(db_session, owner, name="x", publish=True, item_doi="10.1/abc")
 
     # Add a report against the share.
     db_session.add(
@@ -316,9 +304,7 @@ async def test_shares_detail_includes_items_reports_audit(
     )
     await db_session.commit()
 
-    r = api_client.get(
-        f"/admin/shares/{share.id}", headers=_admin_headers(admin)
-    )
+    r = api_client.get(f"/admin/shares/{share.id}", headers=_admin_headers(admin))
     assert r.status_code == 200
     body = r.json()
     assert body["short_code"] == share.short_code
@@ -356,9 +342,7 @@ async def test_tombstone_sets_deleted_at_and_audits(
     assert audit[0].details["reason"].startswith("copyright takedown")
 
 
-async def test_tombstone_requires_reason(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_tombstone_requires_reason(db_session: AsyncSession, api_client: TestClient) -> None:
     admin = await _admin(db_session)
     owner = await make_user(db_session, email="owner@example.com")
     share = await _share_owned_by(db_session, owner, publish=True)
@@ -480,10 +464,10 @@ async def test_unpublish_on_draft_is_idempotent(
     body = r.json()
     assert "already unpublished" in body["message"].lower()
     audits = (
-        await db_session.execute(
-            select(AdminAudit).where(AdminAudit.target_share_id == share.id)
-        )
-    ).scalars().all()
+        (await db_session.execute(select(AdminAudit).where(AdminAudit.target_share_id == share.id)))
+        .scalars()
+        .all()
+    )
     assert len(audits) == 1
     assert audits[0].action == "unpublish_share"
     assert audits[0].details.get("noop") is True

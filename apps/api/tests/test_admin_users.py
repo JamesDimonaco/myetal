@@ -44,9 +44,7 @@ def _admin_allowlist(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 def _admin_headers(admin: User) -> dict[str, str]:
     return {
-        "Authorization": (
-            f"Bearer {signed_jwt(admin.id, email=admin.email or '', is_admin=True)}"
-        )
+        "Authorization": (f"Bearer {signed_jwt(admin.id, email=admin.email or '', is_admin=True)}")
     }
 
 
@@ -113,9 +111,7 @@ async def test_users_list_search_matches_email_prefix(
     assert body["items"][0]["email"] == "alice@example.com"
 
 
-async def test_users_list_filter_admin(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_users_list_filter_admin(db_session: AsyncSession, api_client: TestClient) -> None:
     admin = await _admin(db_session)
     await make_user(db_session, email="rando@example.com", is_admin=False)
 
@@ -132,9 +128,7 @@ async def test_users_list_filter_has_orcid(
     db_session: AsyncSession, api_client: TestClient
 ) -> None:
     admin = await _admin(db_session)
-    await make_user(
-        db_session, email="orcid@example.com", orcid_id="0000-0001-2345-6789"
-    )
+    await make_user(db_session, email="orcid@example.com", orcid_id="0000-0001-2345-6789")
     await make_user(db_session, email="no-orcid@example.com")
 
     r = api_client.get(
@@ -199,9 +193,7 @@ async def test_users_detail_404_for_missing(
     db_session: AsyncSession, api_client: TestClient
 ) -> None:
     admin = await _admin(db_session)
-    r = api_client.get(
-        f"/admin/users/{uuid.uuid4()}", headers=_admin_headers(admin)
-    )
+    r = api_client.get(f"/admin/users/{uuid.uuid4()}", headers=_admin_headers(admin))
     assert r.status_code == 404
 
 
@@ -213,9 +205,7 @@ async def test_users_detail_includes_shares_and_activity(
     s = await share_service.create_share(db_session, owner.id, ShareCreate(name="x"))
     await share_service.publish_share(db_session, s)
 
-    r = api_client.get(
-        f"/admin/users/{owner.id}", headers=_admin_headers(admin)
-    )
+    r = api_client.get(f"/admin/users/{owner.id}", headers=_admin_headers(admin))
     assert r.status_code == 200
     body = r.json()
     assert body["email"] == "owner@example.com"
@@ -252,9 +242,7 @@ async def test_force_sign_out_revokes_sessions_and_audits(
     )
     await db_session.commit()
 
-    r = api_client.post(
-        f"/admin/users/{target.id}/sign-out", headers=_admin_headers(admin)
-    )
+    r = api_client.post(f"/admin/users/{target.id}/sign-out", headers=_admin_headers(admin))
     assert r.status_code == 200
     body = r.json()
     assert body["ok"] is True
@@ -287,9 +275,7 @@ async def test_toggle_admin_flips_flag_and_audits(
     assert any(a.action == "toggle_admin" for a in audit)
 
 
-async def test_toggle_admin_rejects_self(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_toggle_admin_rejects_self(db_session: AsyncSession, api_client: TestClient) -> None:
     admin = await _admin(db_session)
     r = api_client.post(
         f"/admin/users/{admin.id}/admin?value=false",
@@ -308,9 +294,7 @@ async def test_verify_email_flips_flag_and_audits(
     target = await make_user(db_session, email="target@example.com")
     assert target.email_verified is False
 
-    r = api_client.post(
-        f"/admin/users/{target.id}/verify-email", headers=_admin_headers(admin)
-    )
+    r = api_client.post(f"/admin/users/{target.id}/verify-email", headers=_admin_headers(admin))
     assert r.status_code == 200
 
     await db_session.refresh(target)
@@ -330,9 +314,7 @@ async def test_soft_delete_tombstones_user_and_shares(
     share = await share_service.create_share(db_session, target.id, ShareCreate(name="x"))
     await share_service.publish_share(db_session, share)
 
-    r = api_client.post(
-        f"/admin/users/{target.id}/soft-delete", headers=_admin_headers(admin)
-    )
+    r = api_client.post(f"/admin/users/{target.id}/soft-delete", headers=_admin_headers(admin))
     assert r.status_code == 200
 
     await db_session.refresh(target)
@@ -341,13 +323,9 @@ async def test_soft_delete_tombstones_user_and_shares(
     assert share.deleted_at is not None
 
 
-async def test_soft_delete_rejects_self(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_soft_delete_rejects_self(db_session: AsyncSession, api_client: TestClient) -> None:
     admin = await _admin(db_session)
-    r = api_client.post(
-        f"/admin/users/{admin.id}/soft-delete", headers=_admin_headers(admin)
-    )
+    r = api_client.post(f"/admin/users/{admin.id}/soft-delete", headers=_admin_headers(admin))
     assert r.status_code == 400
 
 
@@ -359,9 +337,7 @@ async def test_soft_delete_409_when_already_deleted(
     target.deleted_at = datetime.now(UTC)
     await db_session.commit()
 
-    r = api_client.post(
-        f"/admin/users/{target.id}/soft-delete", headers=_admin_headers(admin)
-    )
+    r = api_client.post(f"/admin/users/{target.id}/soft-delete", headers=_admin_headers(admin))
     assert r.status_code == 409
 
 
@@ -434,10 +410,7 @@ async def test_send_password_reset_502_on_ba_error(
     assert r.status_code == 502
     # Audit row is still recorded so the attempt is auditable.
     audit = (await db_session.scalars(select(AdminAudit))).all()
-    assert any(
-        a.action == "send_password_reset" and a.details.get("ba_ok") is False
-        for a in audit
-    )
+    assert any(a.action == "send_password_reset" and a.details.get("ba_ok") is False for a in audit)
 
 
 async def test_send_password_reset_400_when_no_email(

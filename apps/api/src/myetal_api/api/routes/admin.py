@@ -68,17 +68,13 @@ async def get_overview(
         # proxy could in theory short-circuit too. We're not behind one
         # for the admin path today, so the in-process cache is doing the
         # real work.
-        response.headers["Cache-Control"] = (
-            f"private, max-age={int(_OVERVIEW_TTL_SECONDS)}"
-        )
+        response.headers["Cache-Control"] = f"private, max-age={int(_OVERVIEW_TTL_SECONDS)}"
         return _OVERVIEW_CACHE["payload"]
 
     payload = await overview_service.build_overview(db)
     _OVERVIEW_CACHE["at"] = now
     _OVERVIEW_CACHE["payload"] = payload
-    response.headers["Cache-Control"] = (
-        f"private, max-age={int(_OVERVIEW_TTL_SECONDS)}"
-    )
+    response.headers["Cache-Control"] = f"private, max-age={int(_OVERVIEW_TTL_SECONDS)}"
     return payload
 
 

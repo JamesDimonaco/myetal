@@ -248,10 +248,7 @@ def _r2_storage() -> dict[str, Any]:
     cached=False + fetched_at=epoch combination.
     """
     now = time.monotonic()
-    if (
-        _R2_CACHE["payload"] is not None
-        and now - _R2_CACHE["at"] < _R2_CACHE_TTL
-    ):
+    if _R2_CACHE["payload"] is not None and now - _R2_CACHE["at"] < _R2_CACHE_TTL:
         payload = dict(_R2_CACHE["payload"])
         payload["cached"] = True
         return payload

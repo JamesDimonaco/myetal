@@ -48,14 +48,10 @@ async def _counters(db: AsyncSession) -> dict[str, int]:
 
     total_users = await db.scalar(select(func.count()).select_from(User)) or 0
     new_users_7d = (
-        await db.scalar(
-            select(func.count()).select_from(User).where(User.created_at >= week_ago)
-        )
+        await db.scalar(select(func.count()).select_from(User).where(User.created_at >= week_ago))
     ) or 0
     new_users_30d = (
-        await db.scalar(
-            select(func.count()).select_from(User).where(User.created_at >= month_ago)
-        )
+        await db.scalar(select(func.count()).select_from(User).where(User.created_at >= month_ago))
     ) or 0
 
     # "Total shares (published only)" per the ticket.
@@ -82,16 +78,12 @@ async def _counters(db: AsyncSession) -> dict[str, int]:
     total_items = await db.scalar(select(func.count()).select_from(ShareItem)) or 0
     views_7d = (
         await db.scalar(
-            select(func.count())
-            .select_from(ShareView)
-            .where(ShareView.viewed_at >= week_ago)
+            select(func.count()).select_from(ShareView).where(ShareView.viewed_at >= week_ago)
         )
     ) or 0
     views_30d = (
         await db.scalar(
-            select(func.count())
-            .select_from(ShareView)
-            .where(ShareView.viewed_at >= month_ago)
+            select(func.count()).select_from(ShareView).where(ShareView.viewed_at >= month_ago)
         )
     ) or 0
 
@@ -144,9 +136,7 @@ async def _daily_buckets(
     return [{"date": str(r.date), "count": int(r.count)} for r in rows]
 
 
-def _pad_buckets(
-    buckets: list[dict[str, Any]], days: int = 30
-) -> list[dict[str, Any]]:
+def _pad_buckets(buckets: list[dict[str, Any]], days: int = 30) -> list[dict[str, Any]]:
     """Fill in zero-count days so the chart has a continuous x-axis.
 
     ``buckets`` arrives sorted ascending. We walk through the last
@@ -250,9 +240,7 @@ async def _top_tags(db: AsyncSession) -> list[dict[str, Any]]:
         .limit(10)
     )
     rows = (await db.execute(stmt)).all()
-    return [
-        {"slug": r.slug, "label": r.label, "usage_count": int(r.usage_count)} for r in rows
-    ]
+    return [{"slug": r.slug, "label": r.label, "usage_count": int(r.usage_count)} for r in rows]
 
 
 # ---- Recent activity --------------------------------------------------------
