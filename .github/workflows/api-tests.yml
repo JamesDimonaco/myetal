@@ -23,6 +23,13 @@ on:
 permissions:
   contents: read
 
+# Opt every JS-based action into Node 24 ahead of GitHub's June 2026
+# forced flip. The Docker actions and astral-sh/setup-uv@v6 still ship
+# Node-20-built JS bundles; this runner flag re-routes them to Node 24
+# without bumping each action's pinned version one-by-one.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   test:
     runs-on: ubuntu-latest

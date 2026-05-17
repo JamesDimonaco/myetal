@@ -20,6 +20,11 @@ on:
 permissions:
   contents: read
 
+# Opt every JS-based action into Node 24 ahead of GitHub's June 2026
+# forced flip — see api-tests.yml for the longer note.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   # Re-run lint+tests inline so the build step has a hard dependency on a
   # green test suite. Mirrors api-tests.yml — keep them in sync.  Without
