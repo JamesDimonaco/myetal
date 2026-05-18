@@ -226,6 +226,9 @@ async def test_force_sign_out_revokes_sessions_and_audits(
 ) -> None:
     admin = await _admin(db_session)
     target = await make_user(db_session, email="target@example.com")
+    # Control user whose sessions must NOT be touched — guards against
+    # the endpoint accidentally widening to `DELETE FROM sessions`.
+    control = await make_user(db_session, email="bystander@example.com")
     db_session.add(
         Session(
             user_id=target.id,
@@ -240,6 +243,13 @@ async def test_force_sign_out_revokes_sessions_and_audits(
             token="t2",
         )
     )
+    db_session.add(
+        Session(
+            user_id=control.id,
+            expires_at=datetime.now(UTC),
+            token="control-t1",
+        )
+    )
     await db_session.commit()
 
     r = api_client.post(f"/admin/users/{target.id}/sign-out", headers=_admin_headers(admin))
@@ -247,10 +257,25 @@ async def test_force_sign_out_revokes_sessions_and_audits(
     body = r.json()
     assert body["ok"] is True
 
-    remaining = (await db_session.scalars(select(Session))).all()
-    assert remaining == []
-    audit_rows = (await db_session.scalars(select(AdminAudit))).all()
-    assert any(a.action == "force_sign_out" for a in audit_rows)
+    target_sessions = (
+        await db_session.scalars(select(Session).where(Session.user_id == target.id))
+    ).all()
+    assert target_sessions == []
+    control_sessions = (
+        await db_session.scalars(select(Session).where(Session.user_id == control.id))
+    ).all()
+    assert [s.token for s in control_sessions] == ["control-t1"]
+
+    audit_row = (
+        await db_session.scalars(
+            select(AdminAudit).where(
+                AdminAudit.action == "force_sign_out",
+                AdminAudit.admin_user_id == admin.id,
+                AdminAudit.target_user_id == target.id,
+            )
+        )
+    ).one_or_none()
+    assert audit_row is not None
 
 
 # ---- Toggle admin ----------------------------------------------------------
@@ -321,6 +346,16 @@ async def test_soft_delete_tombstones_user_and_shares(
     assert target.deleted_at is not None
     await db_session.refresh(share)
     assert share.deleted_at is not None
+    audit_row = (
+        await db_session.scalars(
+            select(AdminAudit).where(
+                AdminAudit.action == "soft_delete_user",
+                AdminAudit.admin_user_id == admin.id,
+                AdminAudit.target_user_id == target.id,
+            )
+        )
+    ).one_or_none()
+    assert audit_row is not None
 
 
 async def test_soft_delete_rejects_self(db_session: AsyncSession, api_client: TestClient) -> None:

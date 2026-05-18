@@ -51,6 +51,10 @@ export function UsersList({
   // moved on. Prevents a stale `loadMore` append after the user changed
   // filter mid-flight (race flagged by the functional reviewer).
   const requestTokenRef = useRef(0);
+  // The server has already fetched the first page with the initial
+  // params; skip the very first run of the refetch effect so we don't
+  // duplicate that request on mount.
+  const initialFetchSkippedRef = useRef(false);
 
   // Search debounce
   useEffect(() => {
@@ -64,6 +68,10 @@ export function UsersList({
   // synchronously inside the effect — keeps `react-hooks/set-state-in-effect`
   // quiet without depending on a separate library helper.
   useEffect(() => {
+    if (!initialFetchSkippedRef.current) {
+      initialFetchSkippedRef.current = true;
+      return;
+    }
     const params = new URLSearchParams();
     if (debounced) params.set('q', debounced);
     if (filter !== 'all') params.set('filter', filter);

@@ -37,7 +37,8 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -174,10 +175,14 @@ async def _flush_loop() -> None:
 async def flush_now() -> int:
     """Flush whatever's currently in the aggregator. Returns rows touched.
 
-    Drains the aggregator under the lock, then writes outside it so
-    inflight request increments don't pile up against the DB call.
-    The upsert is dialect-aware (PG uses ON CONFLICT; SQLite test path
-    INSERT-OR-UPDATEs manually).
+    Snapshots the aggregator under the lock then writes outside it so
+    inflight request increments don't pile up against the DB call. The
+    write uses a single dialect-aware UPSERT (``ON CONFLICT DO UPDATE``)
+    against the ``(bucket_start, route_prefix)`` unique index so two
+    concurrent flushers — or a flush racing the unique-constraint — sum
+    additively rather than losing increments. On commit failure the
+    drained counts are merged back into the in-memory aggregator so
+    transient DB hiccups don't permanently drop telemetry.
     """
     async with _AGG_LOCK:
         if not _AGGREGATOR:
@@ -185,35 +190,49 @@ async def flush_now() -> int:
         drained = dict(_AGGREGATOR)
         _AGGREGATOR.clear()
 
-    written = 0
-    async with SessionLocal() as session:
-        for (bucket_iso, prefix), counts in drained.items():
-            bucket_dt = datetime.fromisoformat(bucket_iso)
-            existing = (
-                await session.execute(
-                    select(RequestMetric).where(
-                        RequestMetric.bucket_start == bucket_dt,
-                        RequestMetric.route_prefix == prefix,
-                    )
+    try:
+        async with SessionLocal() as session:
+            dialect = session.bind.dialect.name if session.bind is not None else ""
+            insert_stmt = pg_insert if dialect == "postgresql" else sqlite_insert
+            cols = RequestMetric.__table__.c
+            for (bucket_iso, prefix), counts in drained.items():
+                bucket_dt = datetime.fromisoformat(bucket_iso)
+                stmt = insert_stmt(RequestMetric).values(
+                    bucket_start=bucket_dt,
+                    route_prefix=prefix,
+                    request_count=counts["request_count"],
+                    error_count=counts["error_count"],
+                    latency_ms_sum=counts["latency_ms_sum"],
                 )
-            ).scalar_one_or_none()
-            if existing is None:
-                session.add(
-                    RequestMetric(
-                        bucket_start=bucket_dt,
-                        route_prefix=prefix,
-                        request_count=counts["request_count"],
-                        error_count=counts["error_count"],
-                        latency_ms_sum=counts["latency_ms_sum"],
-                    )
+                # SET clause references the existing row via the Core
+                # table columns + the incoming row via `excluded.*` so
+                # the upsert sums additively rather than overwriting.
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["bucket_start", "route_prefix"],
+                    set_={
+                        "request_count": cols.request_count + stmt.excluded.request_count,
+                        "error_count": cols.error_count + stmt.excluded.error_count,
+                        "latency_ms_sum": cols.latency_ms_sum + stmt.excluded.latency_ms_sum,
+                    },
                 )
-            else:
-                existing.request_count += counts["request_count"]
-                existing.error_count += counts["error_count"]
-                existing.latency_ms_sum += counts["latency_ms_sum"]
-            written += 1
-        await session.commit()
-    return written
+                await session.execute(stmt)
+            await session.commit()
+    except Exception:
+        # Re-queue what we drained so a transient DB failure doesn't
+        # permanently lose the bucket. Subsequent flushes will sum
+        # alongside any new requests recorded in the interim.
+        async with _AGG_LOCK:
+            for key, counts in drained.items():
+                slot = _AGGREGATOR.setdefault(
+                    key,
+                    {"request_count": 0, "error_count": 0, "latency_ms_sum": 0},
+                )
+                slot["request_count"] += counts["request_count"]
+                slot["error_count"] += counts["error_count"]
+                slot["latency_ms_sum"] += counts["latency_ms_sum"]
+        raise
+
+    return len(drained)
 
 
 def _reset_for_tests() -> None:

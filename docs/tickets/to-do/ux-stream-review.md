@@ -10,7 +10,17 @@ Read-only review of the UX-polish stream on `staging`. Files re-verified at HEAD
 
 ## Critical
 
-None — nothing here will eat data, leak secrets, or take production down. Promote.
+None — nothing here will eat data, leak secrets, or take production down.
+
+## Promotion checklist
+
+The "Critical" bar is clear, but the three **Serious** issues below are not auto-cleared. Promotion to `main` requires each row to read **Resolved** (fix landed) or **Waived** (explicit decision recorded inline). Until then this stream stays on `staging`.
+
+| Serious issue | Status | Notes |
+|---|---|---|
+| 1. StrictMode side-effect in `removeItem` (`share-editor.tsx:408-416`) | Open | Fix: move `toast.success` out of the `setItems` updater. |
+| 2. `aria-activedescendant` ignores Create row (`tag-input.tsx:320-324`) | Open | Fix: point at the Create `<li>` id when `highlightOnCreate` is true. |
+| 3. Publish toggle has no in-flight guard (`share-editor.tsx:770-802`) | Open | Fix: disable the switch when either mutation is pending. |
 
 ## Serious
 

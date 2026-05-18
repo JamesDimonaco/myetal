@@ -34,3 +34,16 @@ export function formatRelativeTime(iso: string): string {
 export function formatItemCount(n: number): string {
   return `${n} ${n === 1 ? 'paper' : 'papers'}`;
 }
+
+export function formatBytes(n: number): string {
+  if (n === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const exp = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(n) / Math.log(1024)),
+  );
+  const value = n / 1024 ** exp;
+  const formatted =
+    value >= 100 ? value.toFixed(0) : value >= 10 ? value.toFixed(1) : value.toFixed(2);
+  return `${formatted} ${units[exp]}`;
+}

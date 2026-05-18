@@ -1,6 +1,6 @@
 # Admin analytics + moderation dashboard
 
-**Status:** Proposal — staged build, no urgency
+**Status:** Shipped (Stages 1–4) — original proposal preserved below for context; companion follow-up ticket: `admin-analytics-future-metrics.md`.
 **Created:** 2026-05-16
 **Owner:** James
 **Effort estimate:** ~10-12 days end-to-end across 4 stages; each stage is shippable on its own
@@ -30,7 +30,7 @@ The platform-level stuff (counts, trends, lists) is genuinely cheap because the 
 - All admin pages live under `/dashboard/admin/*` — the dashboard shell already enforces auth + the layout adapts to admins.
 - Backend: a single `/admin/*` router with `Depends(require_admin)` everywhere. Each Stage's endpoints colocated under that prefix.
 - No new auth surface. Admins are still BA-authed users with `is_admin = true`.
-- Read paths cache aggressively (5-min server cache + TanStack Query 1-min stale on the client). Write paths are no-cache, never optimistic.
+- Baseline cache policy for read paths: **5-min server cache + TanStack Query 1-min stale on the client**. Write paths are no-cache, never optimistic. Per-endpoint overrides (e.g. `/admin/overview` is annotated to 60s server-side because its underlying queries are cheap and admins refresh it during incidents) are called out explicitly in the relevant Stage's "Backend" section.
 - Every admin action goes through an `admin_audit` table (created in Stage 2) so we have an immutable record of "who did what when."
 - Charts: use a lightweight library (`recharts` or `chart.js`). No d3.
 - Tables: a small reusable table primitive (or shadcn's table — copy-paste, no new dep).
@@ -72,7 +72,7 @@ Sections, top to bottom:
    - Similar refresh: last run timestamp
 
 ### Backend
-- `GET /admin/overview` — single endpoint returns all of the above in one JSON payload. Cached server-side for 60s.
+- `GET /admin/overview` — single endpoint returns all of the above in one JSON payload. Cached server-side for **60s** (per-endpoint override of the 5-min baseline declared in the architectural shape section above; rationale is that the underlying queries are cheap and admins refresh during incidents).
 - Queries are all index-friendly (mostly `COUNT(*) WHERE ...` and `ORDER BY view_count DESC LIMIT 10`).
 
 ### Scope cuts (defer to later stages)

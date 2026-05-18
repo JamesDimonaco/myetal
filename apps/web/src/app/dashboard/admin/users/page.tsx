@@ -13,10 +13,47 @@ import { UsersList } from './users-list';
 export const metadata = { title: 'Admin — Users' };
 export const dynamic = 'force-dynamic';
 
+// Mirrors the union types in `@/types/admin`. Lifted to runtime
+// constants so the page-level URL-param validation doesn't drift from
+// the API contract — adding a value to the enum requires touching both.
+const VALID_USER_FILTERS: readonly AdminUserFilter[] = [
+  'all',
+  'has_orcid',
+  'has_shares',
+  'admin',
+  'email_verified',
+  'deleted',
+];
+const VALID_USER_SORTS: readonly AdminUserSort[] = [
+  'created_desc',
+  'created_asc',
+  'last_seen_desc',
+];
+
+function isValidFilter(value: unknown): value is AdminUserFilter {
+  return (
+    typeof value === 'string' &&
+    (VALID_USER_FILTERS as readonly string[]).includes(value)
+  );
+}
+
+function isValidSort(value: unknown): value is AdminUserSort {
+  return (
+    typeof value === 'string' &&
+    (VALID_USER_SORTS as readonly string[]).includes(value)
+  );
+}
+
+// `searchParams` is wholly attacker-controlled — declaring the type as
+// the narrow union does not validate the runtime value. A crafted URL
+// can land arbitrary strings here, which then go into the upstream API
+// query and (worse) any conditional shaped on those values. Keep the
+// shape loose at the boundary so the type-guards below are the only
+// place that decides whether the value is a real enum member.
 type SearchParams = Promise<{
   q?: string;
-  filter?: AdminUserFilter;
-  sort?: AdminUserSort;
+  filter?: string;
+  sort?: string;
   cursor?: string;
 }>;
 
@@ -31,8 +68,8 @@ export default async function AdminUsersPage(props: {
 }) {
   const sp = await props.searchParams;
   const q = sp.q ?? '';
-  const filter: AdminUserFilter = sp.filter ?? 'all';
-  const sort: AdminUserSort = sp.sort ?? 'created_desc';
+  const filter: AdminUserFilter = isValidFilter(sp.filter) ? sp.filter : 'all';
+  const sort: AdminUserSort = isValidSort(sp.sort) ? sp.sort : 'created_desc';
 
   const params = new URLSearchParams();
   if (q) params.set('q', q);

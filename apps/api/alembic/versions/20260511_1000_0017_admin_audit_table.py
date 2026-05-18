@@ -25,6 +25,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON
 
 from alembic import op
 
@@ -57,7 +58,7 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("action", sa.String(64), nullable=False),
-        sa.Column("details", JSONB(), nullable=True),
+        sa.Column("details", JSONB().with_variant(JSON(), "sqlite"), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),

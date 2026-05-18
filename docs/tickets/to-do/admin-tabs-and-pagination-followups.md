@@ -74,6 +74,13 @@ Today the rebuild runs inline under the admin's HTTP request. For a share with 5
 
 **Recommendation:** (a) for now. Track a `share_id → last_rebuild_at` so concurrent rebuilds for the same share collapse.
 
+**Where `last_rebuild_at` lives:** the storage backend must match the deploy topology, otherwise the collapse only works inside one worker:
+
+- **Single-worker deploys (today on Pi/Railway, `--workers 1`):** a module-level dict on the `BackgroundTasks` handler is fine. No cross-process state to sync.
+- **Multi-worker deploys (future):** the timestamp moves to a shared store (Redis preferred, the existing Postgres as a cheaper fallback) so a rebuild kicked off by worker A is visible to worker B. Without this, N workers race N rebuilds for one click.
+
+Implementation note: introduce a tiny `RebuildCoordinator` with `get(share_id) -> datetime | None` / `set(share_id, at)` / `compare(share_id, min_interval)` semantics so the rebuild route depends on the interface, not the storage. The in-memory and Redis implementations slot in behind it without changing the route. Document the chosen backend in the deploy doc alongside `--workers`.
+
 ---
 
 ## When to start

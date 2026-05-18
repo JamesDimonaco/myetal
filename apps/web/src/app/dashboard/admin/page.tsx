@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { ApiError } from '@/lib/api';
-import { formatRelativeTime } from '@/lib/format';
+import { formatBytes, formatRelativeTime } from '@/lib/format';
 import { serverFetch } from '@/lib/server-api';
 import type { AdminOverviewResponse } from '@/types/admin';
 
@@ -43,7 +43,7 @@ export default async function AdminOverviewPage() {
             Platform overview
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
-            How is MyEtAl doing right now. Refresh the page to recompute.
+            How is MyEtAl doing right now? Refresh the page to recompute.
           </p>
         </div>
         <p className="text-xs text-ink-faint">
@@ -430,17 +430,3 @@ function RecentList({
   );
 }
 
-// ---- Formatting ------------------------------------------------------------
-
-function formatBytes(n: number): string {
-  if (n === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const exp = Math.min(
-    units.length - 1,
-    Math.floor(Math.log(n) / Math.log(1024)),
-  );
-  const value = n / 1024 ** exp;
-  const formatted =
-    value >= 100 ? value.toFixed(0) : value >= 10 ? value.toFixed(1) : value.toFixed(2);
-  return `${formatted} ${units[exp]}`;
-}

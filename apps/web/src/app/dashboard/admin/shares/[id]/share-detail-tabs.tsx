@@ -3,7 +3,23 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { formatRelativeTime } from '@/lib/format';
+import { formatBytes, formatRelativeTime } from '@/lib/format';
+
+/**
+ * Return true only for http(s) URLs. Item URLs come from user input and
+ * land in href attributes — javascript:/data:/etc. would execute on
+ * click. We're an admin surface, so the threat is limited (admin
+ * clicking on a shady item they're already reviewing) but cheap to
+ * close.
+ */
+function isHttpOrHttps(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 import type {
   AdminAuditEntry,
   AdminShareDetail,
@@ -136,14 +152,18 @@ function ItemsTab({ items }: { items: AdminShareItemOut[] }) {
           {item.url ? (
             <p className="mt-1 text-xs">
               <span className="text-ink-faint">URL: </span>
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="break-all text-accent hover:underline"
-              >
-                {item.url}
-              </a>
+              {isHttpOrHttps(item.url) ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="break-all text-accent hover:underline"
+                >
+                  {item.url}
+                </a>
+              ) : (
+                <span className="break-all text-ink-muted">{item.url}</span>
+              )}
             </p>
           ) : null}
           {item.file_url ? (
@@ -151,14 +171,20 @@ function ItemsTab({ items }: { items: AdminShareItemOut[] }) {
               <p className="text-xs font-medium text-ink">
                 PDF (admin-only link)
               </p>
-              <a
-                href={item.file_url}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="mt-1 block break-all text-xs text-accent hover:underline"
-              >
-                {item.file_url}
-              </a>
+              {isHttpOrHttps(item.file_url) ? (
+                <a
+                  href={item.file_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-1 block break-all text-xs text-accent hover:underline"
+                >
+                  {item.file_url}
+                </a>
+              ) : (
+                <span className="mt-1 block break-all text-xs text-ink-muted">
+                  {item.file_url}
+                </span>
+              )}
               <p className="mt-1 text-xs text-ink-faint">
                 {item.file_mime ?? 'unknown mime'}
                 {item.file_size_bytes
@@ -322,15 +348,3 @@ function AuditTab({ entries }: { entries: AdminAuditEntry[] }) {
   );
 }
 
-function formatBytes(n: number): string {
-  if (n === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const exp = Math.min(
-    units.length - 1,
-    Math.floor(Math.log(n) / Math.log(1024)),
-  );
-  const value = n / 1024 ** exp;
-  const formatted =
-    value >= 100 ? value.toFixed(0) : value >= 10 ? value.toFixed(1) : value.toFixed(2);
-  return `${formatted} ${units[exp]}`;
-}

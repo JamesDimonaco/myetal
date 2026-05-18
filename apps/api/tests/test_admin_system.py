@@ -370,6 +370,13 @@ async def test_flush_now_writes_aggregator_to_db_and_is_idempotent(
     await rm._record("/admin", 200, 100)
     await rm.flush_now()
 
+    # The Core UPSERT updates the DB row directly; the session's
+    # identity map still holds the pre-update snapshot from the first
+    # SELECT above, so the rows have to be re-fetched fresh. In
+    # production this is a non-issue because each flush opens its own
+    # SessionLocal — the test just reuses the test fixture's session
+    # for both write and read paths.
+    db_session.expire_all()
     rows = (await db_session.scalars(select(RequestMetric))).all()
     assert len(rows) == 2  # still 2 rows, no duplicate
     by_prefix = {r.route_prefix: r for r in rows}

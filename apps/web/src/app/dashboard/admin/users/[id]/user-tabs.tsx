@@ -37,23 +37,27 @@ export function UserTabs({ detail }: { detail: AdminUserDetail }) {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 border-b border-rule">
+      <div role="tablist" className="flex flex-wrap gap-1 border-b border-rule">
         <TabButton
+          name="shares"
           active={tab === 'shares'}
           onClick={() => setTab('shares')}
           label={`Shares (${detail.shares.length})`}
         />
         <TabButton
+          name="library"
           active={tab === 'library'}
           onClick={() => setTab('library')}
           label={`Library (${detail.library_paper_count})`}
         />
         <TabButton
+          name="activity"
           active={tab === 'activity'}
           onClick={() => setTab('activity')}
           label={`Activity (${detail.activity.length})`}
         />
         <TabButton
+          name="audit"
           active={tab === 'audit'}
           onClick={() => setTab('audit')}
           label={`Audit (${detail.audit.length})`}
@@ -61,22 +65,30 @@ export function UserTabs({ detail }: { detail: AdminUserDetail }) {
       </div>
 
       <div className="mt-6">
-        {tab === 'shares' ? <SharesTab shares={detail.shares} /> : null}
-        {tab === 'library' ? <LibraryTab detail={detail} /> : null}
-        {tab === 'activity' ? (
+        <TabPanel name="shares" active={tab === 'shares'}>
+          <SharesTab shares={detail.shares} />
+        </TabPanel>
+        <TabPanel name="library" active={tab === 'library'}>
+          <LibraryTab detail={detail} />
+        </TabPanel>
+        <TabPanel name="activity" active={tab === 'activity'}>
           <ActivityTab events={detail.activity} />
-        ) : null}
-        {tab === 'audit' ? <AuditTab entries={detail.audit} /> : null}
+        </TabPanel>
+        <TabPanel name="audit" active={tab === 'audit'}>
+          <AuditTab entries={detail.audit} />
+        </TabPanel>
       </div>
     </div>
   );
 }
 
 function TabButton({
+  name,
   active,
   onClick,
   label,
 }: {
+  name: Tab;
   active: boolean;
   onClick: () => void;
   label: string;
@@ -84,6 +96,10 @@ function TabButton({
   return (
     <button
       type="button"
+      role="tab"
+      id={`tab-${name}`}
+      aria-selected={active}
+      aria-controls={`panel-${name}`}
       onClick={onClick}
       className={`relative px-3 py-2 text-sm font-medium transition ${
         active ? 'text-ink' : 'text-ink-muted hover:text-ink'
@@ -94,6 +110,27 @@ function TabButton({
         <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-ink" />
       ) : null}
     </button>
+  );
+}
+
+function TabPanel({
+  name,
+  active,
+  children,
+}: {
+  name: Tab;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={`panel-${name}`}
+      aria-labelledby={`tab-${name}`}
+      hidden={!active}
+    >
+      {active ? children : null}
+    </div>
   );
 }
 

@@ -16,6 +16,7 @@ is written by the cron wrapper helper (:mod:`scripts._wrapper`).
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -36,6 +37,11 @@ router = APIRouter(prefix="/admin/system", tags=["admin-system"])
 # collectively chunky enough to skip across a 1-min auto-refresh.
 _METRICS_CACHE: dict[str, Any] = {"at": 0.0, "payload": None}
 _METRICS_TTL = 30.0
+# Serialises the build path so concurrent first-hits don't all run
+# ``build_metrics`` against the DB — without this every cache miss
+# (cold start, post-TTL) can stampede with N admins refreshing in
+# tandem during an incident.
+_METRICS_LOCK = asyncio.Lock()
 
 
 @router.get("/metrics", response_model=SystemMetricsResponse)
@@ -52,9 +58,18 @@ async def get_system_metrics(
         response.headers["Cache-Control"] = f"private, max-age={int(_METRICS_TTL)}"
         return _METRICS_CACHE["payload"]
 
-    payload = await admin_system_service.build_metrics(db)
-    _METRICS_CACHE["at"] = now
-    _METRICS_CACHE["payload"] = payload
+    async with _METRICS_LOCK:
+        # Re-check under the lock — a sibling request may have already
+        # populated the cache while we were waiting to acquire.
+        now = time.monotonic()
+        if _METRICS_CACHE["payload"] is not None and now - _METRICS_CACHE["at"] < _METRICS_TTL:
+            response.headers["Cache-Control"] = f"private, max-age={int(_METRICS_TTL)}"
+            return _METRICS_CACHE["payload"]
+
+        payload = await admin_system_service.build_metrics(db)
+        _METRICS_CACHE["at"] = now
+        _METRICS_CACHE["payload"] = payload
+
     response.headers["Cache-Control"] = f"private, max-age={int(_METRICS_TTL)}"
     return payload
 
