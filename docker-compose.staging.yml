@@ -56,9 +56,12 @@ services:
       db:
         condition: service_healthy
     # Apply pending migrations, then start uvicorn (no --reload — this is
-    # a real deploy, not dev mode).
+    # a real deploy, not dev mode). --workers 1 mirrors the prod
+    # Dockerfile so the slowapi rate-limit counter + request_metrics
+    # aggregator behave identically on Pi and Railway. --proxy-headers
+    # likewise — both deploys live behind a reverse proxy.
     command: >
-      sh -c "alembic upgrade head && uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --log-level info"
+      sh -c "alembic upgrade head && exec uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips '*' --log-level info"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
       interval: 10s

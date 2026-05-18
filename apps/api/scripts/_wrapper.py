@@ -34,7 +34,7 @@ import logging
 import re
 import time
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
 from sqlalchemy import select
@@ -88,6 +88,33 @@ async def run_script(name: str, body: Callable[[], Awaitable[int]]) -> int:
     try:
         try:
             async with SessionLocal() as session:
+                # Cron-overlap guard: if there's a prior `running` row for
+                # this script that started within the last 2 hours, assume
+                # the previous invocation is still in flight and bail
+                # rather than racing it. Two-hour window is generous
+                # enough for refresh_similar_shares (the slowest cron)
+                # without holding the lock forever if a process died
+                # without cleaning up.
+                in_flight_cutoff = started - timedelta(hours=2)
+                existing = (
+                    await session.execute(
+                        select(ScriptRun)
+                        .where(ScriptRun.name == name)
+                        .where(ScriptRun.status == "running")
+                        .where(ScriptRun.started_at >= in_flight_cutoff)
+                        .order_by(ScriptRun.started_at.desc())
+                        .limit(1)
+                    )
+                ).scalar_one_or_none()
+                if existing is not None:
+                    logger.warning(
+                        "script %s skipped — prior run %s still in flight (started_at=%s)",
+                        name,
+                        existing.id,
+                        existing.started_at,
+                    )
+                    return 0
+
                 row = ScriptRun(name=name, started_at=started, status="running")
                 session.add(row)
                 await session.commit()

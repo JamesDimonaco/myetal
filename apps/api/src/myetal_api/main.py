@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -23,14 +25,38 @@ from myetal_api.core.observability import (
     configure_logging,
 )
 from myetal_api.core.rate_limit import limiter
-from myetal_api.core.request_metrics import RequestMetricsMiddleware
+from myetal_api.core.request_metrics import (
+    RequestMetricsMiddleware,
+)
+from myetal_api.core.request_metrics import (
+    flush_now as _request_metrics_flush_now,
+)
 
 # Configure logging BEFORE the FastAPI() call so import-time logs use the
 # right format. (Sentry SDK removed — PostHog covers error tracking on the
 # client; server logs go to Railway/Pi stdout.)
 configure_logging()
 
-app = FastAPI(title="MyEtAl API", version=__version__)
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    """App lifespan — startup runs nothing today; shutdown flushes the
+    in-memory request-metrics aggregator one last time so we don't drop
+    the trailing 0-60s of operational telemetry on every graceful
+    Railway redeploy. The flush task's `finally` already does this when
+    uvicorn cancels the task on SIGTERM, but adding an explicit hook
+    asserts the behaviour rather than relying on uvicorn discipline.
+    """
+    yield
+    try:
+        await _request_metrics_flush_now()
+    except Exception:
+        # Shutdown path; never mask the actual cause of the exit.
+        logger = __import__("logging").getLogger(__name__)
+        logger.exception("lifespan shutdown flush failed")
+
+
+app = FastAPI(title="MyEtAl API", version=__version__, lifespan=_lifespan)
 
 # slowapi binds to app.state.limiter and registers a 429 handler.
 app.state.limiter = limiter
