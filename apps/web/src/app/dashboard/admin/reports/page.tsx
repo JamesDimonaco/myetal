@@ -22,8 +22,12 @@ export default async function AdminReportsPage() {
     throw err;
   }
 
+  // The /dashboard/admin layout already provides max-w + horizontal +
+  // vertical padding; nesting another mx-auto/max-w/py here used to
+  // double-pad the page (visible top-margin gap + inset gutters on
+  // desktop). Render content directly.
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-10">
+    <>
       <div>
         <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">
           Report queue
@@ -37,6 +41,6 @@ export default async function AdminReportsPage() {
       <div className="mt-10">
         <ReportsQueue initialReports={reports} />
       </div>
-    </div>
+    </>
   );
 }

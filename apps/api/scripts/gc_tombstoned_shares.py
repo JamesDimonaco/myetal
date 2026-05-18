@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from myetal_api.core.config import settings
 from myetal_api.models import Share
+from scripts._wrapper import run_script
 
 _TOMBSTONE_GRACE = timedelta(days=30)
 
@@ -48,7 +49,7 @@ async def gc() -> int:
 
 def main() -> int:
     try:
-        deleted = asyncio.run(gc())
+        deleted = asyncio.run(run_script("gc_tombstoned_shares", gc))
     except Exception as exc:  # noqa: BLE001
         print(f"gc_tombstoned_shares FAILED: {exc}", file=sys.stderr)
         return 1

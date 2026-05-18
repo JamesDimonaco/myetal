@@ -55,18 +55,14 @@ USER myetal
 
 EXPOSE 8000
 
-# Shell-form CMD so `$PORT` expands at runtime. Railway sets $PORT to a
-# random value and routes external traffic to it. Falls back to 8000 for
-# the Pi compose stack which sets ENV-PORT mappings explicitly.
-# We run alembic before uvicorn so a migration drift never serves traffic.
-# `exec` ensures uvicorn replaces the shell so SIGTERM reaches the
-# Python process for clean shutdown.
-# --log-level info so first-boot messages are visible in Railway logs.
-# --workers 1 because slowapi's rate limit counter is per-worker.
-CMD alembic upgrade head && exec uvicorn myetal_api.main:app \
-     --host 0.0.0.0 \
-     --port ${PORT:-8000} \
-     --workers 1 \
-     --proxy-headers \
-     --forwarded-allow-ips '*' \
-     --log-level info
+# JSON-form CMD invoking `sh -c` so we still get $PORT expansion AND
+# satisfy buildkit's JSON-args linter (signal handling is now sh -> exec
+# uvicorn, which keeps SIGTERM routing to the Python process).
+#
+# Railway sets $PORT to a random value at boot and routes external
+# traffic to it. The `:-8000` fallback covers the Pi compose stack
+# where the port is fixed in env. Alembic runs first so a migration
+# drift never serves traffic; `exec` after `&&` replaces the shell with
+# uvicorn so SIGTERM reaches Python cleanly. `--workers 1` keeps
+# slowapi's per-process rate-limit counter coherent.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn myetal_api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers --forwarded-allow-ips '*' --log-level info"]

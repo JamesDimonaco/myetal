@@ -99,9 +99,7 @@ function ReportCard({
           </div>
           <p className="mt-2 font-serif text-lg leading-snug text-ink">
             <a
-              href={`/c/${report.share_short_code}`}
-              target="_blank"
-              rel="noreferrer noopener"
+              href={`/dashboard/admin/shares/${report.share_id}`}
               className="underline decoration-rule decoration-1 underline-offset-4 transition hover:decoration-ink"
             >
               {report.share_name}
@@ -112,7 +110,15 @@ function ReportCard({
           ) : null}
           <p className="mt-1 text-xs text-ink-faint">
             Reported {formatRelativeTime(report.created_at)}
-            {report.share_deleted_at ? ' · share already tombstoned' : ''}
+            {report.share_deleted_at ? ' · share already tombstoned' : ''} ·{' '}
+            <a
+              href={`/c/${report.share_short_code}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-ink-muted hover:underline"
+            >
+              public viewer
+            </a>
           </p>
         </div>
 

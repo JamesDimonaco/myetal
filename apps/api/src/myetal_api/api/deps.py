@@ -158,24 +158,31 @@ async def require_admin(
     keep elevated rights for up to the JWT TTL. Always read authorization
     from the source of truth.
 
-    NOTE: the ``User.is_admin`` DB column exists (Better Auth additionalField)
-    but is NOT consulted here yet — the env-var allowlist is the v1 contract
-    because it's set per-deploy and changes require a redeploy, which is the
-    same change-control envelope as toggling who's allowed in. If we ever
-    want admin to be a runtime-grantable property (e.g. promote a user via
-    SQL without a deploy), switch this dep to ``return user if user.is_admin
-    else raise HTTPException(...)`` and stop reading ``settings.admin_emails``.
+    Admission is granted when EITHER:
+    - ``user.is_admin`` is true on the DB row (runtime-grantable via the
+      Stage 2 ``/admin/users/{id}/admin`` toggle), OR
+    - ``user.email`` is in ``settings.admin_emails`` (the env allowlist,
+      set per-deploy — the seed-admin / break-glass path).
+
+    Union semantics so the Stage 2 "Grant admin" UI action actually
+    promotes someone (previously it flipped a column nothing read), and
+    the env list stays as the bootstrap path for fresh-DB deploys where
+    no DB-row admin exists yet.
     """
     from myetal_api.core.config import settings
 
+    if user.is_admin:
+        return user
+
     allowed = {e.lower() for e in settings.admin_emails}
     user_email = (user.email or "").lower()
-    if user_email not in allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="admin only",
-        )
-    return user
+    if user_email in allowed:
+        return user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="admin only",
+    )
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

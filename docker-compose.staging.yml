@@ -56,9 +56,21 @@ services:
       db:
         condition: service_healthy
     # Apply pending migrations, then start uvicorn (no --reload — this is
-    # a real deploy, not dev mode).
-    command: >
-      sh -c "alembic upgrade head && uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --log-level info"
+    # a real deploy, not dev mode). --workers 1 mirrors the prod
+    # Dockerfile so the slowapi rate-limit counter + request_metrics
+    # aggregator behave identically on Pi and Railway. --proxy-headers
+    # likewise — both deploys live behind a reverse proxy.
+    #
+    # Exec/JSON form (not the folded-scalar shell form) so Docker doesn't
+    # wrap the whole thing in an outer `/bin/sh -c` — that nested shell
+    # swallows SIGTERM on `docker compose stop` and uvicorn never sees
+    # the signal. With the array form the single sh runs the && chain
+    # and `exec uvicorn …` replaces sh in-place, so SIGTERM reaches
+    # uvicorn directly and graceful shutdown works.
+    command:
+      - sh
+      - -c
+      - "alembic upgrade head && exec uvicorn myetal_api.main:app --host 0.0.0.0 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips '*' --log-level info"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
       interval: 10s

@@ -30,6 +30,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from myetal_api.core.config import settings
+from scripts._wrapper import run_script
 
 _REFRESH_SQL = text(
     """
@@ -69,7 +70,7 @@ async def refresh() -> int:
 
 def main() -> int:
     try:
-        touched = asyncio.run(refresh())
+        touched = asyncio.run(run_script("refresh_trending", refresh))
     except Exception as exc:  # noqa: BLE001
         print(f"refresh_trending FAILED: {exc}", file=sys.stderr)
         return 1

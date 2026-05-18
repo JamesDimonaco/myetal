@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from myetal_api.core.config import settings
 from myetal_api.models import ShareView
+from scripts._wrapper import run_script
 
 _RETENTION = timedelta(days=90)
 
@@ -42,7 +43,7 @@ async def prune() -> int:
 
 def main() -> int:
     try:
-        deleted = asyncio.run(prune())
+        deleted = asyncio.run(run_script("prune_share_views", prune))
     except Exception as exc:  # noqa: BLE001
         print(f"prune_share_views FAILED: {exc}", file=sys.stderr)
         return 1

@@ -240,11 +240,15 @@ const fromPaperOut = (p: PaperOut): DraftItem => ({
 const fromAddPayload = (payload: AddItemPayload): DraftItem => {
   if (payload.kind === 'paper') return fromPaper(payload.paper);
   if (payload.kind === 'pdf') {
-    // PDF upload already happened — the modal hands us the materialised URLs
-    // and metadata. The editor PATCH/POST below echoes these back so the
-    // ShareItem row carries kind='pdf' + the four PDF fields.
+    // PDF upload already happened — the modal hands us the materialised URLs,
+    // metadata, AND the server-assigned ShareItem.id from record-pdf-upload.
+    // The id is critical: the editor's subsequent PATCH /shares/{id} sends
+    // PDF items as `{ id, title, subtitle?, notes? }` only (see toApiItems
+    // in handleSave); without the id, the item path falls into the
+    // "client-supplied create" branch which the API rejects for kind='pdf'.
     return {
       _key: newKey(),
+      id: payload.id,
       kind: 'pdf',
       title: payload.title,
       scholar_url: '',
