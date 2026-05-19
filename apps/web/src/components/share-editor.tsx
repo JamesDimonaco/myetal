@@ -787,7 +787,23 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             type="button"
             role="switch"
             aria-checked={publishedAt !== null}
+            aria-busy={
+              publishMutation.isPending || unpublishMutation.isPending
+            }
+            disabled={
+              !isNew &&
+              (publishMutation.isPending || unpublishMutation.isPending)
+            }
             onClick={() => {
+              // Belt-and-braces with the `disabled` attr: keyboard / programmatic
+              // dispatch during a pending mutation would otherwise fire a second
+              // request whose server-order is undefined.
+              if (
+                !isNew &&
+                (publishMutation.isPending || unpublishMutation.isPending)
+              ) {
+                return;
+              }
               const previousValue = publishedAt;
               const newValue = publishedAt
                 ? null
@@ -822,7 +838,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               );
             }}
             className={[
-              'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition',
+              'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60',
               publishedAt ? 'bg-accent' : 'bg-ink-faint',
             ].join(' ')}
           >

@@ -12,6 +12,7 @@ When a ticket ships, `git mv` it into `done/` so the queue stays clean.
 
 | # | Ticket | Effort | Why this priority | Depends on |
 |---|---|---|---|---|
+| 0 | **[onboarding-tour-and-quick-share](to-do/onboarding-tour-and-quick-share.md)** | ~4-6 hours | **In progress on staging.** First-run dashboard tour + quick-share toolbar on the QR modal + closes the last open `ux-stream-review` item (publish-toggle in-flight guard). Web only — mobile parity tracked separately. | none |
 | 1 | **[prod-cutover-checklist](to-do/prod-cutover-checklist.md)** | ~1 hour active + 7 days spread for comms | **Promote BA from staging to main → Railway.** Destructive Alembic, T-7 comms, smoke matrix. The single biggest near-term gate. | staging baked |
 | 2 | **[better-auth-cutover-runbook](to-do/better-auth-cutover-runbook.md)** | ~2 hours (deploy-day) | Companion to #1 — more detailed runbook for the actual cutover sequence. Use #1 as the checklist, #2 as the deep reference. | same as #1 |
 | 3 | **[better-auth-followups](to-do/better-auth-followups.md)** | ~5-7 days | **Account linking across email / Google / GitHub / ORCID** — owner-prioritised UX gap. Plus 9 smaller post-cutover hardening items (mobile sign-out server-revoke, exchange-code refactor, ORCID private-email recovery, hard email verification flip, mypy/eslint debt, etc). | Better Auth cutover run |
@@ -26,6 +27,7 @@ When a ticket ships, `git mv` it into `done/` so the queue stays clean.
 | 12 | **[gha-node20-deprecation](to-do/gha-node20-deprecation.md)** | done (~10 min) | **Bumped to Node 24-compatible actions in commit `a9f84e8`.** Ticket should move to done/. | none |
 | 13 | **[pdf-virus-scanning-future](to-do/pdf-virus-scanning-future.md)** | ~1.5 days (Pi) / ~2-3 days (Railway) | Defensive depth. PR-C v1 has MIME magic-bytes + `pdftoppm` timeout — sufficient at our scale. | none |
 | 14 | **[discovery-and-handles-future](to-do/discovery-and-handles-future.md)** | ~3 days | Needs demand signal. Real `/u/{handle}` profiles wait for > 100 users or branding requests. | none |
+| 15 | **[mobile-tour-and-quick-share-followup](to-do/mobile-tour-and-quick-share-followup.md)** | ~1-1.5 days | Mobile parity for the 2026-05-19 web tour + QR-quick-share bundle. Wait for the web shape to bake a week before pulling. | onboarding-tour-and-quick-share shipped + baked |
 
 ---
 
