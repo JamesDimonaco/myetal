@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { ShareList } from './share-list';
+import { DashboardTour, ShowTourButton } from '@/components/dashboard-tour';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
@@ -93,7 +94,8 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-2 text-sm text-ink-muted">
             Each share is one QR code — could be a single paper, a curated
-            list, or a bundle of links.
+            list, or a bundle of links.{' '}
+            <ShowTourButton className="text-sm text-ink-muted underline underline-offset-4 transition hover:text-ink" />
           </p>
         </div>
         <Link
@@ -107,6 +109,8 @@ export default async function DashboardPage() {
       <div className="mt-10">
         <ShareList initialShares={shares} libraryCount={libraryCount} />
       </div>
+
+      <DashboardTour />
     </div>
   );
 }
