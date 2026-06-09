@@ -18,9 +18,9 @@ The "Critical" bar is clear, but the three **Serious** issues below are not auto
 
 | Serious issue | Status | Notes |
 |---|---|---|
-| 1. StrictMode side-effect in `removeItem` (`share-editor.tsx:408-416`) | Open | Fix: move `toast.success` out of the `setItems` updater. |
-| 2. `aria-activedescendant` ignores Create row (`tag-input.tsx:320-324`) | Open | Fix: point at the Create `<li>` id when `highlightOnCreate` is true. |
-| 3. Publish toggle has no in-flight guard (`share-editor.tsx:770-802`) | Open | Fix: disable the switch when either mutation is pending. |
+| 1. StrictMode side-effect in `removeItem` (`share-editor.tsx:408-416`) | **Resolved** (re-verified 2026-05-19) | Toast moved outside `setItems`; `items.find(...)` reads from closure. See `share-editor.tsx:415-427`. |
+| 2. `aria-activedescendant` ignores Create row (`tag-input.tsx:320-324`) | **Resolved** (re-verified 2026-05-19) | Points at `${listboxId}-opt-${visibleSuggestions.length}` when `highlightOnCreate`. See `tag-input.tsx:320-333`. |
+| 3. Publish toggle has no in-flight guard (`share-editor.tsx:770-802`) | **Resolved** (2026-05-19) | Fixed as part of `onboarding-tour-and-quick-share.md` bucket 1: `disabled` on the switch + early-return in `onClick` while either mutation is pending. |
 
 ## Serious
 
