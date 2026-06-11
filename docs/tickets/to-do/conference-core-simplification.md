@@ -1,6 +1,11 @@
 # Conference-core simplification — focus the product on the QR loop
 
-**Status:** In progress (2026-06-11)
+**Status:** Implemented (2026-06-11) on `claude/practical-hertz-4b3f13` — awaiting owner testing.
+Streams 1–3 all built (commits `c75817d`, `63160ca`, `54ec18e`, `7ef804b`). Item 11
+(mobile-web QA) done for every touched surface (QR-modal scroll + responsive QR,
+share-card break-words, `bg-surface-sunken` token fix); a full-app 375px sweep is
+still worth a manual pass. Deploy notes: API needs `RESEND_API_KEY` set in prod
+for email-me (skips with a warning otherwise); reportlab ships via uv.lock.
 **Owner:** James
 **Effort estimate:** ~4-6 days across 3 streams (hide / polish / add)
 **Companion to:** `qr-poster-pdf.md` (absorbed, web-only), `discovery-and-handles-future.md` (lightweight v1 absorbed), `share-editor-ux-polish.md` (complementary), `mobile-tour-and-quick-share-followup.md` (ON HOLD — see below)
