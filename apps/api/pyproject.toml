@@ -26,6 +26,7 @@ dependencies = [
     "boto3~=1.35",
     "pdf2image~=1.17",
     "Pillow~=11.0",
+    "reportlab>=4.5.1",
 ]
 
 [dependency-groups]

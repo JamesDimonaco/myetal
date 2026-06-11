@@ -870,6 +870,7 @@ async def get_user_public_card(
                 User.id,
                 User.name,
                 User.avatar_url,
+                User.orcid_id,
                 count_subq.label("share_count"),
             ).where(User.id == user_id)
         )
@@ -881,6 +882,7 @@ async def get_user_public_card(
         name=row.name,
         avatar_url=row.avatar_url,
         share_count=row.share_count,
+        orcid_id=row.orcid_id,
     )
 
 
