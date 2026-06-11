@@ -67,6 +67,9 @@ export interface PublicShareResponse {
   type: ShareType;
   items: ShareItem[];
   owner_name: string | null;
+  /** Owner's user UUID — links the viewer to `/u/{owner_id}`. Null when the
+   *  owner has hidden their profile (no published shares attributable). */
+  owner_id: string | null;
   updated_at: string;
   related_shares: RelatedShare[];
   similar_shares: SimilarShare[];
@@ -237,4 +240,6 @@ export interface UserPublicOut {
   name: string | null;
   avatar_url: string | null;
   share_count: number;
+  /** Bare ORCID iD (e.g. `0000-0002-1825-0097`) when the user linked one. */
+  orcid_id: string | null;
 }

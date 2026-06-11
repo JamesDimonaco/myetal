@@ -1,8 +1,9 @@
 /**
  * Renders a single user as a discovery card. Surfaced in the user-search
  * block on `/dashboard/search` and `/browse` (PR-B §5). Tappable: links to
- * `/browse?owner_id={id}` so the viewer lands on that user's published
- * shares (Q15-C punts handles to a future ticket).
+ * the researcher page `/u/{id}` (the lightweight-v1 profile from
+ * conference-core-simplification; old `/browse?owner_id=` links keep
+ * resolving).
  *
  * Visual: round avatar + name + share count, deliberately distinct from the
  * rectangular share cards above so the user can tell people from collections
@@ -21,7 +22,7 @@ interface Props {
 export function UserCard({ user }: Props) {
   return (
     <Link
-      href={`/browse?owner_id=${encodeURIComponent(user.id)}`}
+      href={`/u/${encodeURIComponent(user.id)}`}
       className="group flex items-center gap-3 rounded-md border border-rule bg-paper-soft px-4 py-3 transition hover:border-ink/30"
     >
       <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={40} />

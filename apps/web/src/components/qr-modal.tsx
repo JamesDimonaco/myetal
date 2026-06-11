@@ -49,8 +49,10 @@ function slugForFilename(name: string): string {
  */
 export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: Props) {
   const qrUrl = `${API_BASE_URL}/public/c/${encodeURIComponent(shortCode)}/qr.png`;
+  const posterUrl = `${API_BASE_URL}/public/c/${encodeURIComponent(shortCode)}/poster.pdf`;
   const shareUrl = `${SITE_URL}/c/${shortCode}`;
   const qrDownloadName = `${slugForFilename(collectionName)}-qr.png`;
+  const posterDownloadName = `${slugForFilename(collectionName)}-poster.pdf`;
 
   const handleCopyLink = async () => {
     try {
@@ -114,7 +116,14 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-sm">
+      {/* Tall content stack (~700px) — cap to the viewport and scroll inside,
+          same treatment as the add-item modal, so short/landscape phones can
+          reach the CTAs. QR shrinks below `sm` so 320px viewports don't
+          overflow horizontally. */}
+      <DialogContent
+        className="max-w-sm overflow-y-auto"
+        style={{ maxHeight: 'calc(100vh - 4rem)' }}
+      >
         <DialogTitle className="pr-8">{collectionName}</DialogTitle>
         <DialogDescription className="mt-1">
           Anyone with a phone can scan this.
@@ -128,7 +137,7 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
               alt={`QR code for "${collectionName}"`}
               width={240}
               height={240}
-              className="h-60 w-60"
+              className="h-48 w-48 sm:h-60 sm:w-60"
             />
           </div>
         </div>
@@ -161,11 +170,10 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
           </button>
         </div>
 
-        {/* Quick-share toolbar. Five destinations covering the gestures users
-            already know: save the QR image, hand off via the native share
-            sheet, copy a markdown citation for Slack/Notion, intent links for
-            X and email. The print-poster PDF (qr-poster-pdf.md) will slot in
-            here as a sixth tile when the API endpoint lands. */}
+        {/* Quick-share toolbar. Six destinations covering the gestures users
+            already know: save the QR image, a print-ready A4 poster PDF,
+            hand off via the native share sheet, copy a markdown citation for
+            Slack/Notion, intent links for X and email. */}
         <div className="mt-6 border-t border-rule pt-4">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
             Share
@@ -179,6 +187,15 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
             >
               <DownloadIcon />
               <span className="mt-1.5 text-[11px] text-ink-muted">QR image</span>
+            </a>
+            <a
+              href={posterUrl}
+              download={posterDownloadName}
+              className={shareTileClass}
+              aria-label="Download print-ready poster PDF"
+            >
+              <PosterIcon />
+              <span className="mt-1.5 text-[11px] text-ink-muted">Poster PDF</span>
             </a>
             <button
               type="button"
@@ -287,6 +304,37 @@ function DownloadIcon() {
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PosterIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <rect
+        x="3.5"
+        y="1.5"
+        width="11"
+        height="15"
+        rx="1"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <rect
+        x="6"
+        y="4"
+        width="6"
+        height="6"
+        rx="0.5"
+        stroke="currentColor"
+        strokeWidth="1.25"
+      />
+      <path
+        d="M6 12.5h6M7.5 14.5h3"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinecap="round"
       />
     </svg>
   );

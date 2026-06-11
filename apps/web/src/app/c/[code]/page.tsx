@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { EmailMeButton } from '@/components/email-me-button';
 import { ReportButton } from '@/components/report-button';
 import { SaveButton } from '@/components/save-button';
 import { ShareItemCard } from '@/components/share-item-card';
@@ -239,7 +240,18 @@ export default async function PublicSharePage({ params }: PageProps) {
           {share.name}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
-          {share.owner_name ? <span>by {share.owner_name}</span> : null}
+          {share.owner_name ? (
+            share.owner_id ? (
+              <Link
+                href={`/u/${share.owner_id}`}
+                className="underline-offset-2 transition hover:text-ink hover:underline"
+              >
+                by {share.owner_name}
+              </Link>
+            ) : (
+              <span>by {share.owner_name}</span>
+            )
+          ) : null}
           <span aria-hidden>·</span>
           <span>Updated {formatRelativeTime(share.updated_at)}</span>
           <span aria-hidden>·</span>
@@ -308,12 +320,12 @@ export default async function PublicSharePage({ params }: PageProps) {
               <li key={rs.short_code}>
                 <Link
                   href={`/c/${rs.short_code}`}
-                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-surface-sunken"
+                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-paper-soft"
                 >
                   <span className="text-sm font-medium text-ink group-hover:underline">
                     {rs.name}
                   </span>
-                  <span className="ml-3 shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
+                  <span className="ml-3 shrink-0 rounded-full bg-paper-soft px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
                     {rs.papers_in_common} in common
                   </span>
                 </Link>
@@ -334,12 +346,12 @@ export default async function PublicSharePage({ params }: PageProps) {
               <li key={ss.short_code}>
                 <Link
                   href={`/c/${ss.short_code}`}
-                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-surface-sunken"
+                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-paper-soft"
                 >
                   <span className="text-sm font-medium text-ink group-hover:underline">
                     {ss.name}
                   </span>
-                  <span className="ml-3 shrink-0 rounded-full bg-surface-sunken px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
+                  <span className="ml-3 shrink-0 rounded-full bg-paper-soft px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
                     {ss.papers_in_common} in common
                   </span>
                 </Link>
@@ -357,6 +369,13 @@ export default async function PublicSharePage({ params }: PageProps) {
               {formatItemCount(itemCount)} ·{' '}
               <code className="text-ink">/c/{share.short_code}</code>
             </p>
+            <Link
+              href={`/c/${share.short_code}/present`}
+              className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+            >
+              <PresentIcon />
+              Present fullscreen
+            </Link>
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -366,6 +385,9 @@ export default async function PublicSharePage({ params }: PageProps) {
             height={160}
             className="h-40 w-40 rounded-md border border-rule bg-white p-2 sm:h-36 sm:w-36"
           />
+        </div>
+        <div className="mt-8 flex justify-center sm:justify-start">
+          <EmailMeButton shortCode={share.short_code} />
         </div>
       </aside>
 
@@ -391,5 +413,27 @@ export default async function PublicSharePage({ params }: PageProps) {
         </p>
       </footer>
     </main>
+  );
+}
+
+function PresentIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="1.5"
+        y="2.5"
+        width="13"
+        height="9"
+        rx="1"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M8 11.5v2M5.5 13.5h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
