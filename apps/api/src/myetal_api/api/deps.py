@@ -140,6 +140,23 @@ async def get_current_user_optional(
     return await db.get(User, user_id)
 
 
+def is_effective_admin(user: User) -> bool:
+    """True when the user is an admin by DB flag OR env allowlist.
+
+    The single source of truth for "is this user an admin", shared by
+    ``require_admin`` (API authz) and ``GET /me`` (what the web/mobile
+    UIs render). Keeping them on one predicate prevents the split-brain
+    where the API admits an allowlisted email to ``/admin/*`` but ``/me``
+    reports ``is_admin: false`` and the web admin layout bounces them.
+    """
+    if user.is_admin:
+        return True
+    from myetal_api.core.config import settings
+
+    allowed = {e.lower() for e in settings.admin_emails}
+    return (user.email or "").lower() in allowed
+
+
 async def require_admin(
     user: Annotated[User, Depends(get_current_user)],
 ) -> User:
@@ -169,14 +186,7 @@ async def require_admin(
     the env list stays as the bootstrap path for fresh-DB deploys where
     no DB-row admin exists yet.
     """
-    from myetal_api.core.config import settings
-
-    if user.is_admin:
-        return user
-
-    allowed = {e.lower() for e in settings.admin_emails}
-    user_email = (user.email or "").lower()
-    if user_email in allowed:
+    if is_effective_admin(user):
         return user
 
     raise HTTPException(
