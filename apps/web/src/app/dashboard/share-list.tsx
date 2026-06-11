@@ -274,7 +274,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
                   </span>
                 ) : null}
               </div>
-              <h3 className="mt-2 font-serif text-lg leading-snug text-ink">
+              <h3 className="mt-2 break-words font-serif text-lg leading-snug text-ink">
                 {share.name}
               </h3>
               <p className="mt-1 text-sm text-ink-muted">

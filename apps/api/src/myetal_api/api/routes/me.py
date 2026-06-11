@@ -18,11 +18,21 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
-from myetal_api.api.deps import CurrentUser, DbSession
+from myetal_api.api.deps import CurrentUser, DbSession, is_effective_admin
+from myetal_api.models import User
 from myetal_api.schemas.user import UpdateMeRequest, UserResponse
 from myetal_api.services import users as users_service
 
 router = APIRouter(prefix="/me", tags=["me"])
+
+
+def _user_response(user: User) -> UserResponse:
+    # ``is_admin`` must be the *effective* admin status (DB flag OR env
+    # allowlist) — the web admin layout gates on this field, so reporting
+    # the raw DB flag locks env-allowlisted admins out of the admin UI.
+    response = UserResponse.model_validate(user)
+    response.is_admin = is_effective_admin(user)
+    return response
 
 
 @router.get("", response_model=UserResponse)
@@ -32,7 +42,7 @@ async def get_me(user: CurrentUser) -> UserResponse:
     Same JSON shape as the legacy ``GET /auth/me``. Auth via the BA
     JWT in ``Authorization: Bearer``; see ``api/deps.py::get_current_user``.
     """
-    return UserResponse.model_validate(user)
+    return _user_response(user)
 
 
 @router.patch("/orcid", response_model=UserResponse)
@@ -51,4 +61,4 @@ async def update_me_orcid(body: UpdateMeRequest, user: CurrentUser, db: DbSessio
                 status_code=status.HTTP_409_CONFLICT,
                 detail="orcid_id is already linked to another account",
             ) from exc
-    return UserResponse.model_validate(user)
+    return _user_response(user)

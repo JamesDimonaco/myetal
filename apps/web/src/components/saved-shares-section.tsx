@@ -22,7 +22,7 @@ export function SavedSharesSection() {
           // remains a Link.
           <div
             key={s.short_code}
-            className="group flex items-center justify-between gap-2 rounded-md border border-ink/10 pr-2 transition-colors hover:border-ink/20 hover:bg-surface-sunken"
+            className="group flex items-center justify-between gap-2 rounded-md border border-ink/10 pr-2 transition-colors hover:border-ink/20 hover:bg-paper-soft"
           >
             <Link
               href={`/c/${s.short_code}`}

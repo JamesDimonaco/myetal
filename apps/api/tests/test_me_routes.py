@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
+import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,6 +94,40 @@ async def test_get_me_returns_profile(api_client: TestClient, db_session: AsyncS
     assert body["id"] == str(user.id)
     assert body["email"] == "me-test@example.com"
     assert body["name"] == "Me Test"
+
+
+async def test_get_me_reports_allowlist_admin(
+    api_client: TestClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An env-allowlisted email gets ``is_admin: true`` from GET /me even
+    when the DB flag is false — the web admin layout gates on this field,
+    so without it allowlisted admins are bounced from /dashboard/admin."""
+    from myetal_api.core.config import settings
+
+    user = await make_user(db_session, email="seed-admin@example.com", name="Seed Admin")
+    assert user.is_admin is False
+
+    monkeypatch.setattr(settings, "admin_emails", ["Seed-Admin@example.com"])
+    r = api_client.get("/me", headers=auth_headers(user))
+    assert r.status_code == 200
+    assert r.json()["is_admin"] is True
+
+
+async def test_get_me_non_admin_stays_false(
+    api_client: TestClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A user neither flagged in the DB nor allowlisted reads as non-admin."""
+    from myetal_api.core.config import settings
+
+    user = await make_user(db_session, email="plain@example.com", name="Plain User")
+    monkeypatch.setattr(settings, "admin_emails", ["someone-else@example.com"])
+    r = api_client.get("/me", headers=auth_headers(user))
+    assert r.status_code == 200
+    assert r.json()["is_admin"] is False
 
 
 def test_get_me_unauthenticated_returns_401(api_client: TestClient) -> None:

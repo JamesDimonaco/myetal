@@ -4,7 +4,9 @@
 
 When a ticket ships, `git mv` it into `done/` so the queue stays clean.
 
-**Current state (2026-05-11):** Better Auth is **live on staging** (Vercel preview + Pi). All four sign-in paths (email + Google + GitHub + ORCID) verified end-to-end. Prod cutover blocked on: pre-cutover comms email + final smoke pass.
+**Current state (2026-06-11):** Better Auth is **live on staging** (Vercel preview + Pi). All four sign-in paths (email + Google + GitHub + ORCID) verified end-to-end. Prod cutover blocked on: pre-cutover comms email + final smoke pass.
+
+**Platform decision (2026-06-11):** the Expo **mobile app is ON HOLD** — web only for now, with mobile *web* responsiveness treated as first-class. See [conference-core-simplification](to-do/conference-core-simplification.md) for rationale. Mobile-parity tickets are paused, not deleted.
 
 ---
 
@@ -12,13 +14,14 @@ When a ticket ships, `git mv` it into `done/` so the queue stays clean.
 
 | # | Ticket | Effort | Why this priority | Depends on |
 |---|---|---|---|---|
+| 0a | **[conference-core-simplification](to-do/conference-core-simplification.md)** | ~4-6 days | **In progress (2026-06-11).** Focus the product on the conference QR loop: slim the authed nav to Shares, editor simple mode, QR poster PDF, researcher page `/u/{id}`, email-me-this-collection, presenter mode, mobile-web QA. Absorbs `qr-poster-pdf` (web-only) + lightweight v1 of `discovery-and-handles-future`. | none |
 | 0 | **[onboarding-tour-and-quick-share](to-do/onboarding-tour-and-quick-share.md)** | ~4-6 hours | **In progress on staging.** First-run dashboard tour + quick-share toolbar on the QR modal + closes the last open `ux-stream-review` item (publish-toggle in-flight guard). Web only — mobile parity tracked separately. | none |
 | 1 | **[prod-cutover-checklist](to-do/prod-cutover-checklist.md)** | ~1 hour active + 7 days spread for comms | **Promote BA from staging to main → Railway.** Destructive Alembic, T-7 comms, smoke matrix. The single biggest near-term gate. | staging baked |
 | 2 | **[better-auth-cutover-runbook](to-do/better-auth-cutover-runbook.md)** | ~2 hours (deploy-day) | Companion to #1 — more detailed runbook for the actual cutover sequence. Use #1 as the checklist, #2 as the deep reference. | same as #1 |
 | 3 | **[better-auth-followups](to-do/better-auth-followups.md)** | ~5-7 days | **Account linking across email / Google / GitHub / ORCID** — owner-prioritised UX gap. Plus 9 smaller post-cutover hardening items (mobile sign-out server-revoke, exchange-code refactor, ORCID private-email recovery, hard email verification flip, mypy/eslint debt, etc). | Better Auth cutover run |
 | 4 | **[railway-migration-future](to-do/railway-migration-future.md)** | ~5-7 days | **Mostly done — Railway prod is live.** This ticket originally scoped the migration; now mostly executed. May need final docs cleanup. | none |
 | 5 | **[feedback-round-3-bug-bag](to-do/feedback-round-3-bug-bag.md)** | ~1-2 days | Seven user-reported bugs/polish items, mostly already addressed (color-scheme, OAuth icons, clear-recents). Open items: publish-to-discovery double-press regression, ORCID-button-greyed edge cases. | none |
-| 6 | **[qr-poster-pdf](to-do/qr-poster-pdf.md)** | ~1.5 days | Print-ready A4 PDF download from the share's QR modal. The QR is the bridge from physical → digital; this makes that bridge actually printable. | none |
+| 6 | **[qr-poster-pdf](to-do/qr-poster-pdf.md)** | ~1.5 days | **Absorbed into conference-core-simplification (web-only — mobile button dropped).** Spec stays here as the reference; move to done/ when 0a ships. | rolled into 0a |
 | 7 | **[auth-integration-tests](to-do/auth-integration-tests.md)** | ~1 day | The test that would have caught all of today's BA-config-drift bugs. Postgres-via-testcontainers + vitest exercising the BA write paths. | none |
 | 8 | **[form-error-surfacing](to-do/form-error-surfacing.md)** | ~30-60 min | Route hidden-field Zod errors to a friendly banner instead of leaking the raw message. Captured after today's `file_size_bytes=0` confusion. | none |
 | 9 | **[comments-on-shares](to-do/comments-on-shares.md)** | ~6 days | Deferred for user testing. Pull off the shelf when usage data justifies it. | none |
@@ -26,8 +29,8 @@ When a ticket ships, `git mv` it into `done/` so the queue stays clean.
 | 11 | **[code-cleanup-sentry-uploadthing](to-do/code-cleanup-sentry-uploadthing.md)** | done (~15 min) | **Sentry SDK removed in commit `574ba97`.** UploadThing was already unused; just need to delete the line from local `.env.prod`. Ticket should move to done/. | none |
 | 12 | **[gha-node20-deprecation](to-do/gha-node20-deprecation.md)** | done (~10 min) | **Bumped to Node 24-compatible actions in commit `a9f84e8`.** Ticket should move to done/. | none |
 | 13 | **[pdf-virus-scanning-future](to-do/pdf-virus-scanning-future.md)** | ~1.5 days (Pi) / ~2-3 days (Railway) | Defensive depth. PR-C v1 has MIME magic-bytes + `pdftoppm` timeout — sufficient at our scale. | none |
-| 14 | **[discovery-and-handles-future](to-do/discovery-and-handles-future.md)** | ~3 days | Needs demand signal. Real `/u/{handle}` profiles wait for > 100 users or branding requests. | none |
-| 15 | **[mobile-tour-and-quick-share-followup](to-do/mobile-tour-and-quick-share-followup.md)** | ~1-1.5 days | Mobile parity for the 2026-05-19 web tour + QR-quick-share bundle. Wait for the web shape to bake a week before pulling. | onboarding-tour-and-quick-share shipped + baked |
+| 14 | **[discovery-and-handles-future](to-do/discovery-and-handles-future.md)** | ~3 days | Needs demand signal. Real `/u/{handle}` profiles wait for > 100 users or branding requests. **Lightweight `/u/{uuid}` v1 (no handle migration) absorbed into 0a** — this ticket keeps the @handle/profile-edit scope. | none |
+| 15 | **[mobile-tour-and-quick-share-followup](to-do/mobile-tour-and-quick-share-followup.md)** | ~1-1.5 days | **ON HOLD — mobile app paused (2026-06-11, see 0a).** Do not pull until the platform decision is revisited. | mobile app un-paused |
 
 ---
 
@@ -40,7 +43,7 @@ Ideas surfaced by the new-ticket-scoping pass. All small, all on-wedge, but **no
 | **bulk-doi-paste** | ~1.5-2 days | Paste a list of DOIs once and add them all to a share or library. Fan-out via existing `/papers/lookup`. Park until someone has 20 papers and complains. |
 | **share-cover-image** | ~2 days | Custom OG/Twitter card image on the public share viewer. Reuses the R2 upload pipeline from PDFs. Park until owners ask for branding. |
 | **duplicate-share** | ~1.5 days | "Duplicate this share" → clone items + tags into a new draft with a fresh `short_code`. Useful for talks/posters/grants. Park until the use case surfaces in feedback. |
-| **share-presenter-mode** | ~1 day | Big-text, swipeable view of a share's items at `/c/{code}/present` for live conference talks. Reuses `PublicShareResponse`. Park; ship and watch analytics if anyone asks. |
+| **share-presenter-mode** | ~1 day | **Promoted into conference-core-simplification (0a).** Big-text, swipeable view at `/c/{code}/present` for live conference talks. |
 | **drag-to-reorder + inline title rename** | ~1-2 days | Up/down arrow reorder already works on both platforms; this is a UX polish upgrade to drag-and-drop + inline-title editing. |
 | **migrate-middleware-to-proxy-ts** | ~10 min | Next.js 16 deprecates `middleware.ts` in favour of `proxy.ts`. Codemod available. Do once sign-in is stable in prod. |
 | **api-on-railway-only-cleanup** | ~30 min | Pi prod stack still running as hot fallback. After 48h of Railway stability, take down `docker compose down` on the Pi to free resources. |

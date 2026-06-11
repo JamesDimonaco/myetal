@@ -50,6 +50,14 @@ REPORT_LIMIT = "3/hour"
 # ticket. 5/hour is generous for legitimate feedback but caps spam.
 FEEDBACK_LIMIT = "5/hour"
 
+# Anonymous "email me this collection" sends — per
+# conference-core-simplification §9. This per-IP layer is a blunt backstop
+# only: the web app proxies anonymous POSTs through a single Vercel egress
+# IP, so every web visitor shares one counter here. The real abuse caps
+# (per-recipient + per-share, rolling 24h) live in `services/email.py`
+# next to the send path.
+SHARE_EMAIL_LIMIT = "10/hour"
+
 # Public share search — tighter than ANON_READ_LIMIT because search hits
 # GiST indexes across the whole published corpus, making it more expensive
 # than a single-share lookup.  20/min/IP caps scraping while allowing

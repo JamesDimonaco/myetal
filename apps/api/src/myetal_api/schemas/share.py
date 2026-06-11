@@ -157,7 +157,12 @@ class SimilarShareOut(BaseModel):
 
 
 class PublicShareResponse(BaseModel):
-    """What an anonymous QR-scan resolves to. Strips owner_id and audit fields."""
+    """What an anonymous QR-scan resolves to. Strips audit fields.
+
+    ``owner_id`` is deliberately public — it's the same id already exposed
+    by ``/public/browse?owner_id=`` and ``/public/search`` user cards, and
+    the viewer uses it to link the owner name to ``/u/{owner_id}``.
+    """
 
     short_code: str
     name: str
@@ -165,6 +170,7 @@ class PublicShareResponse(BaseModel):
     type: ShareType
     items: list[ShareItemResponse]
     owner_name: str | None
+    owner_id: uuid.UUID | None = None
     updated_at: datetime
     related_shares: list[RelatedShareOut] = Field(default_factory=list)
     similar_shares: list[SimilarShareOut] = Field(default_factory=list)
@@ -203,6 +209,10 @@ class UserPublicOut(BaseModel):
     name: str | None
     avatar_url: str | None
     share_count: int
+    # Bare ORCID iD (e.g. 0000-0002-1825-0097). A public researcher
+    # identifier by design, surfaced on the /u/{id} page. Defaults to None
+    # so the raw-SQL user-search path doesn't have to select it.
+    orcid_id: str | None = None
 
 
 # Alias for the user-search block — the shape is identical to

@@ -15,21 +15,26 @@ import type { UserResponse } from '@/types/auth';
 
 /**
  * Shared authed header chrome — used by `/dashboard/layout.tsx` and by
- * `/browse/page.tsx` when the visitor is signed in. Keeping the nav identical
- * across surfaces means an authed user landing on `/browse` doesn't lose
- * `Library`, `Search`, `Feedback` etc. (W-FIX-3).
+ * `/browse/page.tsx` when the visitor is signed in, so an authed user
+ * landing on `/browse` keeps the same chrome automatically.
+ *
+ * Conference-core simplification: the old five-link nav (Shares / Library /
+ * Browse / Search / Feedback — the W-FIX-3 shape) is slimmed to a single
+ * `Shares` link (+ `Admin` for admins). Everything account-shaped —
+ * Profile, My papers, Your public page, Send feedback, Sign out — lives in
+ * an avatar dropdown on desktop and inside the hamburger menu on mobile.
+ * All the old routes stay alive; only the links moved.
  *
  * The wordmark links to `/dashboard` for authed users (precedent: the
  * dashboard layout's wordmark already does this).
  *
- * Mobile: 5 nav links + avatar + sign-out won't fit at 375px, so the nav
- * collapses behind a hamburger menu. The previous implementation used
- * `<details>/<summary>` which didn't close when a Link inside was tapped —
- * users complained that "it doesn't close nicely, I have to hit the x".
- * Migrated to Radix's DropdownMenu (via our shadcn-ui wrapper) which closes
- * on outside-click, Escape, AND when a `<DropdownMenuItem>` is activated.
- * Radix also wires aria-expanded / aria-haspopup / aria-controls on the
- * trigger so the menu is fully accessible.
+ * Both menus use Radix's DropdownMenu (via our shadcn-ui wrapper). The
+ * previous mobile implementation used `<details>/<summary>` which didn't
+ * close when a Link inside was tapped — users complained that "it doesn't
+ * close nicely, I have to hit the x". Radix closes on outside-click,
+ * Escape, AND when a `<DropdownMenuItem>` is activated, and wires
+ * aria-expanded / aria-haspopup / aria-controls on the trigger so the
+ * menus are fully accessible.
  *
  * Now a client component because Radix uses portals + state. The page-level
  * layouts can stay RSC; the header just renders inline.
@@ -38,10 +43,6 @@ const NAV_LINK_CLASS = 'text-ink-muted hover:text-ink';
 
 const NAV_LINKS: Array<{ href: string; label: string }> = [
   { href: '/dashboard', label: 'Shares' },
-  { href: '/dashboard/library', label: 'Library' },
-  { href: '/browse', label: 'Browse' },
-  { href: '/dashboard/search', label: 'Search' },
-  { href: '/dashboard/feedback', label: 'Feedback' },
 ];
 
 // `Admin` is appended dynamically when `user.is_admin === true`. Web-only
@@ -49,8 +50,21 @@ const NAV_LINKS: Array<{ href: string; label: string }> = [
 // the entry).
 const ADMIN_LINK = { href: '/dashboard/admin', label: 'Admin' };
 
+// Account-scoped destinations shared by the desktop avatar dropdown and the
+// mobile hamburger. "Your public page" depends on the user id, so this is a
+// builder rather than a constant.
+function accountLinks(userId: string): Array<{ href: string; label: string }> {
+  return [
+    { href: '/dashboard/profile', label: 'Profile' },
+    { href: '/dashboard/library', label: 'My papers' },
+    { href: `/u/${userId}`, label: 'Your public page' },
+    { href: '/dashboard/feedback', label: 'Send feedback' },
+  ];
+}
+
 export function DashboardHeader({ user }: { user: UserResponse }) {
   const navLinks = user.is_admin ? [...NAV_LINKS, ADMIN_LINK] : NAV_LINKS;
+  const menuLinks = accountLinks(user.id);
   return (
     <header className="border-b border-rule bg-paper">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
@@ -61,25 +75,38 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
           MyEtAl
         </Link>
 
-        {/* Desktop nav — original layout, hidden on mobile */}
+        {/* Desktop nav — slim link row plus an avatar dropdown holding the
+            account-scoped destinations and sign-out. Hidden on mobile. */}
         <nav className="hidden items-center gap-6 text-sm sm:flex">
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href} className={NAV_LINK_CLASS}>
               {link.label}
             </Link>
           ))}
-          <Link
-            href="/dashboard/profile"
-            className="transition hover:opacity-80"
-            title={user.name ?? user.email ?? 'Profile'}
-          >
-            <UserAvatar
-              name={user.name}
-              avatarUrl={user.avatar_url}
-              size={32}
-            />
-          </Link>
-          <SignOutButton className="whitespace-nowrap text-ink-muted hover:text-ink" />
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Account menu"
+              title={user.name ?? user.email ?? 'Account'}
+              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+            >
+              <UserAvatar
+                name={user.name}
+                avatarUrl={user.avatar_url}
+                size={32}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={8} className="w-56">
+              {menuLinks.map((link) => (
+                <DropdownMenuItem key={link.href} asChild>
+                  <Link href={link.href}>{link.label}</Link>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <SignOutButton className="w-full px-4 py-2.5 text-left text-ink-muted transition hover:text-ink" />
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
 
         {/* Mobile cluster — avatar always visible, nav links behind a Radix
@@ -142,9 +169,11 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
                   <Link href={link.href}>{link.label}</Link>
                 </DropdownMenuItem>
               ))}
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/profile">Profile</Link>
-              </DropdownMenuItem>
+              {menuLinks.map((link) => (
+                <DropdownMenuItem key={link.href} asChild>
+                  <Link href={link.href}>{link.label}</Link>
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <SignOutButton className="w-full px-4 py-2.5 text-left text-ink-muted transition hover:text-ink" />
