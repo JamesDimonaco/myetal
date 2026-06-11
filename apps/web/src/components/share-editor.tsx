@@ -239,6 +239,9 @@ const fromPaperOut = (p: PaperOut): DraftItem => ({
 
 const fromAddPayload = (payload: AddItemPayload): DraftItem => {
   if (payload.kind === 'paper') return fromPaper(payload.paper);
+  // Library picks carry the full PaperOut — reuse the ?paper_id= prefill
+  // mapper so url/subtitle/image_url survive.
+  if (payload.kind === 'library_paper') return fromPaperOut(payload.paper);
   if (payload.kind === 'pdf') {
     // PDF upload already happened — the modal hands us the materialised URLs,
     // metadata, AND the server-assigned ShareItem.id from record-pdf-upload.
@@ -361,6 +364,16 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     'post-save',
   );
   const [showAddItem, setShowAddItem] = useState(false);
+  // "More options" disclosure — description + tags fold away so the default
+  // editor reads name → items → publish (conference-core simplification).
+  // One-shot initializer off `initial` only: open when the share already
+  // carries data the fold would hide (never bury the user's own content);
+  // closed in create mode. Deliberately NOT in the isDirty effect deps —
+  // expanding must not arm the discard guards. Content stays mounted and is
+  // CSS-hidden so TagInput's uncommitted draft text survives toggling.
+  const [moreOpen, setMoreOpen] = useState<boolean>(
+    () => Boolean(initial?.description) || (initial?.tags?.length ?? 0) > 0,
+  );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   // Unsaved-changes guard. `isDirty` flips true the first time any tracked
@@ -505,6 +518,11 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         );
       } else {
         setError('Invalid input');
+      }
+      // Description lives behind the "More options" fold — open it when a
+      // failure lands on a folded field so the error isn't invisible.
+      if (parsed.error.issues.some((issue) => issue.path[0] === 'description')) {
+        setMoreOpen(true);
       }
       // Scroll error into view so the user sees what went wrong.
       setTimeout(() => {
@@ -713,25 +731,6 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           {fieldErrors['name'] ? (
             <span className="text-xs text-danger">{fieldErrors['name']}</span>
           ) : null}
-        </Field>
-
-        {/* Description */}
-        <Field label="Description (optional)">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Briefly describe what people will find when they scan your QR code"
-            rows={3}
-            className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
-          />
-        </Field>
-
-        {/* Tags — topical labels, max 5 (Q10). Slugs only on the wire. */}
-        <Field
-          label="Tags (optional)"
-          hint="What topics? E.g. virology, microbiome"
-        >
-          <TagInput value={tags} onChange={setTags} />
         </Field>
 
         {/* Type pills */}
@@ -952,6 +951,63 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           </div>
         </div>
 
+        {/* "More options" disclosure — description + tags. Plain boolean +
+            conditional className (the add-item modal's filtersOpen precedent);
+            content stays mounted so uncommitted TagInput text survives a
+            toggle. The trigger is a form-grid sibling, NOT inside a <Field>
+            (Field renders a <label>; a button inside a label has broken
+            click semantics). */}
+        <div className="grid gap-4">
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-expanded={moreOpen}
+            aria-controls="share-more-options"
+            className="inline-flex min-h-[44px] items-center gap-2 justify-self-start text-sm font-medium text-ink-muted transition hover:text-ink"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-hidden
+              className={['transition-transform', moreOpen ? 'rotate-90' : ''].join(' ')}
+            >
+              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            More options
+            {!moreOpen ? (
+              <span className="font-normal text-ink-faint">
+                · description, tags
+              </span>
+            ) : null}
+          </button>
+
+          <div
+            id="share-more-options"
+            className={moreOpen ? 'grid gap-6' : 'hidden'}
+          >
+            {/* Description */}
+            <Field label="Description (optional)">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Briefly describe what people will find when they scan your QR code"
+                rows={3}
+                className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              />
+            </Field>
+
+            {/* Tags — topical labels, max 5 (Q10). Slugs only on the wire. */}
+            <Field
+              label="Tags (optional)"
+              hint="What topics? E.g. virology, microbiome"
+            >
+              <TagInput value={tags} onChange={setTags} />
+            </Field>
+          </div>
+        </div>
+
         {error ? (
           <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-4 py-3" role="alert">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="mt-0.5 flex-shrink-0 text-danger">
@@ -1014,6 +1070,9 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           onClose={() => setShowAddItem(false)}
           shareId={effectiveId}
           onAutoSaveDraft={autoSaveDraft}
+          existingDois={items
+            .map((it) => it.doi)
+            .filter((doi): doi is string => Boolean(doi))}
           onPick={(payload) => {
             appendItem(payload);
             setShowAddItem(false);

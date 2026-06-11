@@ -12,6 +12,7 @@
  * kind without re-deriving the shape.
  */
 
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -37,6 +38,7 @@ import {
 } from '@/lib/pdf-copy';
 import type { Paper, PaperSearchResult } from '@/types/paper';
 import type { PresignResponse, ShareItemOut } from '@/types/share';
+import type { PaperOut, WorkResponse } from '@/types/works';
 
 type SortOption = 'relevance' | 'newest' | 'oldest' | 'most-cited';
 
@@ -116,9 +118,16 @@ function filterResults(
 }
 
 type Kind = 'paper' | 'repo' | 'link' | 'pdf';
-type PaperMode = 'doi' | 'search' | 'manual';
+type PaperMode = 'doi' | 'search' | 'library' | 'manual';
 
 export type AddItemPaper = { kind: 'paper'; paper: Paper };
+/**
+ * A paper picked from the user's library (`/me/works`). Carries the full
+ * `PaperOut` rather than lossily mapping to `Paper` — the editor already has
+ * a `fromPaperOut` mapper (the `?paper_id=` prefill path) that preserves
+ * url/subtitle/image_url.
+ */
+export type AddItemLibraryPaper = { kind: 'library_paper'; paper: PaperOut };
 export type AddItemRepo = {
   kind: 'repo';
   url: string;
@@ -154,6 +163,7 @@ export type AddItemPdf = {
 };
 export type AddItemPayload =
   | AddItemPaper
+  | AddItemLibraryPaper
   | AddItemRepo
   | AddItemLink
   | AddItemPdf;
@@ -175,12 +185,21 @@ interface Props {
    * mode internally; the URL stays at /dashboard/share/new.
    */
   onAutoSaveDraft?: () => Promise<string>;
+  /**
+   * DOIs of items already in the share — the Library mode greys those
+   * papers out instead of letting the user add a duplicate.
+   */
+  existingDois?: string[];
 }
 
+// Paper-first, PDF last (conference-core simplification: the DOI path is
+// the wedge; PDF upload stays available but doesn't advertise itself).
+// Keep 'paper' the default kind — PdfKindPane has a mount side-effect
+// (auto-saves an empty draft) that must not fire on open.
 const KINDS: { id: Kind; label: string }[] = [
   { id: 'paper', label: 'Paper' },
-  { id: 'repo', label: 'Repo' },
   { id: 'link', label: 'Link' },
+  { id: 'repo', label: 'Repo' },
   { id: 'pdf', label: 'PDF' },
 ];
 
@@ -189,12 +208,13 @@ const MAX_PDF_BYTES = 25 * 1024 * 1024; // 25 MB hard limit (Q2)
 const PAPER_MODES: { id: PaperMode; label: string }[] = [
   { id: 'doi', label: 'DOI' },
   { id: 'search', label: 'Search' },
+  { id: 'library', label: 'Library' },
   { id: 'manual', label: 'Manual' },
 ];
 
 const DEBOUNCE_MS = 300;
 
-export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft }: Props) {
+export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft, existingDois }: Props) {
   const [kind, setKind] = useState<Kind>('paper');
 
   const titleByKind: Record<Kind, string> = {
@@ -246,7 +266,9 @@ export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft }: Prop
           </div>
 
           <div className="px-6 pb-6 pt-4">
-            {kind === 'paper' ? <PaperKindPane onPick={onPick} /> : null}
+            {kind === 'paper' ? (
+              <PaperKindPane onPick={onPick} existingDois={existingDois} />
+            ) : null}
             {kind === 'repo' ? <RepoKindPane onPick={onPick} /> : null}
             {kind === 'link' ? <LinkKindPane onPick={onPick} /> : null}
             {kind === 'pdf' ? (
@@ -266,7 +288,13 @@ export function AddItemModal({ onClose, onPick, shareId, onAutoSaveDraft }: Prop
 // --------------------------------------------------------------------------
 // Paper
 
-function PaperKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
+function PaperKindPane({
+  onPick,
+  existingDois,
+}: {
+  onPick: (p: AddItemPayload) => void;
+  existingDois?: string[];
+}) {
   const [mode, setMode] = useState<PaperMode>('doi');
   const handle = (paper: Paper) => onPick({ kind: 'paper', paper });
 
@@ -293,7 +321,122 @@ function PaperKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
 
       {mode === 'doi' ? <DoiPane onPick={handle} /> : null}
       {mode === 'search' ? <SearchPane onPick={handle} /> : null}
+      {mode === 'library' ? (
+        <LibraryPane onPick={onPick} existingDois={existingDois} />
+      ) : null}
       {mode === 'manual' ? <ManualPane onPick={handle} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Pick a paper straight from the personal library (`/me/works`). The wedge
+ * flow for returning users: ORCID-synced papers are one click from a share
+ * without re-looking anything up. Papers already in the share (matched by
+ * DOI) are greyed out instead of allowing a duplicate.
+ */
+function LibraryPane({
+  onPick,
+  existingDois,
+}: {
+  onPick: (p: AddItemPayload) => void;
+  existingDois?: string[];
+}) {
+  const [filter, setFilter] = useState('');
+  const { data: works, isPending, isError } = useQuery({
+    queryKey: ['works'],
+    queryFn: () => clientApi<WorkResponse[]>('/me/works'),
+  });
+
+  const existing = useMemo(
+    () => new Set((existingDois ?? []).map((d) => d.toLowerCase())),
+    [existingDois],
+  );
+
+  const visible = useMemo(() => {
+    const live = (works ?? []).filter((w) => !w.hidden_at);
+    const needle = filter.trim().toLowerCase();
+    if (!needle) return live;
+    return live.filter(
+      (w) =>
+        w.paper.title.toLowerCase().includes(needle) ||
+        (w.paper.authors ?? '').toLowerCase().includes(needle) ||
+        (w.paper.doi ?? '').toLowerCase().includes(needle),
+    );
+  }, [works, filter]);
+
+  if (isPending) {
+    return <p className="py-4 text-sm text-ink-muted">Loading your library…</p>;
+  }
+  if (isError) {
+    return (
+      <p className="py-4 text-sm text-danger">
+        Couldn&apos;t load your library. Try again in a moment.
+      </p>
+    );
+  }
+  if (!works || works.filter((w) => !w.hidden_at).length === 0) {
+    return (
+      <div className="grid gap-2 py-4 text-sm text-ink-muted">
+        <p>No papers in your library yet.</p>
+        <p>
+          <a
+            href="/dashboard/library"
+            className="font-medium text-ink underline underline-offset-2 hover:opacity-80"
+          >
+            Import from ORCID in your library
+          </a>{' '}
+          — or paste a DOI in the DOI tab.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {visible.length > 8 || filter ? (
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter by title, author, or DOI"
+          className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+        />
+      ) : null}
+      <ul className="grid max-h-80 gap-2 overflow-y-auto">
+        {visible.map((w) => {
+          const alreadyAdded =
+            w.paper.doi != null && existing.has(w.paper.doi.toLowerCase());
+          return (
+            <li key={w.paper.id}>
+              <button
+                type="button"
+                disabled={alreadyAdded}
+                onClick={() => onPick({ kind: 'library_paper', paper: w.paper })}
+                className={[
+                  'w-full rounded-md border border-rule px-3 py-2.5 text-left transition',
+                  alreadyAdded
+                    ? 'cursor-default bg-paper-soft opacity-50'
+                    : 'bg-paper hover:border-accent hover:bg-paper-soft',
+                ].join(' ')}
+              >
+                <span className="block text-sm font-medium text-ink">
+                  {w.paper.title}
+                </span>
+                <span className="mt-0.5 block text-xs text-ink-muted">
+                  {[w.paper.authors, w.paper.year].filter(Boolean).join(' · ')}
+                  {alreadyAdded ? ' — already in this share' : ''}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {visible.length === 0 ? (
+          <li className="py-2 text-sm text-ink-muted">
+            Nothing matches that filter.
+          </li>
+        ) : null}
+      </ul>
     </div>
   );
 }
