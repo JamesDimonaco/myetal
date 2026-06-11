@@ -178,6 +178,23 @@ async def test_email_per_share_cap_is_silent(
     assert len(sent_emails) == 2
 
 
+def test_send_log_sweep_drops_stale_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One-off recipient/share keys must not pin dict entries forever —
+    the periodic sweep on write evicts everything past the window."""
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(email_service.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(email_service, "_SWEEP_EVERY", 5)
+
+    for i in range(4):
+        email_service.record_share_email(f"one-off-{i}@example.com", f"code{i}")
+    assert len(email_service._send_log) == 8
+
+    clock["now"] += email_service._WINDOW_SECONDS + 1
+    # 5th record crosses the sweep cadence → all stale keys evicted.
+    email_service.record_share_email("fresh@example.com", "freshcode")
+    assert set(email_service._send_log) == {"to:fresh@example.com", "share:freshcode"}
+
+
 def test_send_skips_without_api_key(caplog) -> None:
     """No RESEND_API_KEY configured (test default) → skip-and-log, no raise."""
     import asyncio

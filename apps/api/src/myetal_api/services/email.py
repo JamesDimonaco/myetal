@@ -36,8 +36,18 @@ _WINDOW_SECONDS = 24 * 60 * 60
 RECIPIENT_DAILY_CAP = 3
 SHARE_DAILY_CAP = 50
 
-# key -> deque of send timestamps within the window. Pruned on access.
+# key -> deque of send timestamps within the window. Pruned on access, plus
+# a periodic full sweep on write: one-off recipient/share keys are never
+# re-accessed, so without the sweep they'd pin dict entries forever under
+# anonymous traffic.
 _send_log: dict[str, deque[float]] = {}
+_SWEEP_EVERY = 256
+_records_since_sweep = 0
+
+
+def _sweep_expired(now: float) -> None:
+    for key in list(_send_log):
+        _prune_and_count(key, now)
 
 
 def _prune_and_count(key: str, now: float) -> int:
@@ -66,14 +76,21 @@ def share_email_allowed(recipient: str, short_code: str) -> bool:
 
 
 def record_share_email(recipient: str, short_code: str) -> None:
+    global _records_since_sweep
     now = time.monotonic()
+    _records_since_sweep += 1
+    if _records_since_sweep >= _SWEEP_EVERY:
+        _records_since_sweep = 0
+        _sweep_expired(now)
     _send_log.setdefault(f"to:{recipient}", deque()).append(now)
     _send_log.setdefault(f"share:{short_code}", deque()).append(now)
 
 
 def reset_share_email_caps() -> None:
     """Test hook — clear the rolling counters."""
+    global _records_since_sweep
     _send_log.clear()
+    _records_since_sweep = 0
 
 
 async def send_share_link_email(*, to: str, share_name: str, short_code: str) -> None:
@@ -114,11 +131,13 @@ async def send_share_link_email(*, to: str, share_name: str, short_code: str) ->
                 headers={"Authorization": f"Bearer {api_key}"},
             )
         if resp.status_code >= 400:
+            # Status + provider request-id only — the response body can echo
+            # the payload (recipient address), which doesn't belong in logs.
             logger.error(
-                "Resend rejected share-link email for %s: %s %s",
+                "Resend rejected share-link email for %s: status=%s request_id=%s",
                 short_code,
                 resp.status_code,
-                resp.text[:500],
+                resp.headers.get("x-request-id"),
             )
     except httpx.HTTPError:
         logger.exception("Resend request failed for share-link email %s", short_code)

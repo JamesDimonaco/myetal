@@ -330,6 +330,17 @@ function PaperKindPane({
 }
 
 /**
+ * Bare lowercase DOI for duplicate checks — share items can carry DOIs as
+ * `https://doi.org/...`, `doi:...`, or with stray whitespace (manual entry),
+ * while library papers store the bare form.
+ */
+const normalizeDoi = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const bare = extractDoi(value) ?? value.trim();
+  return bare ? bare.toLowerCase() : null;
+};
+
+/**
  * Pick a paper straight from the personal library (`/me/works`). The wedge
  * flow for returning users: ORCID-synced papers are one click from a share
  * without re-looking anything up. Papers already in the share (matched by
@@ -349,7 +360,12 @@ function LibraryPane({
   });
 
   const existing = useMemo(
-    () => new Set((existingDois ?? []).map((d) => d.toLowerCase())),
+    () =>
+      new Set(
+        (existingDois ?? [])
+          .map(normalizeDoi)
+          .filter((doi): doi is string => doi !== null),
+      ),
     [existingDois],
   );
 
@@ -405,8 +421,9 @@ function LibraryPane({
       ) : null}
       <ul className="grid max-h-80 gap-2 overflow-y-auto">
         {visible.map((w) => {
+          const normalizedDoi = normalizeDoi(w.paper.doi);
           const alreadyAdded =
-            w.paper.doi != null && existing.has(w.paper.doi.toLowerCase());
+            normalizedDoi !== null && existing.has(normalizedDoi);
           return (
             <li key={w.paper.id}>
               <button

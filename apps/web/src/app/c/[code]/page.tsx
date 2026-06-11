@@ -252,7 +252,7 @@ export default async function PublicSharePage({ params }: PageProps) {
               <span>by {share.owner_name}</span>
             )
           ) : null}
-          <span aria-hidden>·</span>
+          {share.owner_name ? <span aria-hidden>·</span> : null}
           <span>Updated {formatRelativeTime(share.updated_at)}</span>
           <span aria-hidden>·</span>
           <span className="uppercase tracking-wide text-ink-faint">{share.type}</span>
