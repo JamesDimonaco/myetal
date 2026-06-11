@@ -56,7 +56,7 @@ const STEPS: TourStep[] = [
   {
     icon: 'globe',
     title: 'Make it findable',
-    body: 'Turn on "Publish to discovery" inside a share to list it in MyEtAl search and let Google index it. Off by default — leave it off if the share is for a private audience.',
+    body: 'Turn on "Publish to discovery" inside a share to list it on your public page and let Google index it. Off by default — unlisted shares are reachable only by people with the link or QR.',
   },
 ];
 
