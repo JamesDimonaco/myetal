@@ -452,40 +452,60 @@ runOrSkip('Better Auth ↔ Postgres integration', () => {
   });
 
   // -------------------------------------------------------------------
-  // 5d. mapOrcidProfileToUser hijack guard — iD already linked to
-  // another user throws ``OrcidIdAlreadyLinkedError`` (wrapped as a BA
-  // APIError redirect).
+  // 5d. mapOrcidProfileToUser OAuth-priority link — iD already on a
+  // user row (manual-entry / legacy-backfill shape, no matching
+  // ``account`` row): the OAuth-completing user IS the legitimate
+  // owner of the iD, so we insert the missing ``account`` row pointing
+  // at the existing user row and let the OAuth flow proceed. Two prod
+  // users got locked out by the previous "throw" behaviour; this test
+  // pins the new contract.
   // -------------------------------------------------------------------
-  it('mapOrcidProfileToUser throws when the iD is already linked to another user', async () => {
+  it('mapOrcidProfileToUser links OAuth iD to existing user row claiming it', async () => {
     const { mapOrcidProfileToUser } = authModule;
-    const { users } = schemaModule;
+    const { users, account } = schemaModule;
     const { db } = dbModule;
     const { randomUUID } = await import('node:crypto');
+    const { and, eq } = await import('drizzle-orm');
 
     const claimedOrcidId = '0000-0001-2345-9999';
+    const existingUserId = randomUUID();
 
-    // Seed a user that already owns the iD (manual-entry shape: no
-    // matching ``account`` row). Explicit id because our drizzle
-    // schema does not declare a DB-side default (see db-schema.ts).
+    // Seed a user that already claims the iD via the manual-entry
+    // path: ``users.orcid_id`` is set, NO matching ``account`` row.
     await db.insert(users).values({
-      id: randomUUID(),
+      id: existingUserId,
       name: 'Original Claimant',
       email: 'original@example.com',
       emailVerified: false,
       orcidId: claimedOrcidId,
     });
 
-    // A different user signs in via ORCID and returns the same iD.
-    // assertOrcidIdNotClaimedElsewhere should throw — the throw is a
-    // ``BA APIError`` (FOUND/302 with Location). We just need to
-    // assert that *something* threw, with the right code attached.
-    await expect(
-      mapOrcidProfileToUser({ sub: claimedOrcidId, email: 'attacker@example.com' }),
-    ).rejects.toMatchObject({
-      // BA's APIError carries the body we passed in:
-      // { message: 'orcid_already_linked', code: 'orcid_already_linked' }
-      body: { code: 'orcid_already_linked' },
+    // The legitimate ORCID owner completes OAuth and arrives at
+    // mapProfileToUser. Should NOT throw — the OAuth round-trip is
+    // proof of ownership, so we attach the iD to the existing user
+    // row by inserting the missing ``account`` row.
+    const result = await mapOrcidProfileToUser({
+      sub: claimedOrcidId,
+      email: 'real-orcid-owner@example.com',
+      name: 'Real Owner',
     });
+    expect(result.orcidId).toBe(claimedOrcidId);
+
+    // The link row now exists and points at the original user — BA's
+    // subsequent ``(providerId, accountId)`` lookup will find it and
+    // sign that user in to their existing row.
+    const linkRow = await db
+      .select({ userId: account.userId })
+      .from(account)
+      .where(
+        and(
+          eq(account.providerId, 'orcid'),
+          eq(account.accountId, claimedOrcidId),
+        ),
+      )
+      .limit(1);
+    expect(linkRow).toHaveLength(1);
+    expect(linkRow[0]!.userId).toBe(existingUserId);
   });
 
   // -------------------------------------------------------------------

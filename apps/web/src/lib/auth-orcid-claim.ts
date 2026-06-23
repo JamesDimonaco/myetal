@@ -1,45 +1,54 @@
 /**
- * ORCID hijack-hardening for the Better Auth genericOAuth flow.
+ * ORCID-iD ⇄ user-row linker for the Better Auth genericOAuth flow.
  *
- * Replicates the security property of the legacy
- * ``services/oauth.py::_find_or_create_user`` check: if the ORCID iD
- * returned in the OAuth profile is already linked to an existing
- * MyEtAl user (and is NOT this same user re-authenticating), refuse
- * to attach it / create a duplicate. Without this check a malicious
- * ORCID account that returns somebody else's email could hijack their
- * MyEtAl account.
+ * Replaces the previous "hijack guard" behaviour. The earlier version
+ * locked legitimate ORCID owners out of their own MyEtAl row when the
+ * row already had ``users.orcid_id`` populated (typically via the
+ * manual-entry path ``PATCH /me/orcid`` on the API side, or pre-Phase-3
+ * legacy backfill). Two production users hit this; the failure mode was
+ * a 302 to ``/sign-in?error=orcid_already_linked`` for the *real* ORCID
+ * owner. The earlier docstring's "manual-entry shape" branch was the
+ * common case, not the rare attack case.
  *
- * Threat model:
- *   The attacker controls an ORCID account whose stored email field
- *   matches a MyEtAl user's email. ORCID does not require email
- *   verification on its side. We treat the ORCID iD as the only
- *   trusted identifier from ORCID; emails are advisory.
+ * New policy: **OAuth proof of ORCID ownership wins.** Completing the
+ * ORCID OIDC round-trip is the strongest possible signal that the user
+ * controls that ORCID iD — stronger than any unauthenticated row
+ * already claiming it. So whenever an ORCID OAuth profile arrives and a
+ * user row already carries that iD, we attach the OAuth account to that
+ * existing user row (idempotently) and let BA sign them in. No fork, no
+ * duplicate row, no redirect.
  *
- * Re-login carve-out:
- *   When a user signs in via ORCID, BA writes both ``users.orcid_id``
- *   AND an ``account`` row keyed on (provider_id='orcid',
- *   account_id=<orcid iD>). On the SECOND ORCID sign-in for the same
- *   user, ``users.orcid_id`` is non-null — a naive "any user has this
- *   iD?" check would falsely flag legitimate re-authentication. So the
- *   guard ALSO consults the ``account`` table: if a matching account
- *   row exists, the iD is already correctly linked to the same user
- *   BA is about to authenticate, and the OAuth flow is safe to
- *   proceed. Only the case where ``users.orcid_id`` is set but there
- *   is NO matching ``account`` row triggers the hijack guard — that
- *   shape only occurs via the manual-entry path
- *   (``PATCH /me/orcid``) and represents a user trying to OAuth-link
- *   over someone else's manual claim.
+ * Concretely, on entry:
+ *   • If no user row claims this orcidId → noop. BA creates a fresh
+ *     user with the iD via its normal genericOAuth path.
+ *   • If a user row claims it AND a matching ``account``
+ *     (provider='orcid', accountId=<orcidId>) row already points at the
+ *     same user → noop. Legitimate re-login.
+ *   • If a user row claims it but no matching ``account`` row exists
+ *     (manual-entry shape / legacy backfill) → insert the missing
+ *     ``account`` row pointing at that user. BA's subsequent
+ *     (providerId, accountId) lookup finds it and signs the user into
+ *     their existing row.
  *
- * Called from ``mapProfileToUser`` in ``./auth.ts`` (genericOAuth
- * provider config). On a hijack attempt we throw a controlled BA
- * redirect (``APIError("FOUND", ..., {Location})``) so the user
- * lands on ``/sign-in?error=orcid_already_linked`` instead of BA's
- * generic 500 page. The sign-in page maps that code to a friendly
- * sentence (see ``app/sign-in/page.tsx::describeError``).
+ * Security note: the previous threat-model concern was a malicious
+ * ORCID profile whose email matches a MyEtAl user's email taking over
+ * by email-match auto-link. That risk is independent of this function —
+ * it's mitigated by ``account.accountLinking.disableImplicitLinking``
+ * in ``./auth.ts``, which blocks email-based auto-linking. This
+ * function only acts on the *ORCID iD*, which we treat as the trusted
+ * identifier from ORCID (only the iD's true owner can complete the
+ * OAuth round-trip).
+ *
+ * The ``OrcidIdAlreadyLinkedError`` class and the
+ * ``?error=orcid_already_linked`` sign-in mapping are retained as
+ * dead-code defence-in-depth: if the upsert ever fails for an unknown
+ * reason we still want a controlled redirect rather than a BA 500.
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { APIError } from 'better-auth/api';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { db } from './db';
 import { account, users } from './db-schema';
@@ -57,12 +66,7 @@ export class OrcidIdAlreadyLinkedError extends Error {
 }
 
 /**
- * Build the redirect URL we send the user back to on a hijack attempt.
- *
- * Web users land on the sign-in page with a friendly error message.
- * Mobile users (whose OAuth start sets ``callbackURL`` to the bounce
- * page) land on the same web sign-in page inside the in-app browser —
- * acceptable v1 UX since the hijack case is rare and visible.
+ * Build the redirect URL used by the dead-code fallback below.
  */
 function hijackErrorRedirectUrl(): string {
   const base = process.env.BETTER_AUTH_URL ?? 'http://localhost:3000';
@@ -70,26 +74,22 @@ function hijackErrorRedirectUrl(): string {
 }
 
 /**
- * Throws ``OrcidIdAlreadyLinkedError`` (wrapped as a BA ``APIError``
- * with HTTP 302) when ``orcidId`` is claimed by a different user than
- * the one currently re-authenticating via ORCID.
+ * Ensure the OAuth-completing ORCID iD has an ``account`` row pointing
+ * at whatever user row already claims it. Idempotent.
  *
- * "Different user" is defined as: a row in ``users`` with this
- * ``orcid_id`` exists, AND there is NO ``account`` row keyed on
- * (provider_id='orcid', account_id=<orcid iD>) — i.e. the iD got onto
- * the user row via manual entry rather than a previous ORCID sign-in.
- *
- * Idempotent for the common re-login case: same user, same iD, BA
- * about to authenticate them via the existing ``account`` row.
+ * Called from ``mapProfileToUser`` in ``./auth.ts``. After this returns,
+ * Better Auth's normal ``handleOAuthUserInfo`` flow will find the
+ * ``account`` row via its ``(providerId, accountId)`` lookup and sign
+ * the user into the existing row — no new user is created, no error is
+ * thrown.
  */
-export async function assertOrcidIdNotClaimedElsewhere(
+export async function ensureOrcidAccountForExistingUser(
   orcidId: string,
 ): Promise<void> {
   if (!orcidId) return;
 
-  // Cheap path: does any user row have this iD? If not, nothing to
-  // guard — BA will create a new user with the iD (or attach via
-  // accountLinking, which we have disabled — see ./auth.ts).
+  // 1. Does any user row already claim this iD? If not, nothing to do —
+  // BA will create a fresh user with the iD via its normal path.
   const userRow = await db
     .select({ id: users.id })
     .from(users)
@@ -99,11 +99,9 @@ export async function assertOrcidIdNotClaimedElsewhere(
 
   const claimingUserId = userRow[0]!.id;
 
-  // Is there an ``account`` row that ties this ORCID iD to the user
-  // it's claimed against? If yes, this is the legitimate re-login
-  // shape — the same user is OAuth'ing in again.
+  // 2. Is there already a matching ``account`` row?
   const accountRow = await db
-    .select({ userId: account.userId })
+    .select({ id: account.id, userId: account.userId })
     .from(account)
     .where(
       and(
@@ -113,35 +111,66 @@ export async function assertOrcidIdNotClaimedElsewhere(
     )
     .limit(1);
 
-  if (accountRow.length > 0 && accountRow[0]!.userId === claimingUserId) {
-    // Same user, same iD, with a matching account row — re-login.
-    return;
+  if (accountRow.length > 0) {
+    if (accountRow[0]!.userId === claimingUserId) {
+      // Legitimate re-login — the account row already points at the
+      // user row that claims this iD. Noop; BA will update tokens.
+      return;
+    }
+    // Defence-in-depth: an ``account`` row exists for this iD but
+    // points at a different user than the one ``users.orcid_id``
+    // claims. The (providerId, accountId) unique index AND the
+    // ``users.orcid_id`` unique index together should make this
+    // unreachable. If we ever see it, bail loudly rather than silently
+    // re-link — operator intervention is required.
+    console.error(
+      '[auth-orcid] inconsistent state: account row for ORCID iD ' +
+        `${orcidId} points at user ${accountRow[0]!.userId} but ` +
+        `users.orcid_id claims user ${claimingUserId}. Refusing to ` +
+        'auto-resolve.',
+    );
+    throw new APIError(
+      'FOUND',
+      { message: 'orcid_already_linked', code: 'orcid_already_linked' },
+      { Location: hijackErrorRedirectUrl() },
+    );
   }
 
-  // Hijack shape: the iD is on a user row but either has no account
-  // (manual-entry claim) or is somehow tied to a different user row
-  // (should be impossible given the unique index, but defence-in-depth).
-  // ALSO: check there is no OTHER user row claiming this iD; the
-  // unique index on users.orcid_id makes that a single row, but be
-  // explicit.
-  const otherUserCount = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.orcidId, orcidId), ne(users.id, claimingUserId)))
-    .limit(1);
-  // The above query is informational; the actual guard fires whenever
-  // we've reached this point — we have a claiming user and no matching
-  // account row. Throw the redirect.
-  void otherUserCount;
-
-  // Throwing an APIError with status FOUND tells BA's router to emit
-  // a 302 with the Location header we provide. This is the same
-  // mechanism BA itself uses for its ``ctx.redirect`` calls. The
-  // ``/sign-in`` page parses ``?error`` and renders a friendly
-  // sentence (see ``ORCID_HIJACK_ERROR_CODES`` there).
-  throw new APIError(
-    'FOUND',
-    { message: 'orcid_already_linked', code: 'orcid_already_linked' },
-    { Location: hijackErrorRedirectUrl() },
-  );
+  // 3. Manual-entry / legacy-backfill shape: user row claims this iD
+  // but no ``account`` row exists. Create it now — the OAuth-completing
+  // user is the legitimate owner of the iD and therefore the legitimate
+  // owner of the row that claims it. BA's subsequent (providerId,
+  // accountId) lookup will find this row and sign them in.
+  //
+  // We populate only the fields BA needs to resolve the account ↔ user
+  // mapping (id, userId, providerId, accountId, createdAt, updatedAt);
+  // BA's ``handleOAuthUserInfo`` then UPDATEs the row with the OAuth
+  // tokens (accessToken, refreshToken, idToken, scope, expiresAt) it
+  // received from ORCID.
+  try {
+    await db.insert(account).values({
+      id: randomUUID(),
+      accountId: orcidId,
+      providerId: ORCID_PROVIDER_ID,
+      userId: claimingUserId,
+    });
+  } catch (err) {
+    // Concurrent sign-in attempts could race to insert; the unique
+    // ``(providerId, accountId)`` index makes the second one fail. That
+    // is fine — by the time BA does its lookup, the row will be there.
+    // Log + swallow.
+    console.warn(
+      '[auth-orcid] account-row link insert failed (likely concurrent ' +
+        `sign-in race for orcidId=${orcidId}, userId=${claimingUserId})`,
+      err,
+    );
+  }
 }
+
+/**
+ * @deprecated Use {@link ensureOrcidAccountForExistingUser}. Kept as an
+ * export so any external import path keeps compiling; behaviour is now
+ * "link, don't throw."
+ */
+export const assertOrcidIdNotClaimedElsewhere =
+  ensureOrcidAccountForExistingUser;
