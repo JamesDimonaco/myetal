@@ -25,7 +25,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { genericOAuth, jwt } from 'better-auth/plugins';
 import { Resend } from 'resend';
 
-import { assertOrcidIdNotClaimedElsewhere } from './auth-orcid-claim';
+import { ensureOrcidAccountForExistingUser } from './auth-orcid-claim';
 import { db } from './db';
 import { account, jwks, session, users, verification } from './db-schema';
 
@@ -369,13 +369,16 @@ export const auth = betterAuth({
  *
  * Extracted so the integration tests can exercise the email-fallback
  * (``${orcidId}@orcid.invalid``), name-fallback (ORCID iD as the
- * display name), and hijack-guard (``OrcidIdAlreadyLinkedError``)
+ * display name), and OAuth-priority-link (``ensureOrcidAccountForExistingUser``)
  * paths directly without spinning a full OAuth round trip.
  *
- * Side effect: calls :func:`assertOrcidIdNotClaimedElsewhere`, which
- * reads from the ``users`` and ``account`` tables. The integration
- * tests stand the DB up first and then call this; production calls
- * it via the ``genericOAuth`` ``mapProfileToUser`` callback.
+ * Side effect: calls :func:`ensureOrcidAccountForExistingUser`, which
+ * reads from the ``users`` and ``account`` tables and may INSERT a
+ * missing ``account`` row to attach the OAuth-completing ORCID iD to
+ * an existing user row that already claims it (manual-entry / legacy
+ * shapes). The integration tests stand the DB up first and then call
+ * this; production calls it via the ``genericOAuth``
+ * ``mapProfileToUser`` callback.
  */
 export async function mapOrcidProfileToUser(
   profile: Record<string, unknown>,
@@ -387,7 +390,7 @@ export async function mapOrcidProfileToUser(
         ? profile.orcid
         : '';
   if (orcidId) {
-    await assertOrcidIdNotClaimedElsewhere(orcidId);
+    await ensureOrcidAccountForExistingUser(orcidId);
   }
   // ORCID lets users keep their email private — when they do, we get
   // no `email` claim back even with the `openid` scope. BA requires
