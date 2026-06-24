@@ -683,9 +683,7 @@ async def test_auto_create_orcid_draft_share_skips_when_user_has_a_share(
 
     user = await _seed_orcid_user(db_session)
     # Seed a library entry — the gate is on shares, not library.
-    p = Paper(
-        doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF
-    )
+    p = Paper(doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF)
     db_session.add(p)
     await db_session.flush()
     db_session.add(UserPaper(user_id=user.id, paper_id=p.id, added_via=UserPaperAddedVia.ORCID))
@@ -707,9 +705,7 @@ async def test_auto_create_orcid_draft_share_skips_when_user_has_a_tombstoned_sh
     from myetal_api.models import Share
 
     user = await _seed_orcid_user(db_session)
-    p = Paper(
-        doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF
-    )
+    p = Paper(doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF)
     db_session.add(p)
     await db_session.flush()
     db_session.add(UserPaper(user_id=user.id, paper_id=p.id, added_via=UserPaperAddedVia.ORCID))
@@ -744,9 +740,7 @@ async def test_auto_create_orcid_draft_share_idempotent(db_session: AsyncSession
     from myetal_api.models import Share
 
     user = await _seed_orcid_user(db_session)
-    p = Paper(
-        doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF
-    )
+    p = Paper(doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF)
     db_session.add(p)
     await db_session.flush()
     db_session.add(UserPaper(user_id=user.id, paper_id=p.id, added_via=UserPaperAddedVia.ORCID))
