@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { OrcidAutoDraftBanner } from './orcid-auto-draft-banner';
 import { ShareList } from './share-list';
 import { DashboardTour, ShowTourButton } from '@/components/dashboard-tour';
 import { ApiError } from '@/lib/api';
@@ -60,6 +61,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-10">
+      {/* ORCID first-sign-in auto-draft. Self-detects from `shares`
+          (looks for an unpublished "Publications" share with items)
+          and hides itself once the user publishes, deletes, or
+          dismisses it. Renders above the welcome banner because if
+          this matches, the welcome copy doesn't (shares.length > 0). */}
+      <OrcidAutoDraftBanner shares={shares} />
+
       {showWelcomeBanner ? (
         <div
           role="status"
