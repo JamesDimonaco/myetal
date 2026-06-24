@@ -90,6 +90,7 @@ async def resolve_public_share(
         items=[ShareItemResponse.model_validate(i) for i in share.items],
         owner_name=share.owner.name if share.owner else None,
         owner_id=share.owner_user_id,
+        owner_handle=share.owner.handle if share.owner else None,
         updated_at=share.updated_at,
         related_shares=related_shares,
         similar_shares=similar_shares,

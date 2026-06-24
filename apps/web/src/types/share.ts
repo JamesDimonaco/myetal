@@ -70,6 +70,9 @@ export interface PublicShareResponse {
   /** Owner's user UUID — links the viewer to `/u/{owner_id}`. Null when the
    *  owner has hidden their profile (no published shares attributable). */
   owner_id: string | null;
+  /** Owner's researcher-page handle, when claimed. The viewer prefers
+   *  `/u/{owner_handle}` over the UUID URL when this is non-null. */
+  owner_handle?: string | null;
   updated_at: string;
   related_shares: RelatedShare[];
   similar_shares: SimilarShare[];
