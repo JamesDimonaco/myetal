@@ -104,9 +104,7 @@ class User(Base):
     # uniqueness lives in the named ``uq_users_handle`` constraint added
     # by Alembic 0020. The regex requires lowercase so a plain UNIQUE is
     # case-correct without CITEXT.
-    handle: Mapped[str | None] = mapped_column(
-        String(30), nullable=True, unique=True
-    )
+    handle: Mapped[str | None] = mapped_column(String(30), nullable=True, unique=True)
     # Admin soft-delete (Stage 2 of `admin-analytics-dashboard.md`). NULL =
     # active. Flipping this excludes the user from search/list paths AND
     # tombstones every share they own in the same transaction. Reversible —

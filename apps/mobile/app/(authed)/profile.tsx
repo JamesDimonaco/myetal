@@ -26,7 +26,7 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { useAnalyticsConsent } from '@/hooks/useAnalyticsConsent';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
-import { ApiError } from '@/lib/api';
+import { ApiError, WEB_BASE_URL } from '@/lib/api';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'light', label: 'Light' },
@@ -240,7 +240,7 @@ export default function ProfileScreen() {
               <Pressable
                 accessibilityRole="link"
                 onPress={() => {
-                  Linking.openURL('https://myetal.app/dashboard/profile').catch(() => {
+                  Linking.openURL(`${WEB_BASE_URL}/dashboard/profile`).catch(() => {
                     // best-effort
                   });
                 }}

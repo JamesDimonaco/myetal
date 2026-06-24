@@ -78,17 +78,29 @@ function siteUrl(): string {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const resolved = await fetchOwner(slug);
-  if (!resolved?.data.owner?.name) return { title: 'MyEtAl' };
+
+  // Unresolved owner: the page renders a soft empty state that must
+  // not confirm or deny that an account exists. Mark the page
+  // non-indexable so search engines don't enumerate guessable handles
+  // / UUIDs via a generic title.
+  if (!resolved?.data.owner) {
+    return { title: 'MyEtAl', robots: { index: false } };
+  }
 
   const owner = resolved.data.owner;
   // Canonical URL prefers the handle when present. SEO consolidates;
-  // the UUID URL still resolves so printed cards never break.
+  // the UUID URL still resolves so printed cards never break. Emitted
+  // regardless of whether the owner has a display name — without it
+  // the handle/UUID consolidation defeats itself for accounts whose
+  // ``name`` is empty.
   const canonicalSlug = owner.handle ?? owner.id;
   const canonical = `${siteUrl()}/u/${canonicalSlug}`;
 
   return {
-    title: `${owner.name} — MyEtAl`,
-    description: `Collections published by ${owner.name} on MyEtAl.`,
+    title: owner.name ? `${owner.name} — MyEtAl` : 'MyEtAl',
+    description: owner.name
+      ? `Collections published by ${owner.name} on MyEtAl.`
+      : undefined,
     alternates: { canonical },
   };
 }

@@ -344,7 +344,9 @@ export function HandleSection({ initialHandle }: Props) {
                   ? 'handle-format-error'
                   : serverError
                     ? 'handle-server-error'
-                    : undefined
+                    : availability.state === 'taken'
+                      ? 'handle-availability'
+                      : undefined
               }
               className="w-full bg-paper px-3 py-2.5 font-mono text-base text-ink outline-none"
             />
@@ -359,6 +361,7 @@ export function HandleSection({ initialHandle }: Props) {
 
         {availabilityHint && !showFormatError ? (
           <p
+            id={availability.state === 'taken' ? 'handle-availability' : undefined}
             className={[
               'text-sm',
               availability.state === 'taken'

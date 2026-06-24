@@ -33,7 +33,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from myetal_api.models import User
 
-
 # Format: starts with a letter, then lowercase letters / digits / _ / -,
 # total length 3–30. Lowercase-only means a plain UNIQUE constraint is
 # case-correct (no CITEXT, no LOWER() functional index needed).
@@ -140,9 +139,7 @@ async def set_user_handle(db: AsyncSession, user_id: uuid.UUID, handle: str) -> 
     # 409 rather than a 500 buried in an integrity error. Two concurrent
     # PATCHes for the same handle still race past this check — the
     # unique index catches that case below.
-    clash = await db.scalar(
-        select(User.id).where(User.handle == handle, User.id != user_id)
-    )
+    clash = await db.scalar(select(User.id).where(User.handle == handle, User.id != user_id))
     if clash is not None:
         raise HandleAlreadyTaken
 
@@ -172,8 +169,19 @@ async def find_user_id_by_handle(db: AsyncSession, handle: str) -> uuid.UUID | N
     The handle parameter is lowercased before lookup so a request for
     ``/u/DrSmith`` resolves to the same user as ``/u/drsmith``. Beyond
     the lowercasing this is a strict exact-match lookup (no fuzziness).
+
+    Soft-deleted users are NOT resolved — handle-based browse must not
+    surface tombstoned accounts. The shared ``get_user_public_card``
+    helper stays untouched (it's also used by ``/u/{id}`` and any other
+    UUID-keyed lookup); the deleted-at filter lives on the
+    handle-specific path only.
     """
     normalised = handle.strip().lower()
     if not normalised:
         return None
-    return await db.scalar(select(User.id).where(User.handle == normalised))
+    return await db.scalar(
+        select(User.id).where(
+            User.handle == normalised,
+            User.deleted_at.is_(None),
+        )
+    )

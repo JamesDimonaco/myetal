@@ -211,9 +211,7 @@ async def test_by_handle_unknown_returns_404(api_client: TestClient) -> None:
     assert r.status_code == 404
 
 
-async def test_by_handle_case_insensitive(
-    db_session: AsyncSession, api_client: TestClient
-) -> None:
+async def test_by_handle_case_insensitive(db_session: AsyncSession, api_client: TestClient) -> None:
     """URL-cased handles still resolve — the lookup lowercases first."""
     user = await make_user(db_session, email="cased@example.com", name="Cased")
     await handles_service.set_user_handle(db_session, user.id, "casedhandle")

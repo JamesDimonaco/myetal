@@ -62,7 +62,7 @@ function accountLinks(
   return [
     { href: '/dashboard/profile', label: 'Profile' },
     { href: '/dashboard/library', label: 'My papers' },
-    { href: `/u/${publicSlug}`, label: 'Your public page' },
+    { href: `/u/${encodeURIComponent(publicSlug)}`, label: 'Your public page' },
     { href: '/dashboard/feedback', label: 'Send feedback' },
   ];
 }
