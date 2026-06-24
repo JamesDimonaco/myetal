@@ -63,6 +63,11 @@ export const users = pgTable('users', {
   avatarUrl: varchar('avatar_url', { length: 2000 }),
   orcidId: varchar('orcid_id', { length: 19 }).unique(),
   lastOrcidSyncAt: timestamp('last_orcid_sync_at', { withTimezone: true }),
+  // Researcher-page identity slug (nullable). Format validated server-side
+  // in ``apps/api/src/myetal_api/services/handles.py``; this layer only
+  // surfaces it via Better Auth's additionalFields so server components
+  // can read ``session.user.handle`` without a second round-trip.
+  handle: varchar('handle', { length: 30 }).unique(),
 });
 
 // ----------------------------------------------------------------------

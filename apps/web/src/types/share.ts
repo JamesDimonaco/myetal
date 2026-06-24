@@ -242,4 +242,9 @@ export interface UserPublicOut {
   share_count: number;
   /** Bare ORCID iD (e.g. `0000-0002-1825-0097`) when the user linked one. */
   orcid_id: string | null;
+  /**
+   * Researcher-page identity slug (nullable). When present, the web side
+   * prefers `/u/{handle}` over `/u/{id}` when linking to this researcher.
+   */
+  handle: string | null;
 }

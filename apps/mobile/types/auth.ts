@@ -16,5 +16,10 @@ export interface AuthUser {
   avatar_url: string | null;
   orcid_id: string | null;
   last_orcid_sync_at: string | null;
+  /**
+   * Researcher-page identity slug (nullable). Mobile renders this read-only
+   * on the profile screen; editing happens on the web (`PATCH /me/handle`).
+   */
+  handle: string | null;
   created_at: string;
 }
