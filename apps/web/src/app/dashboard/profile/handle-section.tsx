@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { API_BASE_URL, ApiError } from '@/lib/api';
 import { clientApi } from '@/lib/client-api';
@@ -113,7 +113,15 @@ export function HandleSection({ initialHandle }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
-  const [availability, setAvailability] = useState<Availability>({ state: 'idle' });
+  // Only stores the OUTCOME of a completed network check, scoped to the
+  // exact handle it ran for. The "idle" / "checking" states are derived
+  // in render from input conditions — avoids the
+  // `react-hooks/set-state-in-effect` lint by not syncing transient
+  // states via `setState` inside `useEffect`.
+  const [checkResult, setCheckResult] = useState<
+    | { handle: string; outcome: 'available' | 'taken' | 'error' }
+    | null
+  >(null);
 
   // Always lowercased for validation + submission. The user can type
   // any case; we coerce on the way in.
@@ -137,42 +145,51 @@ export function HandleSection({ initialHandle }: Props) {
   // Only check when the input differs from the saved value AND passes
   // client-side validation. Skip otherwise — saves a round-trip and
   // avoids flashing "taken" while the user is still typing.
-  const lastCheckedRef = useRef<string>('');
+  //
+  // The effect ONLY writes the completed check outcome (inside the
+  // async setTimeout callback). `idle` and `checking` are derived in
+  // render from the same conditions the effect uses — so we never
+  // synchronously `setState` in the effect body.
+  const shouldCheck = inputDiffers && !inputIsEmpty && validation.ok;
+  const availability: Availability = !shouldCheck
+    ? { state: 'idle' }
+    : checkResult?.handle === normalised
+      ? { state: checkResult.outcome }
+      : { state: 'checking' };
+
   useEffect(() => {
-    if (!inputDiffers || inputIsEmpty || !validation.ok) {
-      setAvailability({ state: 'idle' });
-      return;
-    }
-    // Skip if we just checked this exact value (covers re-renders).
-    if (lastCheckedRef.current === normalised) return;
+    if (!shouldCheck) return;
+    // Skip if we already have a settled result for this exact value
+    // (covers re-renders after the network call completed).
+    if (checkResult?.handle === normalised) return;
 
     let cancelled = false;
-    setAvailability({ state: 'checking' });
-    const handle = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const url = `${API_BASE_URL}/public/by-handle/${encodeURIComponent(
           normalised,
         )}`;
         const res = await fetch(url, { method: 'GET' });
         if (cancelled) return;
-        lastCheckedRef.current = normalised;
         if (res.status === 404) {
-          setAvailability({ state: 'available' });
+          setCheckResult({ handle: normalised, outcome: 'available' });
         } else if (res.ok) {
-          setAvailability({ state: 'taken' });
+          setCheckResult({ handle: normalised, outcome: 'taken' });
         } else {
-          setAvailability({ state: 'error' });
+          setCheckResult({ handle: normalised, outcome: 'error' });
         }
       } catch {
-        if (!cancelled) setAvailability({ state: 'error' });
+        if (!cancelled) {
+          setCheckResult({ handle: normalised, outcome: 'error' });
+        }
       }
     }, 300);
 
     return () => {
       cancelled = true;
-      clearTimeout(handle);
+      clearTimeout(timer);
     };
-  }, [normalised, inputDiffers, inputIsEmpty, validation.ok]);
+  }, [normalised, shouldCheck, checkResult?.handle]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -195,7 +212,8 @@ export function HandleSection({ initialHandle }: Props) {
       setSavedValue(updated.handle ?? null);
       setDraft(updated.handle ?? '');
       setJustSaved(true);
-      setAvailability({ state: 'idle' });
+      // No need to reset checkResult — availability derives from
+      // `shouldCheck` which becomes false now that draft === saved.
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
@@ -231,7 +249,8 @@ export function HandleSection({ initialHandle }: Props) {
       setSavedValue(null);
       setDraft('');
       setJustSaved(true);
-      setAvailability({ state: 'idle' });
+      // checkResult is left as-is; availability derives to idle now
+      // that draft is empty.
     } catch (err) {
       if (err instanceof ApiError) {
         setServerError(err.detail || 'Could not remove your handle.');
