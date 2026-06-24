@@ -34,15 +34,31 @@ from datetime import UTC, datetime
 from typing import Literal
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from myetal_api.models import Paper, PaperSource, User, UserPaper, UserPaperAddedVia
+from myetal_api.models import (
+    ItemKind,
+    Paper,
+    PaperSource,
+    Share,
+    ShareItem,
+    SharePaper,
+    User,
+    UserPaper,
+    UserPaperAddedVia,
+)
 from myetal_api.services import orcid_client
 from myetal_api.services import papers as papers_service
 
 AddStatus = Literal["added", "unchanged", "hidden"]
+
+# Onboarding auto-draft: name + description used when we pre-build a share
+# on the first ORCID sync. Kept as module-level constants so tests and the
+# banner detector on the dashboard agree on the canonical name.
+ORCID_AUTO_DRAFT_NAME = "Publications"
+ORCID_AUTO_DRAFT_DESCRIPTION = "Imported from ORCID — review and publish."
 
 
 class LibraryEntryNotFound(Exception):
@@ -68,6 +84,15 @@ class OrcidSyncResult:
       we deliberately left hidden).
     - ``skipped``: works without a DOI, or per-DOI lookup failures.
     - ``errors``: per-DOI failure messages, capped at 10.
+    - ``auto_draft_share_id``: when this sync was the user's first
+      successful ORCID pull (``last_orcid_sync_at`` was NULL at start)
+      AND they had zero shares AND the resulting library is non-empty,
+      we pre-build a draft "Publications" share on their behalf and put
+      its id here. Null in every other case. The web layer uses this to
+      fire the ``orcid_auto_draft_created`` telemetry event and surface
+      the dashboard banner.
+    - ``auto_draft_paper_count``: number of library items attached to
+      the auto-draft. None when no auto-draft was created.
     """
 
     added: int = 0
@@ -75,6 +100,8 @@ class OrcidSyncResult:
     unchanged: int = 0
     skipped: int = 0
     errors: list[str] = field(default_factory=list)
+    auto_draft_share_id: uuid.UUID | None = None
+    auto_draft_paper_count: int | None = None
 
 
 async def add_paper_by_doi(
@@ -184,6 +211,12 @@ async def sync_from_orcid(
     single final transaction (each ``add_paper_by_doi`` already commits
     its own work, so the final commit is just for the timestamp).
 
+    On the user's FIRST successful sync (``last_orcid_sync_at`` was
+    NULL at call start), also attempts to pre-build a draft
+    "Publications" share so the dashboard isn't a blank canvas. See
+    ``auto_create_orcid_draft_share`` for the gating rules. The new
+    share's id is returned via ``OrcidSyncResult.auto_draft_share_id``.
+
     Raises ``OrcidIdNotSet`` if the user has no ``orcid_id`` (→ 400).
     Lets ``orcid_client.UpstreamError`` propagate (→ 503).
     """
@@ -193,6 +226,13 @@ async def sync_from_orcid(
         raise OrcidIdNotSet
     if user.orcid_id is None:
         raise OrcidIdNotSet
+
+    # First-sync gate: capture BEFORE the sync overwrites it. We use this
+    # at the end to decide whether to pre-build the onboarding auto-draft.
+    # Subsequent re-syncs (where last_orcid_sync_at is already populated)
+    # must NEVER create another auto-draft, even if the user has deleted
+    # the first one — that's a "user said no" signal we respect.
+    is_first_sync = user.last_orcid_sync_at is None
 
     # Capture the iD value at sync start. If the user PATCHes their orcid_id
     # mid-sync, the work we just imported is against the *old* iD — so the
@@ -245,7 +285,136 @@ async def sync_from_orcid(
     user.last_orcid_sync_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(user)
+
+    # First-sign-in wow moment: pre-build a draft "Publications" share so
+    # the dashboard isn't empty. Gated to first sync only (so re-syncs
+    # don't recreate a share the user has deleted). The helper itself
+    # also checks shares.count == 0 + non-empty library, so it's safe to
+    # call unconditionally; the ``is_first_sync`` guard is a belt-and-braces
+    # second check that survives even if the helper grows looser gates
+    # later.
+    if is_first_sync:
+        auto_draft = await auto_create_orcid_draft_share(db, user)
+        if auto_draft is not None:
+            result.auto_draft_share_id = auto_draft.id
+            result.auto_draft_paper_count = len(auto_draft.papers)
+
     return result
+
+
+async def auto_create_orcid_draft_share(
+    db: AsyncSession,
+    user: User,
+) -> Share | None:
+    """Pre-build a draft "Publications" share for an ORCID-first-sync user.
+
+    The onboarding wow moment: instead of dropping a freshly-ORCID-linked
+    user on an empty dashboard, we hand them a ready-to-publish share
+    seeded with every paper in their library. They review, tweak, and
+    click publish — one click instead of "find the New Share button,
+    pick the items, name it, publish".
+
+    Gating (returns None and is a no-op when any fails):
+
+    * User already has at least one share (any state, including
+      tombstoned). The tombstone gate is deliberate — a user who deleted
+      their auto-draft is telling us "no thanks", and we must not
+      recreate it on the next sync.
+    * User's library is empty (nothing to attach, no useful share
+      possible).
+
+    Always creates the share in DRAFT state (``published_at = NULL``).
+    NEVER auto-publishes. The whole point is that the user gets to
+    review before anything is public.
+
+    Idempotent — re-calling after a successful run is a no-op because
+    ``shares.count > 0`` will short-circuit.
+
+    Both ``share_items`` (display rows for the editor / public viewer)
+    and ``share_papers`` (the canonical paper join used by discovery,
+    similar-shares, etc.) are populated so the auto-draft behaves
+    identically to a hand-built share from this point on.
+    """
+    # Import locally to avoid a circular import: share.py currently
+    # imports from works.py is fine, but works.py importing share.py at
+    # module top-level would invert the chain.
+    from myetal_api.services.share import _allocate_short_code
+
+    # Gate 1: any pre-existing share (including tombstoned) → bail. A
+    # user who deleted the previous auto-draft has spoken; re-syncs must
+    # not resurrect it. Counting via scalar is cheaper than fetching the
+    # rows themselves.
+    existing_share_count = await db.scalar(
+        select(func.count(Share.id)).where(Share.owner_user_id == user.id)
+    )
+    if existing_share_count and existing_share_count > 0:
+        return None
+
+    # Gate 2: empty library → nothing to seed. The user may have
+    # ORCID-linked but have zero published works; in that case the
+    # banner-on-an-empty-share would be pointless.
+    library_rows = await db.scalars(
+        select(UserPaper)
+        .options(selectinload(UserPaper.paper))
+        .where(
+            UserPaper.user_id == user.id,
+            UserPaper.hidden_at.is_(None),
+        )
+        .order_by(UserPaper.added_at.desc(), UserPaper.paper_id.desc())
+    )
+    library = list(library_rows.all())
+    if not library:
+        return None
+
+    short_code = await _allocate_short_code(db)
+    share = Share(
+        owner_user_id=user.id,
+        short_code=short_code,
+        name=ORCID_AUTO_DRAFT_NAME,
+        description=ORCID_AUTO_DRAFT_DESCRIPTION,
+        # Default share type — a list of papers, exactly what this is.
+        # Type can be edited later. ``is_public=True`` matches the
+        # service default; coupled with ``published_at=NULL`` the share
+        # is link-private until the user clicks publish (see K3 in
+        # share.py — drafts are NOT served publicly even with
+        # is_public=True).
+        is_public=True,
+    )
+    for position, entry in enumerate(library):
+        paper = entry.paper
+        share.items.append(
+            ShareItem(
+                position=position,
+                kind=ItemKind.PAPER,
+                title=paper.title,
+                subtitle=paper.subtitle,
+                url=paper.url,
+                image_url=paper.image_url,
+                doi=paper.doi,
+                authors=paper.authors,
+                year=paper.year,
+            )
+        )
+        share.papers.append(
+            SharePaper(
+                paper_id=paper.id,
+                position=position,
+                added_by=user.id,
+            )
+        )
+
+    db.add(share)
+    await db.commit()
+    await db.refresh(share)
+    # Re-fetch with eagerly-loaded relationships so callers can read
+    # share.papers / share.items without lazy-load surprises.
+    refreshed = await db.scalar(
+        select(Share)
+        .options(selectinload(Share.items), selectinload(Share.papers))
+        .where(Share.id == share.id)
+    )
+    assert refreshed is not None
+    return refreshed
 
 
 async def list_library(

@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from myetal_api.api.deps import get_current_user
 from myetal_api.core.database import get_db
 from myetal_api.main import app
-from myetal_api.models import Paper, UserPaper, UserPaperAddedVia
+from myetal_api.models import Paper, PaperSource, UserPaper, UserPaperAddedVia
 from myetal_api.services import orcid_client
 from myetal_api.services import papers as papers_service
 from myetal_api.services import works as works_service
@@ -607,3 +607,288 @@ async def test_route_sync_orcid_rate_limited_after_five_calls(
     finally:
         oc.fetch_works = original  # type: ignore[assignment]
         limiter.reset()
+
+
+# ---------- ORCID first-sign-in auto-draft ----------
+#
+# A first-time ORCID user (no prior sync, no shares) should land on the
+# dashboard with a pre-built draft "Publications" share — see PR-spec
+# "ORCID first-sign-in auto-draft". Tests cover the service-level helper
+# directly, then end-to-end through the sync route.
+
+
+async def test_auto_create_orcid_draft_share_happy_path(db_session: AsyncSession) -> None:
+    """A first-sync user with N library items gets one DRAFT share named
+    "Publications" with every library item attached (as both share_items
+    rows and share_papers join rows)."""
+    from myetal_api.models import ShareItem, SharePaper
+
+    user = await _seed_orcid_user(db_session)
+
+    # Seed two library entries directly (skip the Crossref dance — this
+    # test only cares about share creation, not paper import).
+    p1 = Paper(
+        doi="10.1/aaa",
+        title="Paper A",
+        authors="Smith J",
+        year=2020,
+        source=PaperSource.CROSSREF,
+    )
+    p2 = Paper(
+        doi="10.1/bbb",
+        title="Paper B",
+        authors="Jones A",
+        year=2021,
+        source=PaperSource.CROSSREF,
+    )
+    db_session.add_all([p1, p2])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            UserPaper(user_id=user.id, paper_id=p1.id, added_via=UserPaperAddedVia.ORCID),
+            UserPaper(user_id=user.id, paper_id=p2.id, added_via=UserPaperAddedVia.ORCID),
+        ]
+    )
+    await db_session.commit()
+
+    share = await works_service.auto_create_orcid_draft_share(db_session, user)
+    assert share is not None
+    assert share.name == "Publications"
+    assert share.description and "ORCID" in share.description
+    # Critical invariant: NEVER auto-published.
+    assert share.published_at is None
+    assert share.deleted_at is None
+
+    # Both join paths populated.
+    assert len(share.items) == 2
+    assert {it.title for it in share.items} == {"Paper A", "Paper B"}
+    papers = (
+        await db_session.scalars(select(SharePaper).where(SharePaper.share_id == share.id))
+    ).all()
+    assert len(papers) == 2
+
+    # share_items kind is paper.
+    items = (
+        await db_session.scalars(select(ShareItem).where(ShareItem.share_id == share.id))
+    ).all()
+    assert all(it.kind.value == "paper" for it in items)
+
+
+async def test_auto_create_orcid_draft_share_skips_when_user_has_a_share(
+    db_session: AsyncSession,
+) -> None:
+    """If the user already owns a share (any state), don't pre-build a new
+    one — they've already onboarded, even if they then deleted it."""
+    from myetal_api.models import Share
+
+    user = await _seed_orcid_user(db_session)
+    # Seed a library entry — the gate is on shares, not library.
+    p = Paper(
+        doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF
+    )
+    db_session.add(p)
+    await db_session.flush()
+    db_session.add(UserPaper(user_id=user.id, paper_id=p.id, added_via=UserPaperAddedVia.ORCID))
+    # Existing share — could be hand-built, could be a tombstoned old auto-draft.
+    db_session.add(
+        Share(owner_user_id=user.id, short_code="x" * 7, name="Existing", is_public=True)
+    )
+    await db_session.commit()
+
+    share = await works_service.auto_create_orcid_draft_share(db_session, user)
+    assert share is None
+
+
+async def test_auto_create_orcid_draft_share_skips_when_user_has_a_tombstoned_share(
+    db_session: AsyncSession,
+) -> None:
+    """A tombstoned share still counts. The user deleted their auto-draft
+    once already — never resurrect it."""
+    from myetal_api.models import Share
+
+    user = await _seed_orcid_user(db_session)
+    p = Paper(
+        doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF
+    )
+    db_session.add(p)
+    await db_session.flush()
+    db_session.add(UserPaper(user_id=user.id, paper_id=p.id, added_via=UserPaperAddedVia.ORCID))
+    tombstoned = Share(
+        owner_user_id=user.id,
+        short_code="y" * 7,
+        name="Publications",
+        is_public=True,
+        deleted_at=datetime.now(UTC),
+    )
+    db_session.add(tombstoned)
+    await db_session.commit()
+
+    share = await works_service.auto_create_orcid_draft_share(db_session, user)
+    assert share is None
+
+
+async def test_auto_create_orcid_draft_share_skips_when_library_empty(
+    db_session: AsyncSession,
+) -> None:
+    """No library items → no useful share to build."""
+    user = await _seed_orcid_user(db_session)
+    share = await works_service.auto_create_orcid_draft_share(db_session, user)
+    assert share is None
+
+
+async def test_auto_create_orcid_draft_share_idempotent(db_session: AsyncSession) -> None:
+    """Calling twice creates exactly one share — the second call short-circuits
+    on the "already has a share" gate."""
+    from sqlalchemy import func as sa_func
+
+    from myetal_api.models import Share
+
+    user = await _seed_orcid_user(db_session)
+    p = Paper(
+        doi="10.1/aaa", title="A", authors="X", year=2020, source=PaperSource.CROSSREF
+    )
+    db_session.add(p)
+    await db_session.flush()
+    db_session.add(UserPaper(user_id=user.id, paper_id=p.id, added_via=UserPaperAddedVia.ORCID))
+    await db_session.commit()
+
+    first = await works_service.auto_create_orcid_draft_share(db_session, user)
+    second = await works_service.auto_create_orcid_draft_share(db_session, user)
+    assert first is not None
+    assert second is None
+    count = await db_session.scalar(
+        select(sa_func.count(Share.id)).where(Share.owner_user_id == user.id)
+    )
+    assert count == 1
+
+
+async def test_sync_from_orcid_creates_auto_draft_on_first_sync(
+    db_session: AsyncSession,
+) -> None:
+    """End-to-end through the service: first sync imports papers AND
+    pre-builds the Publications draft, returning its id in the result."""
+    from myetal_api.models import Share
+
+    user = await _seed_orcid_user(db_session)
+    crossref = _crossref_router(
+        {
+            "10.1000/aaa": {
+                "DOI": "10.1000/aaa",
+                "title": ["A"],
+                "container-title": ["J"],
+                "issued": {"date-parts": [[2020]]},
+            },
+        }
+    )
+    papers_service._set_transport(httpx.MockTransport(crossref))
+    works_body = _orcid_works_body({"doi": "10.1000/aaa"})
+    async with _orcid_http(works_body) as http:
+        result = await works_service.sync_from_orcid(db_session, user.id, http=http)
+
+    assert result.added == 1
+    assert result.auto_draft_share_id is not None
+    assert result.auto_draft_paper_count == 1
+
+    share = await db_session.get(Share, result.auto_draft_share_id)
+    assert share is not None
+    assert share.name == "Publications"
+    assert share.published_at is None
+
+
+async def test_sync_from_orcid_skips_auto_draft_on_resync(
+    db_session: AsyncSession,
+) -> None:
+    """Second sync (user already has last_orcid_sync_at) must not create
+    another auto-draft, even if the user has deleted the original.
+    """
+    from sqlalchemy import update
+
+    from myetal_api.models import Share
+
+    user = await _seed_orcid_user(db_session)
+    crossref = _crossref_router(
+        {
+            "10.1000/aaa": {
+                "DOI": "10.1000/aaa",
+                "title": ["A"],
+                "container-title": ["J"],
+                "issued": {"date-parts": [[2020]]},
+            },
+        }
+    )
+    papers_service._set_transport(httpx.MockTransport(crossref))
+    works_body = _orcid_works_body({"doi": "10.1000/aaa"})
+
+    async with _orcid_http(works_body) as http:
+        first = await works_service.sync_from_orcid(db_session, user.id, http=http)
+    assert first.auto_draft_share_id is not None
+
+    # User deletes the auto-draft (tombstone).
+    await db_session.execute(
+        update(Share)
+        .where(Share.id == first.auto_draft_share_id)
+        .values(deleted_at=datetime.now(UTC))
+    )
+    await db_session.commit()
+
+    async with _orcid_http(works_body) as http:
+        second = await works_service.sync_from_orcid(db_session, user.id, http=http)
+    assert second.auto_draft_share_id is None
+    assert second.auto_draft_paper_count is None
+
+
+async def test_sync_from_orcid_no_auto_draft_when_zero_works(
+    db_session: AsyncSession,
+) -> None:
+    """First sync with zero works → no auto-draft (library empty after sync)."""
+    user = await _seed_orcid_user(db_session)
+    works_body = _orcid_works_body()  # empty
+    async with _orcid_http(works_body) as http:
+        result = await works_service.sync_from_orcid(db_session, user.id, http=http)
+    assert result.auto_draft_share_id is None
+    assert result.auto_draft_paper_count is None
+
+
+async def test_route_sync_orcid_returns_auto_draft_share_id(
+    authed_client: TestClient, db_session: AsyncSession
+) -> None:
+    """Route layer surfaces the auto_draft_share_id field on the response
+    so the web client can fire the telemetry event + deep-link the banner."""
+    from myetal_api.models import User as UserModel
+    from myetal_api.services import orcid_client as oc
+
+    me = (await db_session.scalars(select(UserModel))).first()
+    assert me is not None
+    me.orcid_id = "0000-0002-1825-0097"
+    await db_session.commit()
+
+    async def fake_fetch_works(orcid_id: str, *, http: Any | None = None):  # type: ignore[no-untyped-def]
+        return [
+            oc.OrcidWorkSummary(title="A", doi="10.1000/aaa", publication_year=2020, journal="J")
+        ]
+
+    papers_service._set_transport(
+        httpx.MockTransport(
+            _crossref_router(
+                {
+                    "10.1000/aaa": {
+                        "DOI": "10.1000/aaa",
+                        "title": ["A"],
+                        "container-title": ["J"],
+                        "issued": {"date-parts": [[2020]]},
+                    }
+                }
+            )
+        )
+    )
+    original = oc.fetch_works
+    oc.fetch_works = fake_fetch_works  # type: ignore[assignment]
+    try:
+        r = authed_client.post("/me/works/sync-orcid")
+    finally:
+        oc.fetch_works = original  # type: ignore[assignment]
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["auto_draft_share_id"] is not None
+    assert body["auto_draft_paper_count"] == 1

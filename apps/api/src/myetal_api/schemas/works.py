@@ -61,6 +61,12 @@ class OrcidSyncResponse(BaseModel):
 
     Mirrors ``services.works.OrcidSyncResult``. ``errors`` is capped at
     10 entries — enough to debug, not enough to flood the response.
+
+    ``auto_draft_share_id`` / ``auto_draft_paper_count`` are populated
+    only on a user's first successful sync that resulted in a pre-built
+    "Publications" draft (see ``works.auto_create_orcid_draft_share``).
+    Web uses these two fields to fire the ``orcid_auto_draft_created``
+    telemetry event and to deep-link "Review draft" into the editor.
     """
 
     added: int
@@ -68,3 +74,5 @@ class OrcidSyncResponse(BaseModel):
     unchanged: int
     skipped: int
     errors: list[str]
+    auto_draft_share_id: uuid.UUID | None = None
+    auto_draft_paper_count: int | None = None
