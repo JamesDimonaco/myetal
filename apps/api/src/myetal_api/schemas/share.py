@@ -213,6 +213,11 @@ class UserPublicOut(BaseModel):
     # identifier by design, surfaced on the /u/{id} page. Defaults to None
     # so the raw-SQL user-search path doesn't have to select it.
     orcid_id: str | None = None
+    # Optional researcher-page identity slug. When present, the web side
+    # prefers ``/u/{handle}`` over ``/u/{id}`` when linking to this
+    # researcher. Defaults to None so the raw-SQL user-search path
+    # doesn't need to select it.
+    handle: str | None = None
 
 
 # Alias for the user-search block — the shape is identical to

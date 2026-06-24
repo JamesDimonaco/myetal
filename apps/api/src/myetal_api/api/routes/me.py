@@ -16,11 +16,12 @@ domain operations on the calling user's row that BA does not own:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from myetal_api.api.deps import CurrentUser, DbSession, is_effective_admin
 from myetal_api.models import User
-from myetal_api.schemas.user import UpdateMeRequest, UserResponse
+from myetal_api.schemas.user import UpdateHandleRequest, UpdateMeRequest, UserResponse
+from myetal_api.services import handles as handles_service
 from myetal_api.services import users as users_service
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -62,3 +63,55 @@ async def update_me_orcid(body: UpdateMeRequest, user: CurrentUser, db: DbSessio
                 detail="orcid_id is already linked to another account",
             ) from exc
     return _user_response(user)
+
+
+@router.patch("/handle", response_model=UserResponse)
+async def update_me_handle(
+    body: UpdateHandleRequest, user: CurrentUser, db: DbSession
+) -> UserResponse:
+    """Claim or change the calling user's researcher-page handle.
+
+    Status codes:
+    * 200 — handle set; returns updated user row.
+    * 400 — handle is on the platform reserved list. (Distinct from 422
+      so the frontend can render a tailored "that name is reserved" copy.)
+    * 409 — another user already claims this handle.
+    * 422 — format violation (wrong length, illegal chars, leading digit,
+      consecutive separators). Pydantic raises this before the route
+      body runs.
+    """
+    handle = body.handle
+    if handles_service.is_reserved(handle):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="handle is reserved by the platform",
+        )
+    try:
+        user = await handles_service.set_user_handle(db, user.id, handle)
+    except handles_service.HandleAlreadyTaken as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="handle is already taken",
+        ) from exc
+    except handles_service.InvalidHandle as exc:
+        # Schema validation should catch this — re-raise as 422 if it
+        # somehow slipped through (defence in depth).
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except handles_service.ReservedHandle as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="handle is reserved by the platform",
+        ) from exc
+    return _user_response(user)
+
+
+@router.delete("/handle", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_me_handle(user: CurrentUser, db: DbSession) -> Response:
+    """Clear the calling user's handle. Idempotent — succeeds with 204
+    whether or not a handle was previously set. The UUID URL keeps
+    resolving as before."""
+    await handles_service.clear_user_handle(db, user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

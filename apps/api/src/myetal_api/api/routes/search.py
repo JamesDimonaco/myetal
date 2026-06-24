@@ -23,6 +23,7 @@ from myetal_api.core.rate_limit import (
     limiter,
 )
 from myetal_api.schemas.share import BrowseResponse, ShareSearchResponse, TagOut
+from myetal_api.services import handles as handles_service
 from myetal_api.services import share as share_service
 from myetal_api.services import tags as tags_service
 from myetal_api.services.tags import InvalidTagSlug
@@ -121,6 +122,57 @@ async def browse_shares(
 
     trending, recent, total_published = await share_service.browse_published_shares(
         db, tags=tag_slugs, sort=sort, owner_id=owner_id
+    )
+
+    return BrowseResponse(
+        trending=trending,
+        recent=recent,
+        total_published=total_published,
+        owner=owner_card,
+    )
+
+
+@router.get("/by-handle/{handle}", response_model=BrowseResponse)
+@limiter.limit(BROWSE_LIMIT)
+async def browse_by_handle(
+    handle: str,
+    request: Request,
+    response: Response,
+    db: DbSession,
+) -> BrowseResponse:
+    """Resolve a researcher-page handle to the same payload as
+    ``/public/browse?owner_id=<uuid>``.
+
+    The web side hits this for the ``/u/{handle}`` route. Lookups are
+    lowercased (so ``/u/DrSmith`` resolves to the same user as
+    ``/u/drsmith``) but no other normalisation runs — handles are stored
+    in canonical form. Returns 404 when the handle is unknown so the
+    web page can render the soft empty state.
+    """
+    response.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=3600"
+
+    owner_id = await handles_service.find_user_id_by_handle(db, handle)
+    if owner_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="handle not found",
+        )
+
+    # Reuse the same code path the UUID route uses — guarantees the
+    # response shape (and the empty-state behaviour for a user with zero
+    # published shares) is identical.
+    owner_card = await share_service.get_user_public_card(db, owner_id)
+    if owner_card is None:
+        # Shouldn't happen — the handle resolved to a user_id, so the
+        # card lookup should find the same row. Treat it like a 404 to
+        # be safe.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="handle not found",
+        )
+
+    trending, recent, total_published = await share_service.browse_published_shares(
+        db, tags=None, sort="recent", owner_id=owner_id
     )
 
     return BrowseResponse(

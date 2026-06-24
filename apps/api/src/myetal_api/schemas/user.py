@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from myetal_api.services import handles as handles_service
+
 # ORCID iDs are 16 digits in 4 groups of 4 separated by hyphens; the final
 # character is a MOD-11-2 checksum that may be ``X`` for value 10.  See
 # https://info.orcid.org/ufaqs/what-is-an-orcid-id/ for the spec.
@@ -26,7 +28,36 @@ class UserResponse(BaseModel):
     avatar_url: str | None
     orcid_id: str | None
     last_orcid_sync_at: datetime | None
+    # Optional handle (researcher-page identity slug). NULL until the
+    # user claims one from the profile screen. When present, the web
+    # side prefers ``/u/{handle}`` over the UUID URL.
+    handle: str | None = None
     created_at: datetime
+
+
+class UpdateHandleRequest(BaseModel):
+    """Body for ``PATCH /me/handle``.
+
+    Pydantic validates format → 422 on malformed input. The
+    reserved-handle check is intentionally NOT a pydantic validator: the
+    route lifts it out so reserved hits return 400 (semantic distinction
+    from 422 "wrong shape"). The 409 (already-taken) path is a DB-level
+    race and also lives in the route.
+    """
+
+    handle: str
+
+    @field_validator("handle", mode="before")
+    @classmethod
+    def _validate_handle(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            raise ValueError("handle must be a string")
+        cleaned = value.strip().lower()
+        try:
+            handles_service.validate_handle_format(cleaned)
+        except handles_service.InvalidHandle as exc:
+            raise ValueError(str(exc)) from exc
+        return cleaned
 
 
 class UpdateMeRequest(BaseModel):
