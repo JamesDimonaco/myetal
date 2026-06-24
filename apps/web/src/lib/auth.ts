@@ -212,7 +212,17 @@ export const auth = betterAuth({
   // Sessions, accounts, verifications, jwks: no `fields:` mapping needed
   // for the same reason as the `user` resource above (BA defaults match
   // our drizzle JS field names; drizzle handles the snake_case DB columns).
-  session: {},
+  //
+  // Session lifetime: BA defaults are 7 days expiry / 1 day rolling
+  // refresh — too short for a researcher app where users check in
+  // monthly at most. Bumped to 30 days with a 7-day refresh window:
+  // any visit within the last week pushes the cookie expiry out
+  // another 30 days. Users who stay away >30 days re-sign-in. The
+  // cookie ``maxAge`` is synced from ``expiresIn`` automatically.
+  session: {
+    expiresIn: 60 * 60 * 24 * 30, // 30 days
+    updateAge: 60 * 60 * 24 * 7, // refresh expiry weekly on activity
+  },
   account: {
     // Security posture (Phase 5 — locked decision in the migration
     // ticket): we do NOT auto-link OAuth providers to existing user
