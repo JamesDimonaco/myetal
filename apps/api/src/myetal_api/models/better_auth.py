@@ -98,6 +98,15 @@ class User(Base):
     last_orcid_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Researcher-page identity slug — populated when the user claims one
+    # from the profile screen. Format enforced at the service layer
+    # (``services/handles.py``) and validated by ``schemas/user.py``;
+    # uniqueness lives in the named ``uq_users_handle`` constraint added
+    # by Alembic 0020. The regex requires lowercase so a plain UNIQUE is
+    # case-correct without CITEXT.
+    handle: Mapped[str | None] = mapped_column(
+        String(30), nullable=True, unique=True
+    )
     # Admin soft-delete (Stage 2 of `admin-analytics-dashboard.md`). NULL =
     # active. Flipping this excludes the user from search/list paths AND
     # tombstones every share they own in the same transaction. Reversible —
