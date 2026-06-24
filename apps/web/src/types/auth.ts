@@ -23,5 +23,11 @@ export interface UserResponse {
   is_admin: boolean;
   orcid_id: string | null;
   last_orcid_sync_at: string | null;
+  /**
+   * Researcher-page identity slug (nullable). Surfaced at `/u/{handle}`;
+   * the UUID URL `/u/{id}` keeps resolving for already-printed cards.
+   * Written via `PATCH /me/handle`.
+   */
+  handle: string | null;
   created_at: string;
 }

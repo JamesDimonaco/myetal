@@ -26,7 +26,7 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { useAnalyticsConsent } from '@/hooks/useAnalyticsConsent';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemePreference, type ThemePreference } from '@/hooks/useThemePreference';
-import { ApiError } from '@/lib/api';
+import { ApiError, WEB_BASE_URL } from '@/lib/api';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'light', label: 'Light' },
@@ -223,6 +223,35 @@ export default function ProfileScreen() {
 
           <Text style={[styles.label, { color: c.textMuted }]}>EMAIL</Text>
           <Text style={[styles.value, { color: c.text }]}>{user?.email ?? '—'}</Text>
+
+          <View style={[styles.divider, { backgroundColor: c.border }]} />
+
+          {/* Handle is read-only on mobile in this PR — editing happens on the
+              web (PATCH /me/handle). Surfaces the claimed handle (if any) and
+              a deep link out for users who want to claim/change one. */}
+          <Text style={[styles.label, { color: c.textMuted }]}>HANDLE</Text>
+          {user?.handle ? (
+            <Text style={[styles.value, styles.handleValue, { color: c.text }]}>
+              /u/{user.handle}
+            </Text>
+          ) : (
+            <>
+              <Text style={[styles.value, { color: c.textMuted }]}>Not set</Text>
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => {
+                  Linking.openURL(`${WEB_BASE_URL}/dashboard/profile`).catch(() => {
+                    // best-effort
+                  });
+                }}
+                hitSlop={8}
+              >
+                <Text style={[styles.handleSetupLink, { color: c.textMuted }]}>
+                  Set up your handle on the web {'↗'}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
 
         {/* ORCID iD entry — see docs/tickets/orcid-integration-and-account-linking.md
@@ -425,6 +454,15 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: Spacing.xs },
   value: { fontSize: 17, fontWeight: '500' },
+  handleValue: {
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
+    fontSize: 15,
+  },
+  handleSetupLink: {
+    fontSize: 13,
+    marginTop: Spacing.xs,
+    textDecorationLine: 'underline',
+  },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.md },
 
   orcidHelp: { fontSize: 13, lineHeight: 18, marginBottom: Spacing.sm },

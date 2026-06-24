@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
+import { HandleSection } from './handle-section';
 import { OrcidSection } from './orcid-section';
 import { ProfileActions } from './profile-actions';
 import { ApiError } from '@/lib/api';
@@ -57,6 +58,8 @@ export default async function ProfilePage() {
           <ProfileActions />
         </div>
       </section>
+
+      <HandleSection initialHandle={user.handle} />
 
       <OrcidSection initialOrcidId={user.orcid_id} />
     </div>

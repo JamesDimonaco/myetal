@@ -51,20 +51,25 @@ const NAV_LINKS: Array<{ href: string; label: string }> = [
 const ADMIN_LINK = { href: '/dashboard/admin', label: 'Admin' };
 
 // Account-scoped destinations shared by the desktop avatar dropdown and the
-// mobile hamburger. "Your public page" depends on the user id, so this is a
-// builder rather than a constant.
-function accountLinks(userId: string): Array<{ href: string; label: string }> {
+// mobile hamburger. "Your public page" prefers the user's handle when
+// claimed so the dropdown reflects the prettier URL; falls back to the UUID
+// otherwise. Both shapes resolve to the same ``[slug]`` route.
+function accountLinks(
+  userId: string,
+  handle: string | null,
+): Array<{ href: string; label: string }> {
+  const publicSlug = handle ?? userId;
   return [
     { href: '/dashboard/profile', label: 'Profile' },
     { href: '/dashboard/library', label: 'My papers' },
-    { href: `/u/${userId}`, label: 'Your public page' },
+    { href: `/u/${encodeURIComponent(publicSlug)}`, label: 'Your public page' },
     { href: '/dashboard/feedback', label: 'Send feedback' },
   ];
 }
 
 export function DashboardHeader({ user }: { user: UserResponse }) {
   const navLinks = user.is_admin ? [...NAV_LINKS, ADMIN_LINK] : NAV_LINKS;
-  const menuLinks = accountLinks(user.id);
+  const menuLinks = accountLinks(user.id, user.handle);
   return (
     <header className="border-b border-rule bg-paper">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">

@@ -162,6 +162,8 @@ class PublicShareResponse(BaseModel):
     ``owner_id`` is deliberately public — it's the same id already exposed
     by ``/public/browse?owner_id=`` and ``/public/search`` user cards, and
     the viewer uses it to link the owner name to ``/u/{owner_id}``.
+    ``owner_handle`` lets the viewer prefer the prettier ``/u/{handle}``
+    URL when the owner has claimed one.
     """
 
     short_code: str
@@ -171,6 +173,7 @@ class PublicShareResponse(BaseModel):
     items: list[ShareItemResponse]
     owner_name: str | None
     owner_id: uuid.UUID | None = None
+    owner_handle: str | None = None
     updated_at: datetime
     related_shares: list[RelatedShareOut] = Field(default_factory=list)
     similar_shares: list[SimilarShareOut] = Field(default_factory=list)
@@ -213,6 +216,11 @@ class UserPublicOut(BaseModel):
     # identifier by design, surfaced on the /u/{id} page. Defaults to None
     # so the raw-SQL user-search path doesn't have to select it.
     orcid_id: str | None = None
+    # Optional researcher-page identity slug. When present, the web side
+    # prefers ``/u/{handle}`` over ``/u/{id}`` when linking to this
+    # researcher. Defaults to None so the raw-SQL user-search path
+    # doesn't need to select it.
+    handle: str | None = None
 
 
 # Alias for the user-search block — the shape is identical to

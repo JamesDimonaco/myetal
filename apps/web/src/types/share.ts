@@ -70,6 +70,9 @@ export interface PublicShareResponse {
   /** Owner's user UUID — links the viewer to `/u/{owner_id}`. Null when the
    *  owner has hidden their profile (no published shares attributable). */
   owner_id: string | null;
+  /** Owner's researcher-page handle, when claimed. The viewer prefers
+   *  `/u/{owner_handle}` over the UUID URL when this is non-null. */
+  owner_handle?: string | null;
   updated_at: string;
   related_shares: RelatedShare[];
   similar_shares: SimilarShare[];
@@ -242,4 +245,9 @@ export interface UserPublicOut {
   share_count: number;
   /** Bare ORCID iD (e.g. `0000-0002-1825-0097`) when the user linked one. */
   orcid_id: string | null;
+  /**
+   * Researcher-page identity slug (nullable). When present, the web side
+   * prefers `/u/{handle}` over `/u/{id}` when linking to this researcher.
+   */
+  handle: string | null;
 }

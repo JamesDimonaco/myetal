@@ -207,6 +207,16 @@ export const auth = betterAuth({
         required: false,
         input: false,
       },
+      // Researcher-page identity slug. Written by FastAPI via
+      // ``PATCH /me/handle`` rather than Better Auth itself; declared
+      // here so BA's session response carries it and server components
+      // can read ``session.user.handle``.
+      handle: {
+        type: 'string',
+        required: false,
+        input: false,
+        unique: true,
+      },
     },
   },
   // Sessions, accounts, verifications, jwks: no `fields:` mapping needed

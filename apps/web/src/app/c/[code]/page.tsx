@@ -241,9 +241,9 @@ export default async function PublicSharePage({ params }: PageProps) {
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
           {share.owner_name ? (
-            share.owner_id ? (
+            share.owner_id || share.owner_handle ? (
               <Link
-                href={`/u/${share.owner_id}`}
+                href={`/u/${share.owner_handle ?? share.owner_id}`}
                 className="underline-offset-2 transition hover:text-ink hover:underline"
               >
                 by {share.owner_name}

@@ -20,9 +20,12 @@ interface Props {
 }
 
 export function UserCard({ user }: Props) {
+  // Prefer the handle URL when claimed — better-looking, easier to read,
+  // and the canonical-tag target. The UUID URL still resolves regardless.
+  const slug = user.handle ?? user.id;
   return (
     <Link
-      href={`/u/${encodeURIComponent(user.id)}`}
+      href={`/u/${encodeURIComponent(slug)}`}
       className="group flex items-center gap-3 rounded-md border border-rule bg-paper-soft px-4 py-3 transition hover:border-ink/30"
     >
       <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={40} />
