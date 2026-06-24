@@ -52,6 +52,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { db } from './db';
 import { account, users } from './db-schema';
+import { isPlaceholderOrcidEmail } from './auth-orcid-public';
 
 const ORCID_PROVIDER_ID = 'orcid';
 
@@ -85,19 +86,42 @@ function hijackErrorRedirectUrl(): string {
  */
 export async function ensureOrcidAccountForExistingUser(
   orcidId: string,
+  publicOrcidEmail: string | null = null,
 ): Promise<void> {
   if (!orcidId) return;
 
   // 1. Does any user row already claim this iD? If not, nothing to do —
   // BA will create a fresh user with the iD via its normal path.
   const userRow = await db
-    .select({ id: users.id })
+    .select({ id: users.id, email: users.email })
     .from(users)
     .where(eq(users.orcidId, orcidId))
     .limit(1);
   if (userRow.length === 0) return;
 
   const claimingUserId = userRow[0]!.id;
+  const claimingUserEmail = userRow[0]!.email;
+
+  // 1a. Email-placeholder backfill: ORCID's OIDC userinfo never
+  // returns email, so any user who signed up via ORCID before we
+  // wired the public-REST fallback has a ``${orcidId}@orcid.invalid``
+  // placeholder on their row. If we now have a real public email for
+  // them, overwrite the placeholder so password-reset / future
+  // notification emails actually reach the user. Best-effort; failures
+  // don't block sign-in.
+  if (publicOrcidEmail && isPlaceholderOrcidEmail(claimingUserEmail)) {
+    try {
+      await db
+        .update(users)
+        .set({ email: publicOrcidEmail })
+        .where(eq(users.id, claimingUserId));
+    } catch (err) {
+      console.warn(
+        `[auth-orcid] failed to backfill placeholder email for user ${claimingUserId}`,
+        err,
+      );
+    }
+  }
 
   // 2. Is there already a matching ``account`` row?
   const accountRow = await db

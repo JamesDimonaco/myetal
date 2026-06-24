@@ -26,6 +26,7 @@ import { genericOAuth, jwt } from 'better-auth/plugins';
 import { Resend } from 'resend';
 
 import { ensureOrcidAccountForExistingUser } from './auth-orcid-claim';
+import { fetchPublicOrcidEmail } from './auth-orcid-public';
 import { db } from './db';
 import { account, jwks, session, users, verification } from './db-schema';
 
@@ -389,22 +390,32 @@ export async function mapOrcidProfileToUser(
       : typeof profile.orcid === 'string'
         ? profile.orcid
         : '';
-  if (orcidId) {
-    await ensureOrcidAccountForExistingUser(orcidId);
-  }
-  // ORCID lets users keep their email private — when they do, we get
-  // no `email` claim back even with the `openid` scope. BA requires
-  // email (it's NOT NULL + UNIQUE on the users row), so synthesize one
-  // using the `.invalid` TLD (RFC 2606 reserves this — clearly
-  // non-deliverable, never collides with a real address). Users can
-  // update it later via PATCH /me/orcid's sister endpoint or a future
-  // profile-edit UI.
+
+  // ORCID's OIDC userinfo endpoint NEVER returns email — their
+  // `claims_supported` discovery list omits it. Public email visibility
+  // is reachable only through the public REST API at
+  // `/v3.0/{id}/record`. Fetch it best-effort; on failure we fall back
+  // to the `.invalid` placeholder below. Sign-in must not block on
+  // ORCID's public API.
   const emailFromProfile =
     typeof profile.email === 'string' && profile.email.length > 0
       ? profile.email
       : null;
+  const publicEmail =
+    !emailFromProfile && orcidId ? await fetchPublicOrcidEmail(orcidId) : null;
+
+  if (orcidId) {
+    await ensureOrcidAccountForExistingUser(orcidId, publicEmail);
+  }
+
+  // BA requires email (NOT NULL + UNIQUE on the users row). Order of
+  // preference: real email from OIDC claim → public REST API → synthesized
+  // `.invalid` placeholder (RFC 2606-reserved, non-deliverable, no
+  // collisions with real addresses).
   const email =
-    emailFromProfile ?? (orcidId ? `${orcidId}@orcid.invalid` : undefined);
+    emailFromProfile ??
+    publicEmail ??
+    (orcidId ? `${orcidId}@orcid.invalid` : undefined);
   // ORCID's `given_name` + `family_name` come back separately when
   // present; combine into a single display name. Fall back to the
   // ORCID iD itself if the user has both first + last name set to
