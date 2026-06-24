@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import { useEffect, useRef, useState } from 'react';
 
 import { OrcidIcon } from '@/components/orcid-icon';
@@ -104,6 +105,21 @@ export function LibraryList({
       // Re-fetch the SSR data so `last_orcid_sync_at` is reflected immediately,
       // and a subsequent navigation back doesn't re-trigger the auto-fire.
       router.refresh();
+      // First-sign-in wow moment: when the server pre-built a
+      // "Publications" draft, drop the cached shares list so the
+      // dashboard banner detector sees the new share without a refetch
+      // race, and fire the telemetry event. Identify must have run
+      // first (PostHogIdentify in the dashboard shell); the
+      // `__loaded` guard prevents a no-op error if consent was declined.
+      if (result.auto_draft_share_id) {
+        queryClient.invalidateQueries({ queryKey: SHARES_KEY });
+        if (posthog.__loaded) {
+          posthog.capture('orcid_auto_draft_created', {
+            share_id: result.auto_draft_share_id,
+            paper_count: result.auto_draft_paper_count ?? 0,
+          });
+        }
+      }
       // Auto-dismiss after 8s
       dismissTimerRef.current = setTimeout(() => {
         setBanner(null);
@@ -467,11 +483,25 @@ function SyncBannerView({
       </span>
     );
   } else if (banner.kind === 'success') {
-    const { added, updated, unchanged, skipped } = banner.result;
+    const { added, updated, unchanged, skipped, auto_draft_share_id } =
+      banner.result;
     body = (
       <span>
         Imported {added} new, {updated} updated, {unchanged} already in your
         library, {skipped} skipped.
+        {auto_draft_share_id ? (
+          <>
+            {' '}
+            We also prepared a{' '}
+            <a
+              href={`/dashboard/share/${auto_draft_share_id}`}
+              className="font-medium underline underline-offset-2 hover:opacity-80"
+            >
+              draft share
+            </a>{' '}
+            for you to review.
+          </>
+        ) : null}
       </span>
     );
   } else if (banner.kind === 'needs-orcid') {
