@@ -137,6 +137,7 @@ export default async function ResearcherPage({ params }: PageProps) {
             data={resolved.data}
             pageUrl={pageUrl}
             qrUrl={qrUrl}
+            isOwner={user?.id === resolved.ownerId}
           />
         ) : (
           <SoftEmptyState />

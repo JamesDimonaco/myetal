@@ -41,8 +41,14 @@ import type { UserResponse } from '@/types/auth';
  */
 const NAV_LINK_CLASS = 'text-ink-muted hover:text-ink';
 
+// Browse is re-surfaced in the top nav after the conference-core
+// simplification went too far — authed users could no longer find
+// public discovery from inside /dashboard. Everything else
+// (Profile / Library / Public page / Feedback) stays in the avatar
+// dropdown.
 const NAV_LINKS: Array<{ href: string; label: string }> = [
   { href: '/dashboard', label: 'Shares' },
+  { href: '/browse', label: 'Browse' },
 ];
 
 // `Admin` is appended dynamically when `user.is_admin === true`. Web-only

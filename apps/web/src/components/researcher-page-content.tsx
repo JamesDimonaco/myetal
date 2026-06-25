@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { CopyPageLink } from '@/components/copy-page-link';
 import { OrcidIcon } from '@/components/orcid-icon';
 import { ShareCard } from '@/components/share-card';
@@ -11,14 +13,22 @@ import type { BrowseResponse } from '@/types/share';
  * file stays a thin shell over resolution + canonical-URL logic. Single
  * source of truth for the page layout means the UUID-shape resolution
  * and the handle-shape resolution can't drift visually.
+ *
+ * ``isOwner`` is set by the route when the currently-signed-in user's
+ * id matches the page owner's id. It unlocks two affordances that are
+ * inappropriate for visitors but obvious for the owner: a "+ New
+ * share" button next to the shares grid (non-empty view), and a
+ * "Create your first share" primary CTA in the empty-state (otherwise
+ * the owner lands on their own page with no path forward).
  */
 interface Props {
   data: BrowseResponse;
   pageUrl: string;
   qrUrl: string;
+  isOwner: boolean;
 }
 
-export function ResearcherPageContent({ data, pageUrl, qrUrl }: Props) {
+export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) {
   // ``data.owner`` is guaranteed by the caller (the route renders the
   // soft empty state when owner is null) — assert it locally so the
   // rest of the component can stop juggling the optional.
@@ -86,16 +96,57 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl }: Props) {
 
       <section className="mt-10">
         {shares.length === 0 ? (
-          <p className="py-10 text-center text-sm text-ink-muted">
-            Nothing published yet — collections will appear here as soon as
-            they go live.
-          </p>
+          isOwner ? (
+            // Owner-on-empty: friendly nudge + a clear path to fixing the
+            // emptiness. Without this the owner sees an empty page about
+            // themselves and has to navigate back to /dashboard manually.
+            <div className="rounded-lg border border-rule bg-paper-soft p-8 text-center">
+              <p className="text-sm text-ink-muted">
+                Nothing published here yet. Your researcher page lists every
+                share you publish — start with one.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  href="/dashboard/share/new"
+                  className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+                >
+                  Create your first share
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+                >
+                  Back to dashboard
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <p className="py-10 text-center text-sm text-ink-muted">
+              Nothing published yet — collections will appear here as soon as
+              they go live.
+            </p>
+          )
         ) : (
-          <div className="grid gap-4">
-            {shares.map((share) => (
-              <ShareCard key={share.short_code} result={share} />
-            ))}
-          </div>
+          <>
+            {isOwner ? (
+              // Non-empty owner view: a subtle "+ New share" sitting above
+              // the grid so the owner can extend their public page without
+              // navigating away. Hidden for visitors.
+              <div className="mb-4 flex justify-end">
+                <Link
+                  href="/dashboard/share/new"
+                  className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+                >
+                  + New share
+                </Link>
+              </div>
+            ) : null}
+            <div className="grid gap-4">
+              {shares.map((share) => (
+                <ShareCard key={share.short_code} result={share} />
+              ))}
+            </div>
+          </>
         )}
       </section>
     </>
