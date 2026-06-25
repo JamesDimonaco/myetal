@@ -40,4 +40,13 @@ export interface OrcidSyncResponse {
   unchanged: number;
   skipped: number;
   errors: string[];
+  /**
+   * Populated only on the user's first successful ORCID sync, when the
+   * server pre-built a draft "Publications" share. Null on every
+   * subsequent sync. Used by the library page to emit the
+   * `orcid_auto_draft_created` PostHog event + by the dashboard banner
+   * to deep-link "Review draft".
+   */
+  auto_draft_share_id: string | null;
+  auto_draft_paper_count: number | null;
 }
