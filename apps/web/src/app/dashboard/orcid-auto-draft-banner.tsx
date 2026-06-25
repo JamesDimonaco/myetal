@@ -70,10 +70,9 @@ export function OrcidAutoDraftBanner({ shares }: { shares: ShareResponse[] }) {
 
   // SSR-safe read of "have they dismissed this share's banner?".
   // useSyncExternalStore returns the server snapshot (always false)
-  // during SSR and the client snapshot (real localStorage) after
-  // hydration. No setState-in-effect, no hydration mismatch on the
-  // banner DOM (we delay the visible-banner decision to after
-  // hydration via `hydrated`).
+  // during SSR and the real localStorage value on the client — the
+  // SSR/client snapshot transition is handled by the hook itself, so
+  // we get no hydration mismatch and no setState-in-effect.
   const storedDismissed = useSyncExternalStore(
     subscribeNoop,
     () => (autoDraft ? readDismissedFromStorage(autoDraft.id) : false),

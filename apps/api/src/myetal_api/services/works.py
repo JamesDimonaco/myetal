@@ -340,6 +340,17 @@ async def auto_create_orcid_draft_share(
     # module top-level would invert the chain.
     from myetal_api.services.share import _allocate_short_code
 
+    # Serialize concurrent first-sync attempts on this user's row. Two
+    # tabs (or a double-clicked sync button) hitting the auto-draft path
+    # at the same time can both pass the existing-shares check and
+    # insert duplicate "Publications" drafts — there's no DB-level
+    # uniqueness on (owner_user_id, name) to catch it. ``SELECT ... FOR
+    # UPDATE`` on the User row turns the check-then-create into an
+    # atomic critical section: the second concurrent request blocks
+    # here, then sees the share the first one created and bails at
+    # gate 1. Lock is released on commit/rollback.
+    await db.execute(select(User.id).where(User.id == user.id).with_for_update())
+
     # Gate 1: any pre-existing share (including tombstoned) → bail. A
     # user who deleted the previous auto-draft has spoken; re-syncs must
     # not resurrect it. Counting via scalar is cheaper than fetching the

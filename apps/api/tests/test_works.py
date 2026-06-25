@@ -619,14 +619,19 @@ async def test_route_sync_orcid_rate_limited_after_five_calls(
 
 async def test_auto_create_orcid_draft_share_happy_path(db_session: AsyncSession) -> None:
     """A first-sync user with N library items gets one DRAFT share named
-    "Publications" with every library item attached (as both share_items
-    rows and share_papers join rows)."""
+    "Publications" with every VISIBLE library item attached (as both
+    share_items rows and share_papers join rows). Hidden library
+    entries (``UserPaper.hidden_at IS NOT NULL``) are explicitly
+    excluded — users who hid a paper from their library expect it not
+    to show up in shares they didn't curate themselves."""
+    from datetime import UTC, datetime
+
     from myetal_api.models import ShareItem, SharePaper
 
     user = await _seed_orcid_user(db_session)
 
-    # Seed two library entries directly (skip the Crossref dance — this
-    # test only cares about share creation, not paper import).
+    # Seed three papers — two visible library entries + one hidden.
+    # The hidden one MUST NOT appear in the auto-draft.
     p1 = Paper(
         doi="10.1/aaa",
         title="Paper A",
@@ -641,12 +646,25 @@ async def test_auto_create_orcid_draft_share_happy_path(db_session: AsyncSession
         year=2021,
         source=PaperSource.CROSSREF,
     )
-    db_session.add_all([p1, p2])
+    p_hidden = Paper(
+        doi="10.1/ccc",
+        title="Paper Hidden",
+        authors="Doe X",
+        year=2019,
+        source=PaperSource.CROSSREF,
+    )
+    db_session.add_all([p1, p2, p_hidden])
     await db_session.flush()
     db_session.add_all(
         [
             UserPaper(user_id=user.id, paper_id=p1.id, added_via=UserPaperAddedVia.ORCID),
             UserPaper(user_id=user.id, paper_id=p2.id, added_via=UserPaperAddedVia.ORCID),
+            UserPaper(
+                user_id=user.id,
+                paper_id=p_hidden.id,
+                added_via=UserPaperAddedVia.ORCID,
+                hidden_at=datetime.now(UTC),
+            ),
         ]
     )
     await db_session.commit()
@@ -659,13 +677,16 @@ async def test_auto_create_orcid_draft_share_happy_path(db_session: AsyncSession
     assert share.published_at is None
     assert share.deleted_at is None
 
-    # Both join paths populated.
+    # Both join paths populated with the two VISIBLE papers only.
     assert len(share.items) == 2
     assert {it.title for it in share.items} == {"Paper A", "Paper B"}
+    assert "Paper Hidden" not in {it.title for it in share.items}
+
     papers = (
         await db_session.scalars(select(SharePaper).where(SharePaper.share_id == share.id))
     ).all()
     assert len(papers) == 2
+    assert p_hidden.id not in {sp.paper_id for sp in papers}
 
     # share_items kind is paper.
     items = (

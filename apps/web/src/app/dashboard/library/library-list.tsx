@@ -493,12 +493,12 @@ function SyncBannerView({
           <>
             {' '}
             We also prepared a{' '}
-            <a
+            <Link
               href={`/dashboard/share/${auto_draft_share_id}`}
               className="font-medium underline underline-offset-2 hover:opacity-80"
             >
               draft share
-            </a>{' '}
+            </Link>{' '}
             for you to review.
           </>
         ) : null}
