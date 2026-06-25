@@ -10,14 +10,21 @@ import { SiteFooter } from '@/components/site-footer';
 import { UserAvatar } from '@/components/user-avatar';
 import { ApiError, api } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
-import type { BrowseResponse, BrowseShareResult, Tag } from '@/types/share';
+import type {
+  BrowseResponse,
+  BrowseShareResult,
+  ShareSearchResponse,
+  ShareSearchResult,
+  Tag,
+  UserPublicOut,
+} from '@/types/share';
 import type { UserResponse } from '@/types/auth';
 
 /**
  * Public discovery page (PR-B §4 + §5). Anonymous-readable — no /sign-in
  * redirect on 401.
  *
- * Three modes (resolved at request time from URL query params):
+ * Four modes (resolved at request time from URL query params):
  *
  *  1. Default (no params): trending + recent split, mirroring what authed
  *     users see at `/dashboard/search` before they type. Cacheable at the
@@ -29,6 +36,10 @@ import type { UserResponse } from '@/types/auth';
  *     Backend populates a `UserPublicOut` payload alongside the shares.
  *     404 from the backend → friendly "User not found" rather than the
  *     framework 404 page.
+ *  4. Search (`?q=`): swap `/public/browse` for `/public/search`,
+ *     render a results list + (top-N) matched users. Sort / tags /
+ *     owner filters do NOT apply to search — the search box clears
+ *     them implicitly. Cacheable at the edge per `q` value.
  *
  * `searchParams` is a Promise (modern Next contract — see
  * sign-in/page.tsx and sign-up/page.tsx for precedent).
@@ -79,6 +90,28 @@ async function fetchBrowse(
   }
 }
 
+/** Free-text trigram search over published shares + users. The endpoint
+ * is rate-limited and timeout-bounded on the API side; we render a
+ * tame empty-state when nothing matches, and let other failure modes
+ * fall through to the framework error boundary (Vercel logs catch it).
+ */
+async function fetchSearch(q: string): Promise<ShareSearchResponse | null> {
+  try {
+    return await api<ShareSearchResponse>(
+      `/public/search?q=${encodeURIComponent(q)}&limit=20&offset=0`,
+      FETCH_OPTIONS,
+    );
+  } catch (err) {
+    if (err instanceof ApiError) {
+      // 422 (too short / empty after trim), 429 (rate limit). Treat as
+      // "no results" rather than crashing the page — the search box
+      // stays usable.
+      return { results: [], has_more: false, users: [] };
+    }
+    throw err;
+  }
+}
+
 async function fetchPopularTags(): Promise<Tag[]> {
   try {
     return await api<Tag[]>('/public/tags/popular?limit=8', FETCH_OPTIONS);
@@ -99,9 +132,15 @@ async function getCurrentUser(): Promise<UserResponse | null> {
 
 export default async function BrowsePage({ searchParams }: PageProps) {
   const params = await searchParams;
+  const q = pickFirst(params.q)?.trim() || undefined;
   const tags = pickFirst(params.tags)?.trim() || undefined;
   const sort = pickFirst(params.sort)?.trim() || undefined;
   const ownerId = pickFirst(params.owner_id)?.trim() || undefined;
+
+  // Search short-circuits the browse/filter modes. Tags/sort/owner are
+  // ignored when `q` is set — the search endpoint doesn't honour them
+  // and pretending otherwise would surprise users.
+  const isSearch = Boolean(q);
 
   const qs = new URLSearchParams();
   if (tags) qs.set('tags', tags);
@@ -109,11 +148,15 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   if (ownerId) qs.set('owner_id', ownerId);
   const query = qs.toString();
 
-  const [{ data, ownerNotFound }, popularTags, user] = await Promise.all([
-    fetchBrowse(query),
+  const [browseResult, searchResult, popularTags, user] = await Promise.all([
+    isSearch
+      ? Promise.resolve({ data: null, ownerNotFound: false })
+      : fetchBrowse(query),
+    isSearch ? fetchSearch(q!) : Promise.resolve(null),
     fetchPopularTags(),
     getCurrentUser(),
   ]);
+  const { data, ownerNotFound } = browseResult;
 
   const signedIn = user !== null;
   const filtered = Boolean(tags || sort || ownerId);
@@ -128,9 +171,16 @@ export default async function BrowsePage({ searchParams }: PageProps) {
       )}
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 sm:py-14">
+        {/* Search box is always visible. It's a plain GET form so it
+            works without JS and any text-typed-into-the-URL combo (q=...)
+            is server-renderable and edge-cacheable. */}
+        <SearchBox initialQuery={q ?? ''} />
+
         {ownerNotFound ? <OwnerNotFound /> : null}
 
-        {data ? (
+        {isSearch ? (
+          <SearchResultsView query={q!} response={searchResult} />
+        ) : data ? (
           <BrowseBody
             data={data}
             tags={tags}
@@ -145,6 +195,150 @@ export default async function BrowsePage({ searchParams }: PageProps) {
 
       <SiteFooter />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Search box (RSC — plain GET form, no JS required)
+// ---------------------------------------------------------------------------
+
+function SearchBox({ initialQuery }: { initialQuery: string }) {
+  return (
+    <form
+      action="/browse"
+      method="GET"
+      role="search"
+      className="mb-8 flex flex-wrap gap-2"
+    >
+      <label htmlFor="browse-q" className="sr-only">
+        Search collections
+      </label>
+      <input
+        id="browse-q"
+        type="search"
+        name="q"
+        defaultValue={initialQuery}
+        placeholder="Search collections and researchers"
+        autoComplete="off"
+        className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none transition focus:border-ink"
+      />
+      <button
+        type="submit"
+        className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90"
+      >
+        Search
+      </button>
+      {initialQuery ? (
+        <Link
+          href="/browse"
+          className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+        >
+          Clear
+        </Link>
+      ) : null}
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Search results view
+// ---------------------------------------------------------------------------
+
+function SearchResultsView({
+  query,
+  response,
+}: {
+  query: string;
+  response: ShareSearchResponse | null;
+}) {
+  const shares = response?.results ?? [];
+  const users = response?.users ?? [];
+  const hasShares = shares.length > 0;
+  const hasUsers = users.length > 0;
+  const anything = hasShares || hasUsers;
+
+  return (
+    <section>
+      <header>
+        <h1 className="font-serif text-2xl tracking-tight text-ink sm:text-3xl">
+          Results for &ldquo;{query}&rdquo;
+        </h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          {anything
+            ? `${shares.length} ${shares.length === 1 ? 'collection' : 'collections'}${
+                hasUsers ? `, ${users.length} ${users.length === 1 ? 'researcher' : 'researchers'}` : ''
+              }`
+            : 'No matches yet — try a different word or a researcher name.'}
+        </p>
+      </header>
+
+      {hasUsers ? (
+        <div className="mt-8">
+          <h2 className="font-serif text-lg text-ink">Researchers</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {users.map((u) => (
+              <SearchUserCard key={u.id} user={u} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {hasShares ? (
+        <div className="mt-8">
+          <h2 className="font-serif text-lg text-ink">Collections</h2>
+          <div className="mt-3 grid gap-4">
+            {shares.map((s) => (
+              <SearchShareCard key={s.short_code} result={s} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SearchUserCard({ user }: { user: UserPublicOut }) {
+  const slug = user.handle ?? user.id;
+  return (
+    <Link
+      href={`/u/${encodeURIComponent(slug)}`}
+      className="flex items-center gap-3 rounded-md border border-rule bg-paper p-3 transition hover:bg-paper-soft"
+    >
+      <UserAvatar name={user.name} avatarUrl={user.avatar_url} size={36} />
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-ink">
+          {user.name ?? 'Researcher'}
+        </p>
+        <p className="truncate text-xs text-ink-muted">
+          {user.share_count}{' '}
+          {user.share_count === 1 ? 'collection' : 'collections'}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+function SearchShareCard({ result }: { result: ShareSearchResult }) {
+  return (
+    <Link
+      href={`/c/${result.short_code}`}
+      className="block rounded-lg border border-rule bg-paper p-4 transition hover:bg-paper-soft"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-serif text-base text-ink">{result.name}</h3>
+        <span className="text-xs text-ink-muted">
+          {result.item_count} {result.item_count === 1 ? 'item' : 'items'}
+        </span>
+      </div>
+      {result.description ? (
+        <p className="mt-1 line-clamp-2 text-sm text-ink-muted">
+          {result.description}
+        </p>
+      ) : null}
+      {result.owner_name ? (
+        <p className="mt-2 text-xs text-ink-muted">by {result.owner_name}</p>
+      ) : null}
+    </Link>
   );
 }
 
