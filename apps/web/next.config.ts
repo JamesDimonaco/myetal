@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Transpile the workspace contract package (ships TypeScript source, not a
+  // build artifact). Next compiles it alongside the app.
+  transpilePackages: ['@myetal/api-contract'],
   // Permanent redirects for routes that used to live at the top level but
   // now sit under /dashboard/* so they inherit the authed shell (header,
   // nav, footer). Cheap insurance against stale bookmarks / external links.
