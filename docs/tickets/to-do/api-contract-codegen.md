@@ -108,7 +108,9 @@ Blast radius: purely client/contract plumbing. **None of it touches Nicholas's r
 Built on branch `feat/api-contract-codegen`. Package `@myetal/api-contract` scaffolded, codegen wired (`pnpm --filter @myetal/api-contract generate`), **85 component schemas** generated from the live spec, CI staleness gate (`generate.mjs --check`) verified working. Both `share.ts` mirror trees collapsed to ~50-line re-export shims over the generated types. **web + mobile both typecheck green.** Net −507 lines of hand-maintained app code (460 of it removed hand-written type definitions).
 
 ### Decision confirmed: `--default-non-nullable false`
-Request models carry server-side defaults (`ShareCreate.is_public`/`type`, `ShareItemCreate.kind`). With openapi-typescript's default (`true`) those become **required** in the generated type — wrong for a request body the client may omit. Setting the flag to `false` optionalises any field that carries a `default`. In the **share** domain every defaulted field is request-side, so responses are unaffected. Note (per Luke's review): the flag is global, so a few *response* fields elsewhere that carry defaults (`ReportSubmitResponse.status`, `FeedbackResponse.message`, `OpenAccessInfo.is_oa`) also become optional — but that direction only *tightens* read-safety (forces a guard), never loosens it, so there's no hazard. Baked into `generate.mjs`.
+Request models carry server-side defaults (`ShareCreate.is_public`/`type`, `ShareItemCreate.kind`). With openapi-typescript's default (`true`) those become **required** in the generated type — wrong for a request body the client may omit. Setting the flag to `false` optionalises **any** field that carries a `default` — request OR response.
+
+⚠️ **This flag is global and it DOES touch response models** — do not carry away "responses are unaffected." That was true only in the *share* domain (whose response schemas happen to carry no defaults). Phase-2 rollout is the counterexample: `PaperSearchResult`, `OpenAccessInfo`, `ReportSubmitResponse`, `OrcidSyncResponse`, and `UserResponse.handle` all got optionalised, which is what forced the 17 read-guards. The trade is acceptable because optionalising a *read* only ever *tightens* safety (forces a guard on an always-present-but-nullable field), never loosens it. The genuinely clean fix — per-direction typing so responses stay required — needs a backend request/response model split (no `= None` on response models); logged as separate debt, not worth blocking on. Baked into `generate.mjs`.
 
 ### What the true types surfaced (8 mismatches, all resolved)
 The moment the true contract replaced the hand-written types, the compiler flagged 8 issues. Being precise about severity (Luke pushed back on the first framing):
@@ -117,8 +119,21 @@ The moment the true contract replaced the hand-written types, the compiler flagg
 
 The mobile viewer issue being an exact mirror of the web one is still the thesis in miniature: two hand-copies drift into the *same* wrong assumption independently.
 
+## Rollout — phase 2 (2026-07-05, branch `feat/api-contract-rollout`)
+
+Extended the pattern to **paper, works, reports, user/auth**. Both frontends green.
+
+- **Mobile is now fully migrated** — no hand-written type mirrors remain (`share`, `paper`, `auth`, `works` all shims).
+- **Web** has only `admin.ts` left (deferred to its own PR — 40+ types, and its filter/sort enums are query-param types with no standalone component schema, so it needs a different aliasing approach).
+- Legacy remaps: `Paper`→`PaperMetadata`, mobile `AuthUser`→`UserResponse`. The four enums (`PaperSource`, `UserPaperAddedVia`, `ShareReportReason`, `ShareReportStatus`) are standalone components — aliased directly.
+
+### The `default-non-nullable false` tension is now confirmed on BOTH sides
+The share slice showed the flag fixing over-strict *request* types. This phase shows its cost: paper/works **response** fields carry `= None` defaults, so with `false` they generate as `T | undefined` — over-strict for reads of fields that are always serialized (present-but-nullable). This surfaced 17 drift sites (11 web + 6 mobile), all in the add-item search UIs + profile/header: unguarded reads of `cited_by_count`, `keywords`, `open_access`, `handle`, paper fields.
+
+**Resolution: read-guards, not a flag flip.** `?? 0` on count arithmetic, `x != null && x > 0` narrowing, `?? null` when passing to `string|null` params. Flipping to `true` would re-break the already-merged share editor (it deliberately omits `kind` on PDF-merge, which `true` marks required) and every request builder — a bigger blast radius than defensive guards that are, in fairness, better code. The genuinely clean fix (per-direction typing: `true` for responses, `false` for requests) isn't natively supported by openapi-typescript for shared component schemas; logged as a possible future refinement, not worth it now.
+
 ### Remaining (follow-up)
-1. Roll the other domains (paper → user → admin → reports) the same way; delete each mirror.
+1. **admin domain** — its own PR (query-param enums need extracting from `operations`, or kept as local literal types; the response objects alias cleanly).
 2. Delete the shims entirely and import from `@myetal/api-contract` at call sites.
 3. Fold `ApiError` / `RequestOptions` out of `apps/*/lib/api.ts` onto `transport.ts`. Also fold the still-hand-written `PresignResponse` in `apps/mobile/lib/pdf-upload.ts:40` onto the generated `PdfUploadUrlResponse` during the mobile PDF rollout (its `fields` is required there but optional in the contract — latent drift).
 4. Add the `generate.mjs --check` gate to CI.

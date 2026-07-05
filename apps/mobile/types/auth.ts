@@ -1,25 +1,13 @@
 /**
- * Mirrors backend Pydantic shapes (apps/api/src/myetal_api/schemas/user.py).
- * Hand-written until the OpenAPI codegen pipeline lands.
+ * Calling-user shape — re-exported from `@myetal/api-contract` (generated from
+ * the FastAPI OpenAPI spec; source of truth `schemas/user.py::UserResponse`).
+ * This shim maps the legacy local name `AuthUser` onto `UserResponse`.
  *
- * Phase 4 (Better Auth cutover): TokenPair is gone — Better Auth's JWT
- * plugin replaces our hand-rolled access/refresh pair. The mobile client
- * fetches the JWT from `GET /api/auth/token` after sign-in/sign-up.
+ * Do not hand-edit. Change the Pydantic schema, then
+ *   pnpm --filter @myetal/api-contract generate
+ * See docs/tickets/to-do/api-contract-codegen.md.
  */
+import type { UserResponse } from '@myetal/api-contract';
 
-export interface AuthUser {
-  id: string;
-  name: string | null;
-  email: string | null;
-  email_verified: boolean;
-  is_admin: boolean;
-  avatar_url: string | null;
-  orcid_id: string | null;
-  last_orcid_sync_at: string | null;
-  /**
-   * Researcher-page identity slug (nullable). Mobile renders this read-only
-   * on the profile screen; editing happens on the web (`PATCH /me/handle`).
-   */
-  handle: string | null;
-  created_at: string;
-}
+/** Legacy local name for the backend `UserResponse` shape. */
+export type AuthUser = UserResponse;

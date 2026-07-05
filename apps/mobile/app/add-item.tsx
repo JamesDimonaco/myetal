@@ -458,7 +458,10 @@ function SearchResultCard({
   onPick: () => void;
   c: (typeof Colors)['light'];
 }) {
-  const dateLabel = formatPubDate(result.publication_date, result.year);
+  const dateLabel = formatPubDate(
+    result.publication_date ?? null,
+    result.year ?? null,
+  );
 
   return (
     <Pressable
@@ -503,9 +506,9 @@ function SearchResultCard({
       {/* Badge row: OA, type, citations, PDF */}
       <View style={styles.badgeRow}>
         {result.open_access?.is_oa ? (
-          <View style={[styles.badge, { backgroundColor: oaColor(result.open_access.oa_status) + '20' }]}>
-            <Ionicons name="lock-open-outline" size={10} color={oaColor(result.open_access.oa_status)} />
-            <Text style={[styles.badgeText, { color: oaColor(result.open_access.oa_status) }]}>
+          <View style={[styles.badge, { backgroundColor: oaColor(result.open_access.oa_status ?? null) + '20' }]}>
+            <Ionicons name="lock-open-outline" size={10} color={oaColor(result.open_access.oa_status ?? null)} />
+            <Text style={[styles.badgeText, { color: oaColor(result.open_access.oa_status ?? null) }]}>
               OA{result.open_access.oa_status ? ` \u00b7 ${result.open_access.oa_status}` : ''}
             </Text>
           </View>
@@ -519,7 +522,7 @@ function SearchResultCard({
           </View>
         ) : null}
 
-        {result.cited_by_count > 0 ? (
+        {result.cited_by_count != null && result.cited_by_count > 0 ? (
           <View style={styles.citationChip}>
             <Ionicons name="chatbubble-outline" size={10} color={c.textMuted} />
             <Text style={[styles.citationText, { color: c.textMuted }]}>

@@ -59,7 +59,7 @@ export default async function ProfilePage() {
         </div>
       </section>
 
-      <HandleSection initialHandle={user.handle} />
+      <HandleSection initialHandle={user.handle ?? null} />
 
       <OrcidSection initialOrcidId={user.orcid_id} />
     </div>

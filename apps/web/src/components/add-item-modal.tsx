@@ -71,7 +71,7 @@ function sortResults(
       });
       break;
     case 'most-cited':
-      sorted.sort((a, b) => b.cited_by_count - a.cited_by_count);
+      sorted.sort((a, b) => (b.cited_by_count ?? 0) - (a.cited_by_count ?? 0));
       break;
   }
   return sorted;
@@ -93,7 +93,7 @@ function filterResults(
   }
   if (filters.activeTypes.size > 0) {
     filtered = filtered.filter(
-      (r) => r.type !== null && filters.activeTypes.has(r.type),
+      (r) => r.type != null && filters.activeTypes.has(r.type),
     );
   }
   if (filters.yearFrom) {
@@ -828,14 +828,14 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                         OA{r.open_access.oa_status ? ` · ${r.open_access.oa_status}` : ''}
                       </span>
                     ) : null}
-                    {r.cited_by_count > 0 ? (
+                    {r.cited_by_count != null && r.cited_by_count > 0 ? (
                       <span>{r.cited_by_count.toLocaleString()} cited</span>
                     ) : null}
                     {r.language && r.language !== 'en' ? (
                       <span className="uppercase">{r.language}</span>
                     ) : null}
                   </div>
-                  {r.keywords?.length > 0 ? (
+                  {r.keywords && r.keywords.length > 0 ? (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {r.keywords.slice(0, 4).map((kw) => (
                         <span
@@ -1742,7 +1742,7 @@ function PaperPreview({
               Open Access{sr.open_access.oa_status ? ` · ${sr.open_access.oa_status}` : ''}
             </span>
           ) : null}
-          {sr.cited_by_count > 0 ? (
+          {sr.cited_by_count != null && sr.cited_by_count > 0 ? (
             <span className="text-xs text-ink-muted">
               {sr.cited_by_count.toLocaleString()} citations
             </span>
