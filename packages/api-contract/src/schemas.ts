@@ -35,3 +35,29 @@ export type ShareSearchResponse = Schemas['ShareSearchResponse'];
 export type BrowseShareResult = Schemas['BrowseShareResult'];
 export type BrowseResponse = Schemas['BrowseResponse'];
 export type UserPublicOut = Schemas['UserPublicOut'];
+
+// --- Paper search (Crossref / OpenAlex lookup) ------------------------------
+export type PaperMetadata = Schemas['PaperMetadata'];
+export type OpenAccessInfo = Schemas['OpenAccessInfo'];
+export type TopicInfo = Schemas['TopicInfo'];
+export type PaperSearchResult = Schemas['PaperSearchResult'];
+export type PaperSearchResponse = Schemas['PaperSearchResponse'];
+
+// --- Works library (/me/works) ----------------------------------------------
+export type PaperOut = Schemas['PaperOut'];
+export type PaperSource = Schemas['PaperSource'];
+export type UserPaperAddedVia = Schemas['UserPaperAddedVia'];
+export type WorkResponse = Schemas['WorkResponse'];
+export type AddWorkRequest = Schemas['AddWorkRequest'];
+export type OrcidSyncResponse = Schemas['OrcidSyncResponse'];
+
+// --- Reports (user-submitted + admin queue) ---------------------------------
+export type ShareReportReason = Schemas['ShareReportReason'];
+export type ShareReportStatus = Schemas['ShareReportStatus'];
+export type ReportSubmit = Schemas['ReportSubmit'];
+export type ReportSubmitResponse = Schemas['ReportSubmitResponse'];
+export type ReportOut = Schemas['ReportOut'];
+export type ReportAction = Schemas['ReportAction'];
+
+// --- Calling user (/me) -----------------------------------------------------
+export type UserResponse = Schemas['UserResponse'];

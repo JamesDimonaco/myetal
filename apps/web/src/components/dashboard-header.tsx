@@ -75,7 +75,7 @@ function accountLinks(
 
 export function DashboardHeader({ user }: { user: UserResponse }) {
   const navLinks = user.is_admin ? [...NAV_LINKS, ADMIN_LINK] : NAV_LINKS;
-  const menuLinks = accountLinks(user.id, user.handle);
+  const menuLinks = accountLinks(user.id, user.handle ?? null);
   return (
     <header className="border-b border-rule bg-paper">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">

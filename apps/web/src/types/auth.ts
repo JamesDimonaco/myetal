@@ -1,33 +1,10 @@
 /**
- * Calling-user shape — JSON body of GET /me on the API side.
+ * Calling-user shape — JSON body of GET /me. Re-exported from
+ * `@myetal/api-contract` (generated from the FastAPI OpenAPI spec); the source
+ * of truth is `apps/api/.../schemas/user.py::UserResponse`.
  *
- * Mirrors ``apps/api/src/myetal_api/schemas/user.py::UserResponse``.
- * Phase 3 dropped the legacy ``TokenPair`` / ``LoginInput`` /
- * ``RegisterInput`` / ``SessionResponse`` shapes — Better Auth's
- * client owns those concerns now.
+ * Do not hand-edit. Change the Pydantic schema, then
+ *   pnpm --filter @myetal/api-contract generate
+ * See docs/tickets/to-do/api-contract-codegen.md.
  */
-export interface UserResponse {
-  id: string;
-  email: string | null;
-  name: string | null;
-  /**
-   * Soft email-verification flag (mirrors Better Auth's `emailVerified`
-   * core column, exposed by `schemas/user.py::UserResponse`). Mobile uses
-   * it to render an "unverified email" banner; web doesn't surface it
-   * today but it's present in the wire shape, so the type must include
-   * it to keep this interface honest. Removing it from the type would
-   * make the field silently `undefined` for any future web consumer.
-   */
-  email_verified: boolean;
-  avatar_url: string | null;
-  is_admin: boolean;
-  orcid_id: string | null;
-  last_orcid_sync_at: string | null;
-  /**
-   * Researcher-page identity slug (nullable). Surfaced at `/u/{handle}`;
-   * the UUID URL `/u/{id}` keeps resolving for already-printed cards.
-   * Written via `PATCH /me/handle`.
-   */
-  handle: string | null;
-  created_at: string;
-}
+export type { UserResponse } from '@myetal/api-contract';

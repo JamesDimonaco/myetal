@@ -1,43 +1,20 @@
 /**
- * Mirrors the backend's `PaperMetadata` / `PaperSearchResult` Pydantic shapes.
- * Hand-written — will be replaced when OpenAPI codegen lands. Mirrors
- * apps/mobile/types/paper.ts so the contract is identical across platforms.
+ * Paper-search domain types — re-exported from `@myetal/api-contract`
+ * (generated from the FastAPI OpenAPI spec). This shim maps the legacy local
+ * name `Paper` onto the canonical `PaperMetadata`; the rest match the backend.
+ *
+ * Do not hand-edit. Change the Pydantic schema, then
+ *   pnpm --filter @myetal/api-contract generate
+ * See docs/tickets/to-do/api-contract-codegen.md.
  */
+import type { PaperMetadata } from '@myetal/api-contract';
 
-export interface Paper {
-  doi: string | null;
-  title: string;
-  authors: string | null;
-  year: number | null;
-  container: string | null;
-  scholar_url: string | null;
-  source: 'crossref' | 'openalex';
-}
+export type {
+  OpenAccessInfo,
+  TopicInfo,
+  PaperSearchResult,
+  PaperSearchResponse,
+} from '@myetal/api-contract';
 
-export interface OpenAccessInfo {
-  is_oa: boolean;
-  oa_status: string | null;
-  oa_url: string | null;
-}
-
-export interface TopicInfo {
-  name: string;
-  score: number;
-}
-
-export interface PaperSearchResult extends Paper {
-  score: number;
-  cited_by_count: number;
-  type: string | null;
-  publication_date: string | null;
-  is_retracted: boolean;
-  open_access: OpenAccessInfo;
-  pdf_url: string | null;
-  topics: TopicInfo[];
-  keywords: string[];
-  language: string | null;
-}
-
-export interface PaperSearchResponse {
-  results: PaperSearchResult[];
-}
+/** Legacy local name for the backend `PaperMetadata` shape. */
+export type Paper = PaperMetadata;
