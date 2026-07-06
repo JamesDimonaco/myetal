@@ -15,6 +15,7 @@ import { SavedShareCard } from '@/components/saved-share-card';
 import { TagChips } from '@/components/tag-chips';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { ApiError } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useBrowse } from '@/hooks/useBrowse';
 import { usePopularTags } from '@/hooks/usePopularTags';
@@ -39,6 +40,7 @@ export default function DiscoverScreen() {
   const c = Colors[scheme];
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ tag?: string; owner_id?: string }>();
+  const { user } = useAuth();
   const { items: savedShares } = useSavedShares();
   const hasSaved = (savedShares?.length ?? 0) > 0;
 
@@ -120,6 +122,25 @@ export default function DiscoverScreen() {
           onClear={clearOwner}
           colors={c}
         />
+      ) : null}
+
+      {/* Owner CTA — web parity (df0c191): when the owner view is *you*,
+          give yourself a path forward instead of a dead-end list. */}
+      {ownerId && user && ownerId === user.id ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Create a new share"
+          onPress={() => router.push('/(authed)/share/new')}
+          style={({ pressed }) => [
+            styles.selfCta,
+            { borderColor: c.accent, opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Ionicons name="add" size={16} color={c.accent} />
+          <Text style={[styles.selfCtaText, { color: c.accent }]}>
+            New share
+          </Text>
+        </Pressable>
       ) : null}
 
       {/* Search entry */}
@@ -580,6 +601,23 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+  },
+
+  selfCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.xs + 2,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.sm,
+  },
+  selfCtaText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   section: {
