@@ -57,6 +57,7 @@ export function QrModal({ visible, onClose, shortCode, collectionName, extraCont
   const shareUrl = `https://myetal.app/c/${shortCode}`;
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [citationCopied, setCitationCopied] = useState(false);
 
   const cardScale = useSharedValue(0.92);
   const cardOpacity = useSharedValue(0);
@@ -116,6 +117,16 @@ export function QrModal({ visible, onClose, shortCode, collectionName, extraCont
   const handleShare = async () => {
     haptics.tapStrong();
     await Share.share({ message: shareUrl, title: collectionName });
+  };
+
+  // Web parity (quick-share toolbar): markdown citation `[name](url)` for
+  // pasting into Slack / Notion / README files. The native share sheet
+  // already covers the web toolbar's X + email tiles.
+  const handleCopyCitation = async () => {
+    haptics.tap();
+    await Clipboard.setStringAsync(`[${collectionName}](${shareUrl})`);
+    setCitationCopied(true);
+    setTimeout(() => setCitationCopied(false), 2000);
   };
 
   const handleClose = () => {
@@ -267,6 +278,12 @@ export function QrModal({ visible, onClose, shortCode, collectionName, extraCont
                 icon="share-outline"
                 variant="primary"
                 onPress={handleShare}
+              />
+              <Button
+                label={citationCopied ? 'Citation copied' : 'Copy citation'}
+                icon={citationCopied ? 'checkmark' : 'document-text-outline'}
+                variant="secondary"
+                onPress={handleCopyCitation}
               />
               <Button
                 label="Done"

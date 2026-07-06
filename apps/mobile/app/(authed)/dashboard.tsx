@@ -1,11 +1,12 @@
 // TODO: Web parity gaps:
-//   - Share cards on web have "Copy link" and "Open in new tab" actions (mobile only has QR + Edit)
-//   - Web shows a kind-aware summary (e.g. "2 papers, 1 repo") per card; mobile just shows item count
-//   - Web allows delete directly from the dashboard card; mobile requires opening the editor
+//   - Web allows delete directly from the dashboard card; mobile requires
+//     opening the editor (deliberate for now — destructive action stays
+//     behind the editor until we design a confirm flow for the card).
 
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { router, useNavigation } from 'expo-router';
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,6 +17,7 @@ import {
   View,
 } from 'react-native';
 
+import { OrcidAutoDraftBanner } from '@/components/orcid-auto-draft-banner';
 import { QrModal } from '@/components/qr-modal';
 import { TagChips } from '@/components/tag-chips';
 import { VerifyEmailBanner } from '@/components/verify-email-banner';
@@ -24,7 +26,34 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
 import { useShares } from '@/hooks/useShares';
 import { useWorks } from '@/hooks/useWorks';
-import type { ShareResponse } from '@/types/share';
+import type { ShareItemKind, ShareResponse } from '@/types/share';
+
+/**
+ * Kind-aware item summary, mirroring the web dashboard cards:
+ * "2 papers, 1 repo, 1 PDF" instead of a bare "4 items".
+ */
+const KIND_ORDER: ShareItemKind[] = ['paper', 'repo', 'link', 'pdf'];
+const KIND_LABELS: Record<ShareItemKind, [singular: string, plural: string]> = {
+  paper: ['paper', 'papers'],
+  repo: ['repo', 'repos'],
+  link: ['link', 'links'],
+  pdf: ['PDF', 'PDFs'],
+};
+
+function summarizeItems(items: ShareResponse['items']): string {
+  if (items.length === 0) return '0 items';
+  const counts = new Map<ShareItemKind, number>();
+  for (const item of items) {
+    counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+  }
+  return KIND_ORDER.filter((k) => counts.has(k))
+    .map((k) => {
+      const n = counts.get(k)!;
+      const [one, many] = KIND_LABELS[k];
+      return `${n} ${n === 1 ? one : many}`;
+    })
+    .join(', ');
+}
 
 /**
  * Owner dashboard — lists every share the user has created. Header "+" jumps
@@ -39,6 +68,16 @@ export default function DashboardScreen() {
   const worksQuery = useWorks();
   const libraryCount = worksQuery.data?.length ?? 0;
   const [qrTarget, setQrTarget] = useState<ShareResponse | null>(null);
+  // "Copy link" feedback — one card at a time, resets after 2s.
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCopyLink = async (share: ShareResponse) => {
+    await Clipboard.setStringAsync(`https://myetal.app/c/${share.short_code}`);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    setCopiedId(share.id);
+    copyTimer.current = setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Wire up the header "+" via setOptions so it lives in the tab navigator's
   // own header (no need for a custom container).
@@ -127,6 +166,10 @@ export default function DashboardScreen() {
                 when the user is verified or has dismissed it for this
                 email — see VerifyEmailBanner for the gating logic. */}
             <VerifyEmailBanner />
+            {/* ORCID first-sign-in auto-draft — web parity (dashboard
+                banner). Uses allShares: the draft always has items so it
+                survives the empty-draft filter, but don't depend on that. */}
+            <OrcidAutoDraftBanner shares={allShares} />
             {showWelcomeBanner ? (
               <View
                 style={[
@@ -260,7 +303,7 @@ export default function DashboardScreen() {
                 {item.name}
               </Text>
               <Text style={[styles.meta, { color: c.textMuted }]}>
-                {item.items.length} {item.items.length === 1 ? 'item' : 'items'}
+                {summarizeItems(item.items)}
                 {item.is_public ? '' : ' · private'}
                 {' · '}
                 <Text style={styles.typeTag}>{item.type}</Text>
@@ -279,6 +322,29 @@ export default function DashboardScreen() {
               >
                 <Ionicons name="qr-code-outline" size={18} color={c.text} />
                 <Text style={[styles.actionText, { color: c.text }]}>QR</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Copy link"
+                onPress={() => handleCopyLink(item)}
+                style={({ pressed }) => [
+                  styles.action,
+                  { borderColor: c.border, opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                <Ionicons
+                  name={copiedId === item.id ? 'checkmark' : 'link-outline'}
+                  size={18}
+                  color={copiedId === item.id ? c.success : c.text}
+                />
+                <Text
+                  style={[
+                    styles.actionText,
+                    { color: copiedId === item.id ? c.success : c.text },
+                  ]}
+                >
+                  {copiedId === item.id ? 'Copied' : 'Copy'}
+                </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -391,12 +457,16 @@ const styles = StyleSheet.create({
   typeTag: { textTransform: 'capitalize' },
 
   actionsRow: { flexDirection: 'row', gap: Spacing.sm },
+  // flex: 1 + centered content so four actions (QR / Copy / View / Edit)
+  // share the row evenly on narrow screens.
   action: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.xs,
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
     borderRadius: Radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
   },
