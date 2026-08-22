@@ -14,6 +14,11 @@ function pickFirst(value: string | string[] | undefined): string | null {
   return value ?? null;
 }
 
+const SHORT_CODE_RE = /^[A-Za-z0-9]{4,16}$/;
+function safeShareCode(raw: string | null): string | null {
+  return raw && SHORT_CODE_RE.test(raw) ? raw : null;
+}
+
 function describeError(code: string | null): string | null {
   if (!code) return null;
   if (ORCID_HIJACK_ERROR_CODES.has(code)) {
@@ -52,14 +57,18 @@ export default async function SignInPage({
   const returnTo = pickFirst(params.return_to);
   const errorCode = pickFirst(params.error);
   const errorMessage = describeError(errorCode);
+  const fromShare = safeShareCode(pickFirst(params.from_share));
 
   return (
     <main
       data-ph-no-capture
       className="mx-auto flex min-h-screen max-w-md flex-col px-4 py-8 sm:px-6 sm:py-16"
     >
-      <Link href="/" className="inline-flex min-h-[40px] items-center text-sm text-ink-muted hover:text-ink">
-        &larr; MyEtAl
+      <Link
+        href={fromShare ? `/c/${fromShare}` : '/'}
+        className="inline-flex min-h-[40px] items-center text-sm text-ink-muted hover:text-ink"
+      >
+        &larr; {fromShare ? 'Back to the collection' : 'MyEtAl'}
       </Link>
 
       <h1 className="mt-8 font-serif text-3xl tracking-tight text-ink sm:mt-12 sm:text-4xl">
@@ -79,7 +88,7 @@ export default async function SignInPage({
       ) : null}
 
       {/* --- OAuth buttons (primary, client component) --- */}
-      <OAuthButtons returnTo={returnTo} />
+      <OAuthButtons returnTo={returnTo} highlightOrcid={fromShare !== null} />
 
       {/* --- Divider --- */}
       <div className="mt-8 flex items-center gap-3 text-xs uppercase tracking-widest text-ink-faint">

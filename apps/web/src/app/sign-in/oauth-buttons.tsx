@@ -28,7 +28,13 @@ function safeReturnTo(raw: string | null): string {
  * ``/sign-in?error=...``; the parent server page displays the friendly
  * copy.
  */
-export function OAuthButtons({ returnTo: rawReturnTo }: { returnTo: string | null }) {
+export function OAuthButtons({
+  returnTo: rawReturnTo,
+  highlightOrcid = false,
+}: {
+  returnTo: string | null;
+  highlightOrcid?: boolean;
+}) {
   const callbackURL = safeReturnTo(rawReturnTo);
   const [pending, setPending] = useState<'google' | 'github' | 'orcid' | null>(
     null,
@@ -49,35 +55,69 @@ export function OAuthButtons({ returnTo: rawReturnTo }: { returnTo: string | nul
     setPending(null);
   }
 
+  const orcidButton = (
+    <button
+      type="button"
+      onClick={startOrcid}
+      disabled={pending !== null}
+      className={
+        highlightOrcid
+          ? 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60'
+          : 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60'
+      }
+    >
+      <OrcidIcon size={18} />
+      {pending === 'orcid' ? 'Redirecting…' : 'Continue with ORCID'}
+    </button>
+  );
+
+  const googleButton = (
+    <button
+      type="button"
+      onClick={() => startSocial('google')}
+      disabled={pending !== null}
+      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+    >
+      <GoogleIcon size={18} />
+      {pending === 'google' ? 'Redirecting…' : 'Continue with Google'}
+    </button>
+  );
+
+  const githubButton = (
+    <button
+      type="button"
+      onClick={() => startSocial('github')}
+      disabled={pending !== null}
+      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+    >
+      <GitHubIcon size={18} />
+      {pending === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
+    </button>
+  );
+
+  if (highlightOrcid) {
+    return (
+      <div className="mt-8 grid gap-3 sm:mt-10">
+        {orcidButton}
+        <p className="text-xs text-ink-muted">
+          We&apos;ll import your publications from ORCID automatically.
+        </p>
+        {googleButton}
+        {githubButton}
+        <p className="text-xs text-ink-muted">
+          Already signed up with Google or GitHub? Add your ORCID iD on your
+          profile instead — signing in with ORCID will create a separate
+          account.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-8 grid gap-3 sm:mt-10">
-      <button
-        type="button"
-        onClick={() => startSocial('google')}
-        disabled={pending !== null}
-        className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
-      >
-        <GoogleIcon size={18} />
-        {pending === 'google' ? 'Redirecting…' : 'Continue with Google'}
-      </button>
-      <button
-        type="button"
-        onClick={() => startSocial('github')}
-        disabled={pending !== null}
-        className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
-      >
-        <GitHubIcon size={18} />
-        {pending === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
-      </button>
-      <button
-        type="button"
-        onClick={startOrcid}
-        disabled={pending !== null}
-        className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
-      >
-        <OrcidIcon size={18} />
-        {pending === 'orcid' ? 'Redirecting…' : 'Continue with ORCID'}
-      </button>
+      {googleButton}
+      {githubButton}
+      {orcidButton}
       <p className="text-xs text-ink-muted">
         Already signed up with Google or GitHub? Add your ORCID iD on your
         profile instead — signing in with ORCID will create a separate
