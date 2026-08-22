@@ -6,6 +6,7 @@ import { EmailMeButton } from '@/components/email-me-button';
 import { ReportButton } from '@/components/report-button';
 import { SaveButton } from '@/components/save-button';
 import { ShareItemCard } from '@/components/share-item-card';
+import { ShareSignupBar } from '@/components/share-signup-bar';
 import { TagChips } from '@/components/tag-chips';
 import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { formatItemCount, formatRelativeTime } from '@/lib/format';
@@ -412,6 +413,12 @@ export default async function PublicSharePage({ params }: PageProps) {
           </Link>
         </p>
       </footer>
+
+      <ShareSignupBar
+        shortCode={share.short_code}
+        ownerName={share.owner_name ?? null}
+        ownerId={share.owner_id ?? null}
+      />
     </main>
   );
 }
