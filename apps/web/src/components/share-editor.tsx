@@ -367,10 +367,12 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   const [showAddItem, setShowAddItem] = useState(false);
   // Quick-share: spins one item off into its own single-item share + QR,
   // independent of the share being edited here. `quickSharePendingKey`
-  // tracks which row is mid-flight (disables that row's button only);
-  // `quickShareResult` holds the *new* share's short_code + name once
-  // created — deliberately separate from `savedShare`/`showQr`, which
-  // belong to the share this editor is actually editing.
+  // tracks which row triggered the in-flight request, but gates every
+  // row's button while it's set (see handleQuickShare) — not just that
+  // row's — to avoid racing two concurrent quick-shares. `quickShareResult`
+  // holds the *new* share's short_code + name once created — deliberately
+  // separate from `savedShare`/`showQr`, which belong to the share this
+  // editor is actually editing.
   const [quickSharePendingKey, setQuickSharePendingKey] = useState<
     string | null
   >(null);
