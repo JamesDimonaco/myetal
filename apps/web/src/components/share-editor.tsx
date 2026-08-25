@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -364,6 +365,21 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     'post-save',
   );
   const [showAddItem, setShowAddItem] = useState(false);
+  // Quick-share: spins one item off into its own single-item share + QR,
+  // independent of the share being edited here. `quickSharePendingKey`
+  // tracks which row triggered the in-flight request, but gates every
+  // row's button while it's set (see handleQuickShare) — not just that
+  // row's — to avoid racing two concurrent quick-shares. `quickShareResult`
+  // holds the *new* share's short_code + name once created — deliberately
+  // separate from `savedShare`/`showQr`, which belong to the share this
+  // editor is actually editing.
+  const [quickSharePendingKey, setQuickSharePendingKey] = useState<
+    string | null
+  >(null);
+  const [quickShareResult, setQuickShareResult] = useState<{
+    shortCode: string;
+    name: string;
+  } | null>(null);
   // "More options" disclosure — description + tags fold away so the default
   // editor reads name → items → publish (conference-core simplification).
   // One-shot initializer off `initial` only: open when the share already
@@ -449,6 +465,105 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       [next[idx], next[target]] = [next[target], next[idx]];
       return next;
     });
+  };
+
+  /**
+   * Quick-share one item as its own single-item share (docs/tickets/to-do/
+   * quick-share-single-item.md). Reuses `create_share` + `publish_share`
+   * unchanged — no new backend route. Publish is NOT optional here (unlike
+   * the main save flow's Publish toggle): both the public viewer and the
+   * QR route 404 on a draft (published_at = NULL), so a quick-share that
+   * only created a draft would open a QR modal pointing at a broken image.
+   * If publish fails, the share still exists (owner can publish it later
+   * from the dashboard) — surfaced as a non-fatal toast, not a thrown error.
+   *
+   * Runs the item through the same `itemSchema` the main Save flow uses
+   * (not just a bare title check) — otherwise this can publish a repo/link
+   * item with no URL (schema requires one, this route didn't), or 422 on a
+   * mid-typing partial year with an opaque "Unprocessable Entity" toast
+   * (FastAPI's validation `detail` is an array; `clientApi` only surfaces
+   * string details, see `client-api.ts`).
+   *
+   * `quickSharePendingKey` gates every row's button, not just the clicked
+   * one — a second click on a different row while the first is in flight
+   * would otherwise let two creates race, with `quickShareResult` (single,
+   * not per-row) showing whichever resolves last regardless of which the
+   * user actually clicked. One in-flight quick-share at a time avoids that;
+   * the round-trip is short enough that this isn't a real limitation.
+   */
+  const handleQuickShare = async (item: DraftItem) => {
+    if (item.kind === 'pdf') return; // guarded in the UI too; belt and braces
+    const parsedItem = itemSchema.safeParse(item);
+    if (!parsedItem.success) {
+      toast.error(
+        parsedItem.error.issues[0]?.message ?? 'Fix this item before sharing it',
+      );
+      return;
+    }
+    const it = parsedItem.data;
+    setQuickSharePendingKey(item._key);
+    // Both flip only once creation actually succeeds — the event fires for
+    // "created, published or not" (worth seeing either way), never for a
+    // failed create (nothing happened, nothing to log).
+    let didCreate = false;
+    let didPublish = false;
+    try {
+      const payload: ShareCreateInput = {
+        name: it.title.slice(0, 200),
+        description: null,
+        // A repo/link mini-share labelled "paper" reads oddly on the public
+        // page and dashboard list (both render `share.type` verbatim) —
+        // `bundle` is the closest existing type for "single non-paper item".
+        type: it.kind === 'paper' ? 'paper' : 'bundle',
+        items: [
+          {
+            kind: it.kind,
+            title: it.title,
+            scholar_url: it.scholar_url ? it.scholar_url : null,
+            doi: it.doi ? it.doi : null,
+            authors: it.authors ? it.authors : null,
+            year: it.year ? Number(it.year) : null,
+            notes: it.notes ? it.notes : null,
+            url: it.url ? it.url : null,
+            subtitle: it.subtitle ? it.subtitle : null,
+            image_url: it.image_url ? it.image_url : null,
+          },
+        ],
+        tags: null,
+      };
+      let created = await createMutation.mutateAsync(payload);
+      didCreate = true;
+      try {
+        created = await clientApi<typeof created>(
+          `/shares/${created.id}/publish`,
+          { method: 'POST' },
+        );
+        didPublish = true;
+      } catch (publishErr) {
+        toast.error(
+          publishErr instanceof ApiError
+            ? `Created, but publishing failed — ${publishErr.detail}. Publish it from the dashboard to get a working QR.`
+            : "Created, but publishing failed — publish it from the dashboard to get a working QR.",
+        );
+        return;
+      }
+      setQuickShareResult({ shortCode: created.short_code, name: created.name });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Couldn't create share");
+    } finally {
+      // Fires whenever the share was actually created — published or not —
+      // since a created-but-unpublished share is exactly the case worth
+      // seeing, not just the happy path. Never fires on a failed create;
+      // nothing happened, nothing to log.
+      if (didCreate && posthog.__loaded) {
+        posthog.capture('quick_share_created', {
+          source_share_id: effectiveId ?? null,
+          item_kind: item.kind,
+          published: didPublish,
+        });
+      }
+      setQuickSharePendingKey(null);
+    }
   };
 
   // dnd-kit sensors — pointer for mouse/touch, keyboard for accessibility.
@@ -944,6 +1059,11 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                     onMove={moveItem}
                     onRemove={removeItem}
                     onUpdate={updateItem}
+                    onQuickShare={handleQuickShare}
+                    // Gates every row, not just the clicked one — see the
+                    // comment on handleQuickShare for why concurrent
+                    // quick-shares are disallowed rather than raced.
+                    quickSharePending={quickSharePendingKey !== null || submitting}
                   />
                 ))}
               </SortableContext>
@@ -1052,7 +1172,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             ) : null}
             <button
               type="submit"
-              disabled={submitting || !name.trim()}
+              // Also disabled mid-quick-share: without this, Save can
+              // resolve first and open its own post-save QrModal while the
+              // quick-share modal is still pending, stacking two Dialogs.
+              disabled={submitting || quickSharePendingKey !== null || !name.trim()}
               className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
             >
               {submitting
@@ -1096,6 +1219,20 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           onKeepEditing={
             qrMode === 'post-save' ? closeQrAndKeepEditing : undefined
           }
+        />
+      ) : null}
+
+      {/* Quick-share QR — a different share from the one being edited here,
+          so it gets its own modal instance, independent of savedShare/showQr.
+          Closing just dismisses; there's nowhere to navigate to. Gated on
+          `!showQr` as a second guard (alongside disabling Save while a
+          quick-share is pending, above) against stacking two Dialogs if
+          both resolve close together. */}
+      {quickShareResult && !showQr ? (
+        <QrModal
+          shortCode={quickShareResult.shortCode}
+          collectionName={quickShareResult.name}
+          onClose={() => setQuickShareResult(null)}
         />
       ) : null}
 
@@ -1190,6 +1327,8 @@ function SortableItemRow({
   onMove,
   onRemove,
   onUpdate,
+  onQuickShare,
+  quickSharePending,
 }: {
   item: DraftItem;
   idx: number;
@@ -1197,6 +1336,8 @@ function SortableItemRow({
   onMove: (key: string, direction: -1 | 1) => void;
   onRemove: (key: string) => void;
   onUpdate: (key: string, patch: Partial<DraftItem>) => void;
+  onQuickShare: (item: DraftItem) => void;
+  quickSharePending: boolean;
 }) {
   const {
     attributes,
@@ -1254,6 +1395,19 @@ function SortableItemRow({
           >
             <ArrowIcon direction="down" />
           </IconBtn>
+          {item.kind === 'pdf' ? null : (
+            // PDF items can't be quick-shared — ShareItemCreate rejects
+            // kind=pdf server-side (the file columns are server-managed,
+            // set only by the dedicated upload route), so cloning one here
+            // would just 422.
+            <IconBtn
+              label="Share this item"
+              disabled={quickSharePending}
+              onClick={() => onQuickShare(item)}
+            >
+              <QrIcon />
+            </IconBtn>
+          )}
           <IconBtn label="Remove item" onClick={() => onRemove(item._key)}>
             <TrashIcon />
           </IconBtn>
@@ -1625,6 +1779,20 @@ function ArrowIcon({ direction }: { direction: 'up' | 'down' }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function QrIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <rect x="1.5" y="1.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="8.5" y="1.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="1.5" y="8.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="8.5" y="8.5" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="11" y="8.5" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="8.5" y="11" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="11" y="11" width="1.5" height="1.5" fill="currentColor" />
     </svg>
   );
 }
