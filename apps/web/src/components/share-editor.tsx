@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import posthog from 'posthog-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -364,6 +365,19 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     'post-save',
   );
   const [showAddItem, setShowAddItem] = useState(false);
+  // Quick-share: spins one item off into its own single-item share + QR,
+  // independent of the share being edited here. `quickSharePendingKey`
+  // tracks which row is mid-flight (disables that row's button only);
+  // `quickShareResult` holds the *new* share's short_code + name once
+  // created — deliberately separate from `savedShare`/`showQr`, which
+  // belong to the share this editor is actually editing.
+  const [quickSharePendingKey, setQuickSharePendingKey] = useState<
+    string | null
+  >(null);
+  const [quickShareResult, setQuickShareResult] = useState<{
+    shortCode: string;
+    name: string;
+  } | null>(null);
   // "More options" disclosure — description + tags fold away so the default
   // editor reads name → items → publish (conference-core simplification).
   // One-shot initializer off `initial` only: open when the share already
@@ -449,6 +463,73 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       [next[idx], next[target]] = [next[target], next[idx]];
       return next;
     });
+  };
+
+  /**
+   * Quick-share one item as its own single-item share (docs/tickets/to-do/
+   * quick-share-single-item.md). Reuses `create_share` + `publish_share`
+   * unchanged — no new backend route. Publish is NOT optional here (unlike
+   * the main save flow's Publish toggle): both the public viewer and the
+   * QR route 404 on a draft (published_at = NULL), so a quick-share that
+   * only created a draft would open a QR modal pointing at a broken image.
+   * If publish fails, the share still exists (owner can publish it later
+   * from the dashboard) — surfaced as a non-fatal toast, not a thrown error.
+   */
+  const handleQuickShare = async (item: DraftItem) => {
+    if (item.kind === 'pdf') return; // guarded in the UI too; belt and braces
+    const title = item.title.trim();
+    if (!title) {
+      toast.error('Add a title before sharing this item');
+      return;
+    }
+    setQuickSharePendingKey(item._key);
+    try {
+      const payload: ShareCreateInput = {
+        name: title.slice(0, 200),
+        description: null,
+        type: 'paper',
+        items: [
+          {
+            kind: item.kind,
+            title,
+            scholar_url: item.scholar_url ? item.scholar_url : null,
+            doi: item.doi ? item.doi : null,
+            authors: item.authors ? item.authors : null,
+            year: item.year ? Number(item.year) : null,
+            notes: null,
+            url: item.url ? item.url : null,
+            subtitle: item.subtitle ? item.subtitle : null,
+            image_url: item.image_url ? item.image_url : null,
+          },
+        ],
+        tags: null,
+      };
+      let created = await createMutation.mutateAsync(payload);
+      try {
+        created = await clientApi<typeof created>(
+          `/shares/${created.id}/publish`,
+          { method: 'POST' },
+        );
+      } catch (publishErr) {
+        toast.error(
+          publishErr instanceof ApiError
+            ? `Created, but publishing failed — ${publishErr.detail}. Publish it from the dashboard to get a working QR.`
+            : "Created, but publishing failed — publish it from the dashboard to get a working QR.",
+        );
+        return;
+      }
+      if (posthog.__loaded) {
+        posthog.capture('quick_share_created', {
+          source_share_id: effectiveId ?? null,
+          item_kind: item.kind,
+        });
+      }
+      setQuickShareResult({ shortCode: created.short_code, name: created.name });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Couldn't create share");
+    } finally {
+      setQuickSharePendingKey(null);
+    }
   };
 
   // dnd-kit sensors — pointer for mouse/touch, keyboard for accessibility.
@@ -944,6 +1025,8 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                     onMove={moveItem}
                     onRemove={removeItem}
                     onUpdate={updateItem}
+                    onQuickShare={handleQuickShare}
+                    quickSharePending={quickSharePendingKey === it._key}
                   />
                 ))}
               </SortableContext>
@@ -1099,6 +1182,17 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         />
       ) : null}
 
+      {/* Quick-share QR — a different share from the one being edited here,
+          so it gets its own modal instance, independent of savedShare/showQr.
+          Closing just dismisses; there's nowhere to navigate to. */}
+      {quickShareResult ? (
+        <QrModal
+          shortCode={quickShareResult.shortCode}
+          collectionName={quickShareResult.name}
+          onClose={() => setQuickShareResult(null)}
+        />
+      ) : null}
+
       {/* Delete-confirm — migrated from hand-rolled overlay to shadcn Dialog
           so the focus-trap, Escape and outside-click logic comes from Radix
           rather than this file. */}
@@ -1190,6 +1284,8 @@ function SortableItemRow({
   onMove,
   onRemove,
   onUpdate,
+  onQuickShare,
+  quickSharePending,
 }: {
   item: DraftItem;
   idx: number;
@@ -1197,6 +1293,8 @@ function SortableItemRow({
   onMove: (key: string, direction: -1 | 1) => void;
   onRemove: (key: string) => void;
   onUpdate: (key: string, patch: Partial<DraftItem>) => void;
+  onQuickShare: (item: DraftItem) => void;
+  quickSharePending: boolean;
 }) {
   const {
     attributes,
@@ -1254,6 +1352,19 @@ function SortableItemRow({
           >
             <ArrowIcon direction="down" />
           </IconBtn>
+          {item.kind === 'pdf' ? null : (
+            // PDF items can't be quick-shared — ShareItemCreate rejects
+            // kind=pdf server-side (the file columns are server-managed,
+            // set only by the dedicated upload route), so cloning one here
+            // would just 422.
+            <IconBtn
+              label="Share this item"
+              disabled={quickSharePending}
+              onClick={() => onQuickShare(item)}
+            >
+              <QrIcon />
+            </IconBtn>
+          )}
           <IconBtn label="Remove item" onClick={() => onRemove(item._key)}>
             <TrashIcon />
           </IconBtn>
@@ -1625,6 +1736,20 @@ function ArrowIcon({ direction }: { direction: 'up' | 'down' }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function QrIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <rect x="1.5" y="1.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="8.5" y="1.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="1.5" y="8.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="8.5" y="8.5" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="11" y="8.5" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="8.5" y="11" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="11" y="11" width="1.5" height="1.5" fill="currentColor" />
     </svg>
   );
 }
