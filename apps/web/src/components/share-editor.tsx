@@ -474,42 +474,69 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
    * only created a draft would open a QR modal pointing at a broken image.
    * If publish fails, the share still exists (owner can publish it later
    * from the dashboard) — surfaced as a non-fatal toast, not a thrown error.
+   *
+   * Runs the item through the same `itemSchema` the main Save flow uses
+   * (not just a bare title check) — otherwise this can publish a repo/link
+   * item with no URL (schema requires one, this route didn't), or 422 on a
+   * mid-typing partial year with an opaque "Unprocessable Entity" toast
+   * (FastAPI's validation `detail` is an array; `clientApi` only surfaces
+   * string details, see `client-api.ts`).
+   *
+   * `quickSharePendingKey` gates every row's button, not just the clicked
+   * one — a second click on a different row while the first is in flight
+   * would otherwise let two creates race, with `quickShareResult` (single,
+   * not per-row) showing whichever resolves last regardless of which the
+   * user actually clicked. One in-flight quick-share at a time avoids that;
+   * the round-trip is short enough that this isn't a real limitation.
    */
   const handleQuickShare = async (item: DraftItem) => {
     if (item.kind === 'pdf') return; // guarded in the UI too; belt and braces
-    const title = item.title.trim();
-    if (!title) {
-      toast.error('Add a title before sharing this item');
+    const parsedItem = itemSchema.safeParse(item);
+    if (!parsedItem.success) {
+      toast.error(
+        parsedItem.error.issues[0]?.message ?? 'Fix this item before sharing it',
+      );
       return;
     }
+    const it = parsedItem.data;
     setQuickSharePendingKey(item._key);
+    // Both flip only once creation actually succeeds — the event fires for
+    // "created, published or not" (worth seeing either way), never for a
+    // failed create (nothing happened, nothing to log).
+    let didCreate = false;
+    let didPublish = false;
     try {
       const payload: ShareCreateInput = {
-        name: title.slice(0, 200),
+        name: it.title.slice(0, 200),
         description: null,
-        type: 'paper',
+        // A repo/link mini-share labelled "paper" reads oddly on the public
+        // page and dashboard list (both render `share.type` verbatim) —
+        // `bundle` is the closest existing type for "single non-paper item".
+        type: it.kind === 'paper' ? 'paper' : 'bundle',
         items: [
           {
-            kind: item.kind,
-            title,
-            scholar_url: item.scholar_url ? item.scholar_url : null,
-            doi: item.doi ? item.doi : null,
-            authors: item.authors ? item.authors : null,
-            year: item.year ? Number(item.year) : null,
-            notes: null,
-            url: item.url ? item.url : null,
-            subtitle: item.subtitle ? item.subtitle : null,
-            image_url: item.image_url ? item.image_url : null,
+            kind: it.kind,
+            title: it.title,
+            scholar_url: it.scholar_url ? it.scholar_url : null,
+            doi: it.doi ? it.doi : null,
+            authors: it.authors ? it.authors : null,
+            year: it.year ? Number(it.year) : null,
+            notes: it.notes ? it.notes : null,
+            url: it.url ? it.url : null,
+            subtitle: it.subtitle ? it.subtitle : null,
+            image_url: it.image_url ? it.image_url : null,
           },
         ],
         tags: null,
       };
       let created = await createMutation.mutateAsync(payload);
+      didCreate = true;
       try {
         created = await clientApi<typeof created>(
           `/shares/${created.id}/publish`,
           { method: 'POST' },
         );
+        didPublish = true;
       } catch (publishErr) {
         toast.error(
           publishErr instanceof ApiError
@@ -518,16 +545,21 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         );
         return;
       }
-      if (posthog.__loaded) {
-        posthog.capture('quick_share_created', {
-          source_share_id: effectiveId ?? null,
-          item_kind: item.kind,
-        });
-      }
       setQuickShareResult({ shortCode: created.short_code, name: created.name });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.detail : "Couldn't create share");
     } finally {
+      // Fires whenever the share was actually created — published or not —
+      // since a created-but-unpublished share is exactly the case worth
+      // seeing, not just the happy path. Never fires on a failed create;
+      // nothing happened, nothing to log.
+      if (didCreate && posthog.__loaded) {
+        posthog.capture('quick_share_created', {
+          source_share_id: effectiveId ?? null,
+          item_kind: item.kind,
+          published: didPublish,
+        });
+      }
       setQuickSharePendingKey(null);
     }
   };
@@ -1026,7 +1058,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                     onRemove={removeItem}
                     onUpdate={updateItem}
                     onQuickShare={handleQuickShare}
-                    quickSharePending={quickSharePendingKey === it._key}
+                    // Gates every row, not just the clicked one — see the
+                    // comment on handleQuickShare for why concurrent
+                    // quick-shares are disallowed rather than raced.
+                    quickSharePending={quickSharePendingKey !== null || submitting}
                   />
                 ))}
               </SortableContext>
@@ -1135,7 +1170,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             ) : null}
             <button
               type="submit"
-              disabled={submitting || !name.trim()}
+              // Also disabled mid-quick-share: without this, Save can
+              // resolve first and open its own post-save QrModal while the
+              // quick-share modal is still pending, stacking two Dialogs.
+              disabled={submitting || quickSharePendingKey !== null || !name.trim()}
               className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
             >
               {submitting
@@ -1184,8 +1222,11 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
 
       {/* Quick-share QR — a different share from the one being edited here,
           so it gets its own modal instance, independent of savedShare/showQr.
-          Closing just dismisses; there's nowhere to navigate to. */}
-      {quickShareResult ? (
+          Closing just dismisses; there's nowhere to navigate to. Gated on
+          `!showQr` as a second guard (alongside disabling Save while a
+          quick-share is pending, above) against stacking two Dialogs if
+          both resolve close together. */}
+      {quickShareResult && !showQr ? (
         <QrModal
           shortCode={quickShareResult.shortCode}
           collectionName={quickShareResult.name}
