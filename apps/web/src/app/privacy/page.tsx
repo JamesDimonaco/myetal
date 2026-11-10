@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SectionHeading } from '@/components/ui/page-header';
 
 export const metadata = { title: 'Privacy Policy' };
 
@@ -11,14 +12,14 @@ export default function PrivacyPage() {
         </Link>
       </div>
 
-      <h1 className="mt-8 font-serif text-4xl tracking-tight text-ink">
+      <h1 className="mt-8 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
         Privacy Policy
       </h1>
       <p className="mt-4 text-sm text-ink-muted">Last updated: 27 April 2026</p>
 
       <div className="mt-8 space-y-6 text-base leading-relaxed text-ink">
         <section>
-          <h2 className="font-serif text-xl text-ink">Data controller</h2>
+          <SectionHeading>Data controller</SectionHeading>
           <p className="mt-2">
             MyEtAl is operated by James Dimonaco. For any privacy-related
             questions or requests, contact{' '}
@@ -33,7 +34,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">What we collect</h2>
+          <SectionHeading>What we collect</SectionHeading>
           <p className="mt-2">
             When you create an account we store your email address, display name,
             and an optional link to your ORCID profile. When you sign in via
@@ -55,7 +56,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">How we use it</h2>
+          <SectionHeading>How we use it</SectionHeading>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>To authenticate you and manage your sessions.</li>
             <li>To display your name on public shares you choose to publish.</li>
@@ -68,7 +69,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Legal basis</h2>
+          <SectionHeading>Legal basis</SectionHeading>
           <p className="mt-2">
             We process your data on the following legal bases under UK GDPR:
           </p>
@@ -86,7 +87,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Third parties</h2>
+          <SectionHeading>Third parties</SectionHeading>
           <p className="mt-2">
             We use the following processors to operate MyEtAl:
           </p>
@@ -110,7 +111,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Cookies</h2>
+          <SectionHeading>Cookies</SectionHeading>
           <p className="mt-2">
             MyEtAl sets <strong>no tracking cookies</strong> on public pages.
             When you sign in, we set a strictly necessary httpOnly cookie
@@ -124,7 +125,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">View tracking</h2>
+          <SectionHeading>View tracking</SectionHeading>
           <p className="mt-2">
             We record one view per share per visitor per 24-hour window.
             Mobile app installs send a random per-device token for de-duplication;
@@ -134,7 +135,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Data retention</h2>
+          <SectionHeading>Data retention</SectionHeading>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>
               View records older than 90 days are aggregated and the raw rows
@@ -148,7 +149,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Your rights</h2>
+          <SectionHeading>Your rights</SectionHeading>
           <p className="mt-2">
             Under UK GDPR you have the right to:
           </p>
@@ -180,7 +181,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Changes to this policy</h2>
+          <SectionHeading>Changes to this policy</SectionHeading>
           <p className="mt-2">
             We may update this policy from time to time. Changes will be posted
             on this page with an updated &ldquo;Last updated&rdquo; date.
@@ -188,7 +189,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Contact</h2>
+          <SectionHeading>Contact</SectionHeading>
           <p className="mt-2">
             Questions or concerns? Email{' '}
             <a

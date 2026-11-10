@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SectionHeading } from '@/components/ui/page-header';
 
 export const metadata = { title: 'Terms of Service' };
 
@@ -11,14 +12,14 @@ export default function TermsPage() {
         </Link>
       </div>
 
-      <h1 className="mt-8 font-serif text-4xl tracking-tight text-ink">
+      <h1 className="mt-8 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
         Terms of Service
       </h1>
       <p className="mt-4 text-sm text-ink-muted">Last updated: 27 April 2026</p>
 
       <div className="mt-8 space-y-6 text-base leading-relaxed text-ink">
         <section>
-          <h2 className="font-serif text-xl text-ink">Acceptable use</h2>
+          <SectionHeading>Acceptable use</SectionHeading>
           <p className="mt-2">
             You may use MyEtAl to create and share collections of academic
             papers, repositories, and related research resources. You agree not
@@ -42,7 +43,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">User content</h2>
+          <SectionHeading>User content</SectionHeading>
           <p className="mt-2">
             You retain full ownership of any content you create on MyEtAl
             (collection titles, descriptions, and curated paper lists). By
@@ -58,7 +59,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Takedown</h2>
+          <SectionHeading>Takedown</SectionHeading>
           <p className="mt-2">
             Every public share page includes a <em>Report</em> button. If you
             believe content violates these terms or infringes your rights, use
@@ -75,7 +76,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Account termination</h2>
+          <SectionHeading>Account termination</SectionHeading>
           <p className="mt-2">
             We reserve the right to suspend or delete accounts that violate
             these terms, engage in abusive behaviour, or remain inactive for an
@@ -85,7 +86,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Disclaimers</h2>
+          <SectionHeading>Disclaimers</SectionHeading>
           <p className="mt-2">
             MyEtAl is provided <strong>&ldquo;as is&rdquo;</strong> and{' '}
             <strong>&ldquo;as available&rdquo;</strong>, without warranty of any
@@ -97,7 +98,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Limitation of liability</h2>
+          <SectionHeading>Limitation of liability</SectionHeading>
           <p className="mt-2">
             To the fullest extent permitted by law, MyEtAl and its operators
             shall not be liable for any indirect, incidental, special, or
@@ -110,7 +111,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Governing law</h2>
+          <SectionHeading>Governing law</SectionHeading>
           <p className="mt-2">
             These terms are governed by and construed in accordance with the laws
             of England and Wales. Any disputes arising from these terms or your
@@ -120,7 +121,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Changes to these terms</h2>
+          <SectionHeading>Changes to these terms</SectionHeading>
           <p className="mt-2">
             We may update these terms from time to time. Changes will be posted
             on this page with an updated &ldquo;Last updated&rdquo; date. Your
@@ -130,7 +131,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-serif text-xl text-ink">Contact</h2>
+          <SectionHeading>Contact</SectionHeading>
           <p className="mt-2">
             Questions about these terms? Email{' '}
             <a

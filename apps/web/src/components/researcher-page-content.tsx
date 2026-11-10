@@ -5,6 +5,7 @@ import { OrcidIcon } from '@/components/orcid-icon';
 import { ShareCard } from '@/components/share-card';
 import { UserAvatar } from '@/components/user-avatar';
 import type { BrowseResponse } from '@/types/share';
+import { Card } from '@/components/ui/card';
 
 /**
  * Renders the body of ``/u/{slug}`` once a valid owner has been resolved.
@@ -66,33 +67,35 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
         </div>
       </header>
 
-      <aside className="mt-10 rounded-lg border border-rule bg-paper-soft p-5">
-        <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:gap-6 sm:text-left">
-          <div>
-            <p className="font-serif text-lg text-ink">
-              One QR for everything published here
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Put it on your slides, poster corner, or business card — it
-              always points to the latest collections.
-            </p>
-            <p className="mt-2 break-all font-mono text-sm text-ink">
-              {displayUrl}
-            </p>
-            <div className="mt-4">
-              <CopyPageLink url={pageUrl} />
+      <Card asChild className="mt-10">
+        <aside>
+          <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:gap-6 sm:text-left">
+            <div>
+              <p className="font-serif text-lg text-ink">
+                One QR for everything published here
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">
+                Put it on your slides, poster corner, or business card — it
+                always points to the latest collections.
+              </p>
+              <p className="mt-2 break-all font-mono text-sm text-ink">
+                {displayUrl}
+              </p>
+              <div className="mt-4">
+                <CopyPageLink url={pageUrl} />
+              </div>
             </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrUrl}
+              alt={`QR code for ${owner.name ?? 'this researcher'}'s page`}
+              width={144}
+              height={144}
+              className="h-36 w-36 shrink-0 rounded-md border border-rule bg-white p-2"
+            />
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrUrl}
-            alt={`QR code for ${owner.name ?? 'this researcher'}'s page`}
-            width={144}
-            height={144}
-            className="h-36 w-36 shrink-0 rounded-md border border-rule bg-white p-2"
-          />
-        </div>
-      </aside>
+        </aside>
+      </Card>
 
       <section className="mt-10">
         {shares.length === 0 ? (

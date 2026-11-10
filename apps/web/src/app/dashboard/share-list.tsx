@@ -16,6 +16,7 @@ import {
 import { ApiError } from '@/lib/api';
 import { useDeleteShare, useShares } from '@/lib/hooks/useShares';
 import type { ShareItemKind, ShareResponse } from '@/types/share';
+import { Card } from '@/components/ui/card';
 
 function kindSummary(items: ShareResponse['items']): string {
   if (items.length === 0) return '0 items';
@@ -248,84 +249,87 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
 
       <ul className="grid gap-4 sm:grid-cols-2">
         {shares.map((share) => (
-          <li
+          <Card
+            asChild
             key={share.id}
-            className="relative flex flex-col rounded-lg border border-rule bg-paper-soft p-5 transition focus-within:border-ink/30 hover:border-ink/30"
+            className="relative flex flex-col transition focus-within:border-ink/30 hover:border-ink/30"
           >
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-mono text-xs tracking-wider text-ink-faint">
-                  {share.short_code}
+            <li>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-xs tracking-wider text-ink-faint">
+                    {share.short_code}
+                  </p>
+                  {share.published_at === null ? (
+                    <span className="inline-flex items-center rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+                      Unlisted
+                    </span>
+                  ) : null}
+                </div>
+                {/* The title link covers the whole card (after:inset-0); the
+                    action buttons below sit above it via `relative`. */}
+                <h2 className="mt-2 break-words font-serif text-lg leading-snug text-ink">
+                  <Link
+                    href={`/dashboard/share/${share.id}`}
+                    className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent"
+                  >
+                    {share.name}
+                  </Link>
+                </h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  {kindSummary(share.items)}
+                  {' · '}
+                  <span className="capitalize">{share.type}</span>
+                  {' · '}
+                  {share.published_at !== null ? 'Published' : 'Unlisted'}
                 </p>
-                {share.published_at === null ? (
-                  <span className="inline-flex items-center rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
-                    Unlisted
-                  </span>
+                {share.tags && share.tags.length > 0 ? (
+                  <div className="relative mt-2">
+                    <TagChips tags={share.tags} max={2} linkPattern="browse" />
+                  </div>
                 ) : null}
               </div>
-              {/* The title link covers the whole card (after:inset-0); the
-                  action buttons below sit above it via `relative`. */}
-              <h2 className="mt-2 break-words font-serif text-lg leading-snug text-ink">
-                <Link
-                  href={`/dashboard/share/${share.id}`}
-                  className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent"
-                >
-                  {share.name}
-                </Link>
-              </h2>
-              <p className="mt-1 text-sm text-ink-muted">
-                {kindSummary(share.items)}
-                {' · '}
-                <span className="capitalize">{share.type}</span>
-                {' · '}
-                {share.published_at !== null ? 'Published' : 'Unlisted'}
-              </p>
-              {share.tags && share.tags.length > 0 ? (
-                <div className="relative mt-2">
-                  <TagChips tags={share.tags} max={2} linkPattern="browse" />
-                </div>
-              ) : null}
-            </div>
 
-            <div className="relative mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                title="Show QR"
-                onClick={() => setQrTarget(share)}
-                className={iconBtnClass}
-              >
-                <QrIcon />
-              </button>
-              <button
-                type="button"
-                title={copiedId === share.id ? 'Copied!' : 'Copy link'}
-                onClick={() => handleCopyLink(share)}
-                className={iconBtnClass}
-              >
-                {copiedId === share.id ? <CheckIcon /> : <ClipboardIcon />}
-              </button>
-              <a
-                href={`/c/${share.short_code}`}
-                target="_blank"
-                rel="noreferrer"
-                title="View share"
-                className={iconBtnClass}
-              >
-                <ExternalLinkIcon />
-              </a>
-              <button
-                type="button"
-                title="Delete share"
-                onClick={() => {
-                  setDeleteError(null);
-                  setDeleteTarget(share);
-                }}
-                className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md border border-rule bg-paper text-ink-muted transition hover:bg-paper-soft hover:text-danger sm:h-9 sm:w-9"
-              >
-                <TrashIcon />
-              </button>
-            </div>
-          </li>
+              <div className="relative mt-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  title="Show QR"
+                  onClick={() => setQrTarget(share)}
+                  className={iconBtnClass}
+                >
+                  <QrIcon />
+                </button>
+                <button
+                  type="button"
+                  title={copiedId === share.id ? 'Copied!' : 'Copy link'}
+                  onClick={() => handleCopyLink(share)}
+                  className={iconBtnClass}
+                >
+                  {copiedId === share.id ? <CheckIcon /> : <ClipboardIcon />}
+                </button>
+                <a
+                  href={`/c/${share.short_code}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="View share"
+                  className={iconBtnClass}
+                >
+                  <ExternalLinkIcon />
+                </a>
+                <button
+                  type="button"
+                  title="Delete share"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteTarget(share);
+                  }}
+                  className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md border border-rule bg-paper text-ink-muted transition hover:bg-paper-soft hover:text-danger sm:h-9 sm:w-9"
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            </li>
+          </Card>
         ))}
       </ul>
 

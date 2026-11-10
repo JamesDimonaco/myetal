@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 import { useSavedShares } from '@/hooks/useSavedShares';
+import { SectionHeading } from '@/components/ui/page-header';
 
 export function SavedSharesSection() {
   const { saved, unsave } = useSavedShares();
@@ -12,9 +13,9 @@ export function SavedSharesSection() {
 
   return (
     <section className="mt-16">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+      <SectionHeading>
         Saved collections
-      </h2>
+      </SectionHeading>
       <div className="mt-4 space-y-2">
         {saved.map((s) => (
           // Outer wrapper is a div (not a Link) so the per-item X button can

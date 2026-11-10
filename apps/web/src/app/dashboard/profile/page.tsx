@@ -6,6 +6,8 @@ import { ProfileActions } from './profile-actions';
 import { ApiError } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
+import { PageHeader } from '@/components/ui/page-header';
+import { Card } from '@/components/ui/card';
 
 export const metadata = { title: 'Profile' };
 export const dynamic = 'force-dynamic';
@@ -29,35 +31,33 @@ export default async function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-10">
-      <header>
-        <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">
-          Profile
-        </h1>
-      </header>
+      <PageHeader title="Profile" />
 
-      <section className="mt-8 rounded-lg border border-rule bg-paper-soft p-6">
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs uppercase tracking-wider text-ink-muted">
-              Name
-            </dt>
-            <dd className="mt-1 text-base text-ink">
-              {user.name ?? <span className="text-ink-faint">Not set</span>}
-            </dd>
+      <Card asChild>
+        <section>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-ink-muted">
+                Name
+              </dt>
+              <dd className="mt-1 text-base text-ink">
+                {user.name ?? <span className="text-ink-faint">Not set</span>}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-ink-muted">
+                Email
+              </dt>
+              <dd className="mt-1 text-base text-ink">
+                {user.email ?? <span className="text-ink-faint">Not set</span>}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-6 border-t border-rule pt-4">
+            <ProfileActions />
           </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wider text-ink-muted">
-              Email
-            </dt>
-            <dd className="mt-1 text-base text-ink">
-              {user.email ?? <span className="text-ink-faint">Not set</span>}
-            </dd>
-          </div>
-        </dl>
-        <div className="mt-6 border-t border-rule pt-4">
-          <ProfileActions />
-        </div>
-      </section>
+        </section>
+      </Card>
 
       <HandleSection initialHandle={user.handle ?? null} />
 

@@ -14,6 +14,7 @@ import type {
   ShareType,
   UserPublicOut,
 } from '@/types/share';
+import { SectionHeading } from '@/components/ui/page-header';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -248,9 +249,9 @@ export function SearchResults() {
           (separate empty state per result type, per E5). */}
       {enabled && hasUsersResults ? (
         <section className="mt-6">
-          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+          <SectionHeading>
             People matching &lsquo;{debouncedQuery}&rsquo;
-          </h2>
+          </SectionHeading>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {users.map((user) => (
               <UserCard key={user.id} user={user} />
@@ -398,9 +399,9 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
     <div className="mt-6">
       {showTrending ? (
         <div>
-          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+          <SectionHeading>
             Trending this week
-          </h2>
+          </SectionHeading>
           <div role="list" className="mt-2">
             {trending.map((item) => (
               <ShareCard key={item.short_code} result={item} showViews />
@@ -410,9 +411,9 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
       ) : null}
 
       <div className={showTrending ? 'mt-8' : undefined}>
-        <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+        <SectionHeading>
           Recently published
-        </h2>
+        </SectionHeading>
         <div role="list" className="mt-2">
           {recent.map((item) => (
             <ShareCard key={item.short_code} result={item} />

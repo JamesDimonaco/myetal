@@ -13,6 +13,7 @@ import { formatItemCount, formatRelativeTime } from '@/lib/format';
 import { lookupManyRepos, parseGithubUrl } from '@/lib/github';
 import { lookupManyOpenAccess } from '@/lib/openalex';
 import type { PublicShareResponse } from '@/types/share';
+import { SectionHeading } from '@/components/ui/page-header';
 
 /**
  * The public, no-auth-required collection viewer. THIS IS THE GROWTH LOOP —
@@ -237,7 +238,7 @@ export default async function PublicSharePage({ params }: PageProps) {
       </div>
 
       <header className="mt-6 sm:mt-8">
-        <h1 className="break-words font-serif text-[clamp(1.875rem,7vw,2.25rem)] leading-tight tracking-tight text-ink sm:text-5xl">
+        <h1 className="break-words font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
           {share.name}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
@@ -312,7 +313,7 @@ export default async function PublicSharePage({ params }: PageProps) {
 
       {share.related_shares && share.related_shares.length > 0 ? (
         <section className="mt-16 border-t border-rule pt-8">
-          <h2 className="font-serif text-lg text-ink">Who else shares these papers</h2>
+          <SectionHeading>Who else shares these papers</SectionHeading>
           <p className="mt-1 text-sm text-ink-muted">
             Other public collections with papers in common.
           </p>
@@ -338,7 +339,7 @@ export default async function PublicSharePage({ params }: PageProps) {
 
       {share.similar_shares && share.similar_shares.length > 0 ? (
         <section className="mt-10 border-t border-rule pt-8">
-          <h2 className="font-serif text-lg text-ink">Similar collections</h2>
+          <SectionHeading>Similar collections</SectionHeading>
           <p className="mt-1 text-sm text-ink-muted">
             Collections with the most overlap in papers.
           </p>

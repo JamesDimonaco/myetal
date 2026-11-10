@@ -157,7 +157,7 @@ export default async function ResearcherPage({ params }: PageProps) {
 function SoftEmptyState() {
   return (
     <div className="rounded-lg border border-rule bg-paper-soft p-8 text-center">
-      <h1 className="font-serif text-2xl text-ink">Nothing published here yet</h1>
+      <h1 className="font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">Nothing published here yet</h1>
       <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-muted">
         When collections are published, this page will list them — check back
         soon, or explore what other researchers are sharing.

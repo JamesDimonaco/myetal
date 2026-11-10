@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { clientApi } from '@/lib/client-api';
+import { Card } from '@/components/ui/card';
 
 type FeedbackType = 'feature_request' | 'bug_report';
 
@@ -143,31 +144,29 @@ export function FeedbackForm({ userEmail }: Props) {
   if (!selectedType) {
     return (
       <div className="grid gap-4 sm:grid-cols-2">
-        <button
-          onClick={() => setSelectedType('feature_request')}
-          className="group rounded-lg border border-rule bg-white p-6 text-left transition-all hover:border-accent hover:shadow-sm"
-        >
-          <div className="text-3xl">&#x1f4a1;</div>
-          <h2 className="mt-3 text-lg font-semibold text-ink">
-            Request a feature
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Tell us what would make MyEtAl better for your research
-          </p>
-        </button>
+        <Card asChild className="text-left transition-all hover:border-accent hover:shadow-sm">
+          <button type="button" onClick={() => setSelectedType('feature_request')}>
+            <div className="text-3xl">&#x1f4a1;</div>
+            <h2 className="mt-3 text-lg font-semibold text-ink">
+              Request a feature
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Tell us what would make MyEtAl better for your research
+            </p>
+  </button>
+        </Card>
 
-        <button
-          onClick={() => setSelectedType('bug_report')}
-          className="group rounded-lg border border-rule bg-white p-6 text-left transition-all hover:border-accent hover:shadow-sm"
-        >
-          <div className="text-3xl">&#x1f41b;</div>
-          <h2 className="mt-3 text-lg font-semibold text-ink">
-            Report an issue
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Something broken or not working as expected?
-          </p>
-        </button>
+        <Card asChild className="text-left transition-all hover:border-accent hover:shadow-sm">
+          <button type="button" onClick={() => setSelectedType('bug_report')}>
+            <div className="text-3xl">&#x1f41b;</div>
+            <h2 className="mt-3 text-lg font-semibold text-ink">
+              Report an issue
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Something broken or not working as expected?
+            </p>
+  </button>
+        </Card>
       </div>
     );
   }

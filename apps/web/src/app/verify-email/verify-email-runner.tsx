@@ -46,7 +46,7 @@ export function VerifyEmailRunner() {
   if (state.kind === 'redirecting') {
     return (
       <div className="mt-8">
-        <h1 className="font-serif text-xl text-ink">Verifying your email…</h1>
+        <h1 className="font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">Verifying your email…</h1>
         <p className="mt-2 text-sm text-ink-muted">One moment.</p>
       </div>
     );
@@ -57,7 +57,7 @@ export function VerifyEmailRunner() {
       <p className="text-xs uppercase tracking-widest text-danger">
         Verification failed
       </p>
-      <h1 className="mt-3 font-serif text-xl text-ink">
+      <h1 className="mt-3 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
         No verification token in this link.
       </h1>
       <a

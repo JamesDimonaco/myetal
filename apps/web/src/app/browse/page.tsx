@@ -19,6 +19,7 @@ import type {
   UserPublicOut,
 } from '@/types/share';
 import type { UserResponse } from '@/types/auth';
+import { SectionHeading } from '@/components/ui/page-header';
 
 /**
  * Public discovery page (PR-B §4 + §5). Anonymous-readable — no /sign-in
@@ -260,7 +261,7 @@ function SearchResultsView({
   return (
     <section>
       <header>
-        <h1 className="font-serif text-2xl tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
           Results for &ldquo;{query}&rdquo;
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
@@ -274,7 +275,7 @@ function SearchResultsView({
 
       {hasUsers ? (
         <div className="mt-8">
-          <h2 className="font-serif text-lg text-ink">Researchers</h2>
+          <SectionHeading>Researchers</SectionHeading>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {users.map((u) => (
               <SearchUserCard key={u.id} user={u} />
@@ -285,7 +286,7 @@ function SearchResultsView({
 
       {hasShares ? (
         <div className="mt-8">
-          <h2 className="font-serif text-lg text-ink">Collections</h2>
+          <SectionHeading>Collections</SectionHeading>
           <div className="mt-3 grid gap-4">
             {shares.map((s) => (
               <SearchShareCard key={s.short_code} result={s} />
@@ -491,9 +492,9 @@ function DefaultBrowse({
     <div className="mt-8">
       {showTrending ? (
         <section>
-          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+          <SectionHeading>
             Trending this week
-          </h2>
+          </SectionHeading>
           <div role="list" className="mt-2">
             {trending.map((item) => (
               <ShareCard key={item.short_code} result={item} showViews />
@@ -503,9 +504,9 @@ function DefaultBrowse({
       ) : null}
 
       <section className={showTrending ? 'mt-12' : ''}>
-        <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+        <SectionHeading>
           Recently published
-        </h2>
+        </SectionHeading>
         <div role="list" className="mt-2">
           {recent.map((item) => (
             <ShareCard key={item.short_code} result={item} />

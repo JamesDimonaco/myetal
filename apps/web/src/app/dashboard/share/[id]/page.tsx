@@ -31,24 +31,22 @@ export default async function EditSharePage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
-      <header className="mb-8">
-        <p className="font-mono text-xs tracking-wider text-ink-muted">
-          /c/{share.short_code}
-        </p>
-        <h1 className="mt-1 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
-          Edit share
-        </h1>
-      </header>
-      <ShareEditor id={id} initial={share} />
-
-      <div className="mt-6 border-t border-rule pt-6">
-        <Link
-          href={`/dashboard/share/${id}/analytics`}
-          className="inline-flex items-center gap-2 text-sm font-medium text-ink-muted transition hover:text-ink"
-        >
-          View analytics →
-        </Link>
-      </div>
+      <ShareEditor
+        id={id}
+        initial={share}
+        header={{
+          eyebrow: `/c/${share.short_code}`,
+          title: 'Edit share',
+          description: (
+            <Link
+              href={`/dashboard/share/${id}/analytics`}
+              className="inline-flex min-h-11 items-center text-sm font-medium text-accent transition hover:opacity-80 sm:min-h-0"
+            >
+              View analytics &rarr;
+            </Link>
+          ),
+        }}
+      />
     </div>
   );
 }

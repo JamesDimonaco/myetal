@@ -1,7 +1,8 @@
-import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 import { ApiError } from '@/lib/api';
+import { Card } from '@/components/ui/card';
+import { BackLink, PageHeader, SectionHeading } from '@/components/ui/page-header';
 import { formatDayMonth } from '@/lib/format';
 import { serverFetch } from '@/lib/server-api';
 import type { ShareResponse } from '@/types/share';
@@ -51,15 +52,12 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
-      <header className="mb-8">
-        <p className="font-mono text-xs tracking-wider text-ink-muted">
-          /c/{share.short_code}
-        </p>
-        <h1 className="mt-1 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
-          Analytics
-        </h1>
-        <p className="mt-2 text-sm text-ink-muted">{share.name}</p>
-      </header>
+      <PageHeader
+        back={<BackLink href={`/dashboard/share/${id}`}>Edit share</BackLink>}
+        eyebrow={`/c/${share.short_code}`}
+        title="Analytics"
+        description={share.name}
+      />
 
       {/* Stat cards — stack on phones, 3-up on sm+ */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -70,11 +68,9 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
 
       {/* Daily views bar chart */}
       <section className="mt-10">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-          Daily views (last 30 days)
-        </h2>
+        <SectionHeading>Daily views, last 30 days</SectionHeading>
 
-        {analytics.views_last_30d === 0 ? (
+        {!analytics.daily_views.some((d) => d.count > 0) ? (
           <p className="mt-4 text-sm text-ink-muted">No views recorded yet.</p>
         ) : (
           <>
@@ -114,21 +110,6 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
         )}
       </section>
 
-      {/* Navigation */}
-      <div className="mt-10 flex flex-wrap items-center gap-4 border-t border-rule pt-6">
-        <Link
-          href={`/dashboard/share/${id}`}
-          className="text-sm text-ink-muted hover:text-ink"
-        >
-          ← Edit share
-        </Link>
-        <Link
-          href="/dashboard"
-          className="text-sm text-ink-muted hover:text-ink"
-        >
-          ← Back to dashboard
-        </Link>
-      </div>
     </div>
   );
 }
@@ -140,13 +121,11 @@ function chartSummary(days: { date: string; count: number }[]): string {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-rule bg-paper-soft p-4">
-      <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-        {label}
-      </p>
+    <Card>
+      <p className="text-sm text-ink-muted">{label}</p>
       <p className="mt-1 font-serif text-3xl tracking-tight text-ink">
         {value.toLocaleString()}
       </p>
-    </div>
+    </Card>
   );
 }

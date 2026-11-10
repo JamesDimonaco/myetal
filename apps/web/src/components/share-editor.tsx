@@ -17,9 +17,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -31,6 +30,7 @@ import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
 import { TagInput } from '@/components/tag-input';
 import { Button } from '@/components/ui/button';
+import { BackLink, PageHeader } from '@/components/ui/page-header';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,8 @@ import type {
   ShareType,
 } from '@/types/share';
 import type { PaperOut } from '@/types/works';
+import { SectionHeading } from '@/components/ui/page-header';
+import { Card } from '@/components/ui/card';
 
 const SHARE_TYPES: ShareType[] = [
   'paper',
@@ -116,6 +118,19 @@ const shareSchema = z.object({
 // (file_size_bytes, file_mime, thumbnail_url, etc.) routes through the
 // hidden-field banner instead of leaking raw Zod messages — see
 // docs/tickets/to-do/form-error-surfacing.md.
+/** User-facing messages for one item, deduped. */
+function itemIssues(item: DraftItem): string[] {
+  const parsed = itemSchema.safeParse(item);
+  if (parsed.success) return [];
+  return [
+    ...new Set(
+      parsed.error.issues
+        .filter((issue) => USER_EDITABLE_FIELDS.has(`items.*.${issue.path.join('.')}`))
+        .map((issue) => issue.message),
+    ),
+  ];
+}
+
 const USER_EDITABLE_FIELDS = new Set([
   'name',
   'description',
@@ -298,6 +313,8 @@ interface Props {
    * popover. Ignored in edit mode (`initial` takes precedence).
    */
   initialPaper?: PaperOut;
+  /** Page title block, rendered under the (unsaved-changes-guarded) back link. */
+  header: { eyebrow?: ReactNode; title: ReactNode; description?: ReactNode };
 }
 
 /**
@@ -311,7 +328,7 @@ interface Props {
  * After a successful save we surface the QR via <QrModal>. Closing it bounces
  * back to /dashboard so the new share appears in the list.
  */
-export function ShareEditor({ initial, id, initialPaper }: Props) {
+export function ShareEditor({ initial, id, initialPaper, header }: Props) {
   const router = useRouter();
 
   // `effectiveId` mirrors `id` until an auto-save (W1 — PDF tab on a brand-new
@@ -508,16 +525,14 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       // Prefer surfacing a user-editable message (clear, actionable). Fall
       // back to a generic banner only when every issue is on a hidden field
       // — the previous code leaked raw Zod text in that case.
-      // Inline errors render next to their fields, plus a derived summary
-      // by the save button (see `openFieldErrors`) that clears as they're fixed.
-      if (Object.keys(inline).length > 0) {
-        // nothing else to show
-      } else if (hidden.length > 0) {
+      // Inline errors render next to their fields, plus a derived summary by
+      // the save button (see `openErrorCount`); both clear as they're fixed.
+      if (Object.keys(inline).length === 0 && hidden.length > 0) {
         console.warn('[share-editor] hidden-field validation failed:', hidden);
         setError(
           "Something didn't validate. Try again, or remove and re-add the last item.",
         );
-      } else {
+      } else if (Object.keys(inline).length === 0) {
         setError('Invalid input');
       }
       // Description lives behind the "More options" fold — open it when a
@@ -705,17 +720,45 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   // Errors clear as soon as the field is fixed, not on the next save.
   const nameError = name.trim() ? null : fieldErrors['name'];
   const itemsError = items.length > 0 ? null : fieldErrors['items'];
-  const openFieldErrors = Object.keys(fieldErrors).filter((key) =>
-    key === 'name' ? nameError : key === 'items' ? itemsError : true,
-  ).length;
+  // After a failed save, items re-validate live so their errors follow
+  // reordering and clear the moment they're fixed.
+  const checkItems = Object.keys(fieldErrors).some((key) => key.startsWith('items.'));
+  const itemErrors = new Map(
+    checkItems ? items.map((it) => [it._key, itemIssues(it)] as const) : [],
+  );
+  const openErrorCount =
+    (nameError ? 1 : 0) +
+    (itemsError ? 1 : 0) +
+    [...itemErrors.values()].filter((messages) => messages.length > 0).length;
   const bannerError =
     error ??
-    (openFieldErrors > 0
-      ? `Fix the ${openFieldErrors === 1 ? 'field' : `${openFieldErrors} fields`} marked in red above.`
+    (openErrorCount > 0
+      ? `Fix the ${openErrorCount === 1 ? 'problem' : `${openErrorCount} problems`} marked in red above.`
       : null);
 
   return (
     <>
+      <PageHeader
+        {...header}
+        back={
+          <BackLink
+            href="/dashboard"
+            onClick={(e) => {
+              // Guard against silent loss of unsaved edits. The guard is
+              // intentionally NOT applied to the publish toggle, save
+              // submission, delete, or the post-save QR — only this
+              // explicit "leave the editor without saving" surface.
+              if (isDirty) {
+                e.preventDefault();
+                setPendingDiscardHref('/dashboard');
+              }
+            }}
+          >
+            Your shares
+          </BackLink>
+        }
+      />
+
       {/* Success toast — shown briefly after save */}
       {justSaved && !showQr ? (
         <div className="mb-4 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
@@ -872,7 +915,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         {/* Quick-access QR button — edit mode only, lets you view the QR
             without re-saving. */}
         {!isNew && initial ? (
-          <div className="flex items-center gap-3 rounded-md border border-rule bg-paper-soft p-4">
+          <Card className="flex items-center gap-3">
             <div className="flex-1">
               <p className="text-sm font-semibold text-ink">QR Code</p>
               <p className="mt-0.5 text-xs text-ink-muted">
@@ -890,16 +933,16 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             >
               Show QR
             </button>
-          </div>
+          </Card>
         ) : null}
 
         {/* Items */}
         <div>
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <SectionHeading>
                 Items
-              </h2>
+              </SectionHeading>
               <p className="mt-1 text-xs text-ink-faint">
                 {items.length} {items.length === 1 ? 'item' : 'items'} -- use the arrows to reorder
               </p>
@@ -964,6 +1007,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                     onMove={moveItem}
                     onRemove={removeItem}
                     onUpdate={updateItem}
+                    errors={itemErrors.get(it._key) ?? []}
                   />
                 ))}
               </SortableContext>
@@ -1043,47 +1087,27 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
-          <Link
-            href="/dashboard"
-            onClick={(e) => {
-              // Guard against silent loss of unsaved edits. The guard is
-              // intentionally NOT applied to the publish toggle, save
-              // submission, delete, or the post-save QR — only this
-              // explicit "leave the editor without saving" surface.
-              if (isDirty) {
-                e.preventDefault();
-                setPendingDiscardHref('/dashboard');
-              }
-            }}
-            className="inline-flex min-h-[44px] items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Back to dashboard
-          </Link>
-          <div className="flex flex-wrap gap-3">
-            {!isNew ? (
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(true)}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
-              >
-                Delete share
-              </button>
-            ) : null}
+          {/* Delete sits apart from Save so it isn't hit by mistake. */}
+          {!isNew ? (
             <button
-              type="submit"
-              disabled={submitting}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
             >
-              {submitting
-                ? 'Saving…'
-                : isNew
-                  ? 'Create share'
-                  : 'Save changes'}
+              Delete share
             </button>
-          </div>
+          ) : null}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="ml-auto inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+          >
+            {submitting
+              ? 'Saving…'
+              : isNew
+                ? 'Create share'
+                : 'Save changes'}
+          </button>
         </div>
       </form>
 
@@ -1212,6 +1236,7 @@ function SortableItemRow({
   onMove,
   onRemove,
   onUpdate,
+  errors,
 }: {
   item: DraftItem;
   idx: number;
@@ -1219,6 +1244,7 @@ function SortableItemRow({
   onMove: (key: string, direction: -1 | 1) => void;
   onRemove: (key: string) => void;
   onUpdate: (key: string, patch: Partial<DraftItem>) => void;
+  errors: string[];
 }) {
   const {
     attributes,
@@ -1238,10 +1264,10 @@ function SortableItemRow({
   };
 
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
-      className="rounded-md border border-rule bg-paper-soft p-4"
+      className={errors.length > 0 ? 'border-danger' : undefined}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -1282,6 +1308,12 @@ function SortableItemRow({
         </div>
       </div>
 
+      <div role="alert" className="mt-2 text-sm text-danger empty:hidden">
+        {errors.map((message) => (
+          <p key={message}>{message}</p>
+        ))}
+      </div>
+
       <div className="mt-3 grid gap-3">
         {item.kind === 'paper' ? (
           <PaperFields
@@ -1303,7 +1335,7 @@ function SortableItemRow({
           multiline
         />
       </div>
-    </div>
+    </Card>
   );
 }
 

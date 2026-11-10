@@ -9,6 +9,7 @@ import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 import type { ShareResponse } from '@/types/share';
 import type { WorkResponse } from '@/types/works';
+import { PageHeader } from '@/components/ui/page-header';
 
 export const metadata = { title: 'Dashboard' };
 
@@ -95,26 +96,26 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">
-            Your shares
-          </h1>
-          <p className="mt-2 text-sm text-ink-muted">
+      <PageHeader
+        title="Your shares"
+        description={
+          <>
             Each share is one QR code — could be a single paper, a curated
             list, or a bundle of links.{' '}
-            <ShowTourButton className="text-sm text-ink-muted underline underline-offset-4 transition hover:text-ink" />
-          </p>
-        </div>
-        <Link
-          href="/dashboard/share/new"
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-        >
-          + New share
-        </Link>
-      </div>
+            <ShowTourButton className="inline-flex min-h-11 items-center text-ink-muted underline underline-offset-4 transition hover:text-ink sm:min-h-0" />
+          </>
+        }
+        actions={
+          <Link
+            href="/dashboard/share/new"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90 sm:min-h-9"
+          >
+            + New share
+          </Link>
+        }
+      />
 
-      <div className="mt-10">
+      <div>
         <ShareList initialShares={shares} libraryCount={libraryCount} />
       </div>
 

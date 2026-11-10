@@ -4,7 +4,7 @@ export default function ShareNotFound() {
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-10 text-center">
       <p className="text-xs uppercase tracking-widest text-ink-faint">404</p>
-      <h1 className="mt-4 font-serif text-4xl tracking-tight text-ink">
+      <h1 className="mt-4 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
         Collection not found
       </h1>
       <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted">

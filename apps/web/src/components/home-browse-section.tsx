@@ -16,6 +16,7 @@ import { PopularTagsRow } from '@/components/popular-tags-row';
 import { ShareCard } from '@/components/share-card';
 import { api } from '@/lib/api';
 import type { BrowseResponse, Tag } from '@/types/share';
+import { SectionHeading } from '@/components/ui/page-header';
 
 const FETCH_OPTIONS = { next: { revalidate: 300 } };
 
@@ -53,9 +54,9 @@ export async function HomeBrowseSection() {
   if (!browse || browse.total_published === 0) {
     return (
       <section className="mt-24 sm:mt-32">
-        <h2 className="font-serif text-2xl tracking-tight text-ink">
+        <SectionHeading>
           Browse public collections
-        </h2>
+        </SectionHeading>
         <div className="mt-6 rounded-lg border border-rule bg-paper-soft p-10 text-center">
           <p className="mx-auto max-w-md text-sm text-ink-muted">
             No public collections to browse yet — be one of the first. Share
@@ -79,9 +80,9 @@ export async function HomeBrowseSection() {
   return (
     <section className="mt-24 sm:mt-32">
       <div className="flex items-end justify-between gap-4">
-        <h2 className="font-serif text-2xl tracking-tight text-ink">
+        <SectionHeading>
           Browse public collections
-        </h2>
+        </SectionHeading>
         <Link
           href="/browse"
           className="inline-flex min-h-[40px] items-center text-sm font-medium text-accent transition hover:opacity-80"
@@ -95,7 +96,7 @@ export async function HomeBrowseSection() {
 
       {showTrending ? (
         <div className="mt-8">
-          <h3 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+          <h3 className="text-base font-semibold text-ink">
             Trending now
           </h3>
           <div role="list" className="mt-2">
@@ -107,7 +108,7 @@ export async function HomeBrowseSection() {
       ) : null}
 
       <div className={showTrending ? 'mt-10' : 'mt-8'}>
-        <h3 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+        <h3 className="text-base font-semibold text-ink">
           Recently published
         </h3>
         <div role="list" className="mt-2">

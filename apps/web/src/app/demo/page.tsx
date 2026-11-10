@@ -36,7 +36,7 @@ export default function DemoPage() {
         <p className="text-xs uppercase tracking-widest text-ink-faint">
           Live demo · nothing is saved
         </p>
-        <h1 className="mt-3 font-serif text-4xl leading-[1.1] tracking-tight text-ink sm:text-5xl">
+        <h1 className="mt-3 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
           Build a share. See the QR.
         </h1>
         <p className="mt-5 text-base leading-relaxed text-ink-muted">
