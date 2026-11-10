@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { QrModal } from '@/components/qr-modal';
 import { TagChips } from '@/components/tag-chips';
@@ -132,6 +133,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
       ta.remove();
     }
     setCopiedId(share.id);
+    toast.success('Link copied');
     setTimeout(() => {
       setCopiedId((current) => (current === share.id ? null : current));
     }, 1800);

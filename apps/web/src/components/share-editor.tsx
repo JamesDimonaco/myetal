@@ -508,9 +508,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       // Prefer surfacing a user-editable message (clear, actionable). Fall
       // back to a generic banner only when every issue is on a hidden field
       // — the previous code leaked raw Zod text in that case.
-      const firstInline = Object.values(inline)[0];
-      if (firstInline) {
-        setError(firstInline);
+      // Inline errors render next to their fields, plus a derived summary
+      // by the save button (see `openFieldErrors`) that clears as they're fixed.
+      if (Object.keys(inline).length > 0) {
+        // nothing else to show
       } else if (hidden.length > 0) {
         console.warn('[share-editor] hidden-field validation failed:', hidden);
         setError(
@@ -526,7 +527,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       }
       // Scroll error into view so the user sees what went wrong.
       setTimeout(() => {
-        document.querySelector('[role="alert"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        document.querySelector('[role="alert"]:not(:empty)')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 50);
       return;
     }
@@ -704,6 +705,14 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   // Errors clear as soon as the field is fixed, not on the next save.
   const nameError = name.trim() ? null : fieldErrors['name'];
   const itemsError = items.length > 0 ? null : fieldErrors['items'];
+  const openFieldErrors = Object.keys(fieldErrors).filter((key) =>
+    key === 'name' ? nameError : key === 'items' ? itemsError : true,
+  ).length;
+  const bannerError =
+    error ??
+    (openFieldErrors > 0
+      ? `Fix the ${openFieldErrors === 1 ? 'field' : `${openFieldErrors} fields`} marked in red above.`
+      : null);
 
   return (
     <>
@@ -736,11 +745,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               nameError ? 'border-danger' : 'border-rule',
             ].join(' ')}
           />
-          {nameError ? (
-            <span id="share-name-error" role="alert" className="text-sm text-danger">
-              {nameError}
-            </span>
-          ) : null}
+          {/* Always mounted so screen readers announce the message when it appears. */}
+          <span id="share-name-error" role="alert" className="text-sm text-danger empty:hidden">
+            {nameError}
+          </span>
         </Field>
 
         {/* Type pills */}
@@ -898,6 +906,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             </div>
             <button
               type="button"
+              aria-describedby={itemsError ? 'share-items-error' : undefined}
               onClick={() => setShowAddItem(true)}
               className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
@@ -908,11 +917,9 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             </button>
           </div>
 
-          {itemsError ? (
-            <p role="alert" className="mt-2 text-sm text-danger">
-              {itemsError}
-            </p>
-          ) : null}
+          <p id="share-items-error" role="alert" className="mt-2 text-sm text-danger empty:hidden">
+            {itemsError}
+          </p>
 
           <div className="mt-3 grid gap-3">
             {items.length === 0 ? (
@@ -1021,17 +1028,19 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           </div>
         </div>
 
-        {error ? (
-          <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-4 py-3" role="alert">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="mt-0.5 flex-shrink-0 text-danger">
-              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <p className="text-sm text-danger">
-              {error}
-            </p>
-          </div>
-        ) : null}
+        <div role="alert" className="empty:hidden">
+          {bannerError ? (
+            <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-4 py-3">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="mt-0.5 flex-shrink-0 text-danger">
+                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <p className="text-sm text-danger">
+                {bannerError}
+              </p>
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
           <Link

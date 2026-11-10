@@ -212,14 +212,16 @@ export function SearchResults() {
       {!enabled && browseError ? (
         <SearchError onRetry={() => refetchBrowse()} />
       ) : null}
-      {enabled && isError ? <SearchError onRetry={() => refetch()} /> : null}
+      {enabled && isError && !isFetching ? (
+        <SearchError onRetry={() => refetch()} />
+      ) : null}
 
       {/* Loading spinner */}
       {((isLoading || isFetching) && enabled) ||
       (!enabled && !browseData && !browseError) ? (
         <div className="mt-6 flex justify-center" aria-live="polite">
           <div
-            className="h-5 w-5 animate-spin rounded-full border-2 border-ink-faint border-t-ink"
+            className="h-5 w-5 animate-spin rounded-full border-2 border-rule border-t-ink"
             role="status"
           >
             <span className="sr-only">Loading…</span>
@@ -394,23 +396,11 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
 
   return (
     <div className="mt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
-          Public collections
-        </h2>
-        <Link
-          href="/browse"
-          className="text-sm font-medium text-accent transition hover:opacity-80"
-        >
-          Browse all &rarr;
-        </Link>
-      </div>
-
       {showTrending ? (
-        <div className="mt-4">
-          <h3 className="text-[10px] font-medium uppercase tracking-widest text-ink-faint">
+        <div>
+          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
             Trending this week
-          </h3>
+          </h2>
           <div role="list" className="mt-2">
             {trending.map((item) => (
               <ShareCard key={item.short_code} result={item} showViews />
@@ -419,10 +409,10 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
         </div>
       ) : null}
 
-      <div className={showTrending ? 'mt-8' : 'mt-4'}>
-        <h3 className="text-[10px] font-medium uppercase tracking-widest text-ink-faint">
+      <div className={showTrending ? 'mt-8' : undefined}>
+        <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
           Recently published
-        </h3>
+        </h2>
         <div role="list" className="mt-2">
           {recent.map((item) => (
             <ShareCard key={item.short_code} result={item} />
@@ -430,11 +420,14 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
         </div>
       </div>
 
-      {total_published >= 5 ? (
-        <p className="mt-8 text-center text-sm text-ink-faint">
-          Browse {total_published} collections
-        </p>
-      ) : null}
+      <p className="mt-8 text-center">
+        <Link
+          href="/browse"
+          className="inline-flex min-h-[44px] items-center text-sm font-medium text-accent transition hover:opacity-80"
+        >
+          Browse all {total_published >= 5 ? `${total_published} ` : ''}collections &rarr;
+        </Link>
+      </p>
     </div>
   );
 }

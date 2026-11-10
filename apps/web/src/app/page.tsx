@@ -4,7 +4,7 @@ import { HomeBrowseSection } from '@/components/home-browse-section';
 import { SavedSharesSection } from '@/components/saved-shares-section';
 import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
-import { UserAvatar } from '@/components/user-avatar';
+import { getInitials, UserAvatar } from '@/components/user-avatar';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 
@@ -55,8 +55,11 @@ export default async function LandingPage() {
               </Link>
               <Link
                 href="/dashboard/profile"
-                className="transition hover:opacity-80"
+                className="inline-flex h-11 w-11 items-center justify-center transition hover:opacity-80"
                 title={displayName ?? 'Profile'}
+                aria-label={
+                  user!.avatar_url ? 'Your profile' : `${getInitials(user!.name)} profile`
+                }
               >
                 <UserAvatar
                   name={user!.name}

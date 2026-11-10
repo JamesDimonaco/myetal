@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 import { ApiError } from '@/lib/api';
+import { formatDayMonth } from '@/lib/format';
 import { serverFetch } from '@/lib/server-api';
 import type { ShareResponse } from '@/types/share';
 
@@ -77,7 +78,12 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
           <p className="mt-4 text-sm text-ink-muted">No views recorded yet.</p>
         ) : (
           <>
-            <div className="mt-4 flex items-end gap-[3px]" style={{ height: 160 }}>
+            <div
+              role="img"
+              aria-label={chartSummary(analytics.daily_views)}
+              className="mt-4 flex items-end gap-[3px]"
+              style={{ height: 160 }}
+            >
               {analytics.daily_views.map((d) => {
                 const heightPct = (d.count / maxCount) * 100;
                 return (
@@ -94,14 +100,14 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
                     />
                     {/* Tooltip */}
                     <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded border border-rule bg-paper px-2 py-1 text-xs text-ink shadow group-hover:block">
-                      {d.date}: {d.count} view{d.count !== 1 ? 's' : ''}
+                      {formatDayMonth(d.date)}: {d.count} view{d.count !== 1 ? 's' : ''}
                     </div>
                   </div>
                 );
               })}
             </div>
             <div className="mt-2 flex justify-between text-xs text-ink-muted">
-              <span>{analytics.daily_views[0]?.date}</span>
+              <span>{formatDayMonth(analytics.daily_views[0].date)}</span>
               <span>Today</span>
             </div>
           </>
@@ -125,6 +131,11 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
       </div>
     </div>
   );
+}
+
+function chartSummary(days: { date: string; count: number }[]): string {
+  const busiest = days.reduce((a, b) => (b.count > a.count ? b : a));
+  return `Daily views for the last ${days.length} days. Busiest day: ${formatDayMonth(busiest.date)}, ${busiest.count} view${busiest.count === 1 ? '' : 's'}.`;
 }
 
 function StatCard({ label, value }: { label: string; value: number }) {

@@ -130,8 +130,11 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
         <div className="flex items-center gap-2 sm:hidden">
           <Link
             href="/dashboard/profile"
-            className="transition hover:opacity-80"
+            className="inline-flex h-11 w-11 items-center justify-center transition hover:opacity-80"
             title={user.name ?? user.email ?? 'Profile'}
+            aria-label={
+              user.avatar_url ? 'Your profile' : `${getInitials(user.name)} profile`
+            }
           >
             <UserAvatar
               name={user.name}
