@@ -263,36 +263,36 @@ export default async function PublicSharePage({ params }: PageProps) {
             {' \u00b7\u00a0'}
             <span className="capitalize">{share.type}</span>
           </p>
+          <div className="mt-4">
+            <SaveButton
+              shortCode={share.short_code}
+              name={share.name}
+              description={share.description ?? null}
+              type={share.type}
+              ownerName={share.owner_name ?? null}
+              itemCount={share.items.length}
+            />
+          </div>
+          {share.description ? (
+            <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>
+          ) : null}
+          {share.tags && share.tags.length > 0 ? (
             <div className="mt-4">
-              <SaveButton
-                shortCode={share.short_code}
-                name={share.name}
-                description={share.description ?? null}
-                type={share.type}
-                ownerName={share.owner_name ?? null}
-                itemCount={share.items.length}
+              {/* All tags shown on the detail view; each chip links to the
+                  /browse list filtered by that tag (PR-B route). */}
+              <TagChips
+                tags={share.tags}
+                max={share.tags.length}
+                linkPattern="browse"
               />
             </div>
-            {share.description ? (
-              <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>
-            ) : null}
-            {share.tags && share.tags.length > 0 ? (
-              <div className="mt-4">
-                {/* All tags shown on the detail view; each chip links to the
-                    /browse list filtered by that tag (PR-B route). */}
-                <TagChips
-                  tags={share.tags}
-                  max={share.tags.length}
-                  linkPattern="browse"
-                />
-              </div>
-            ) : null}
-          </header>
+          ) : null}
+        </header>
 
-          <section className="mt-10">
-            {itemCount === 0 ? (
-              <p className="py-10 text-center text-sm text-ink-muted">
-                This collection is empty.
+        <section className="mt-10">
+          {itemCount === 0 ? (
+            <p className="py-10 text-center text-sm text-ink-muted">
+              This collection is empty.
             </p>
           ) : (
             share.items.map((item) => {
@@ -372,7 +372,8 @@ export default async function PublicSharePage({ params }: PageProps) {
             <div>
               <p className="font-serif text-lg text-ink">Scan to keep this</p>
               <p className="mt-1 text-sm text-ink-muted">
-                {formatItemCount(itemCount)} ·{' '}
+                {formatItemCount(itemCount)}
+                {' \u00b7\u00a0'}
                 <code className="text-ink">/c/{share.short_code}</code>
               </p>
               <Link

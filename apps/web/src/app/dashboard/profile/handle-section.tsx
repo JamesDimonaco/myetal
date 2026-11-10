@@ -300,7 +300,7 @@ export function HandleSection({ initialHandle }: Props) {
         <p className="mt-1 text-sm text-ink-muted">
           Lowercase letters, digits, <span className="font-mono">_</span> or{' '}
           <span className="font-mono">-</span>. 3–30 characters. Your old{' '}
-          <span className="font-mono">/u/&lt;id&gt;</span> URL keeps working
+          <span className="font-mono">/u/&lt;id&gt;</span>{' '}URL keeps working
           regardless.
         </p>
 

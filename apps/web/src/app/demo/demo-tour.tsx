@@ -442,7 +442,7 @@ export function DemoTour() {
 
         <p className="mt-4 text-sm text-ink-faint">
           The QR encodes{' '}
-          <code className="text-ink">{publicUrl}</code> — try scanning it
+          <code className="text-ink">{publicUrl}</code>{' '}— try scanning it
           with your phone. (It&apos;s a fake URL for the demo, so it won&apos;t
           resolve. Yours will.)
         </p>

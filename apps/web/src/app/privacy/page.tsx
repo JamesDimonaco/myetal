@@ -7,7 +7,7 @@ export const metadata = { title: 'Privacy Policy' };
 export default function PrivacyPage() {
   return (
     <>
-      <main className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-10 sm:py-14">
+      <main className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-14">
         <div className="text-sm text-ink-muted">
           <Link href="/" className="hover:text-ink">
             MyEtAl
@@ -77,11 +77,11 @@ export default function PrivacyPage() {
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>
-                <strong>Contract</strong> &mdash; processing necessary to provide
+                <strong>Contract</strong>{' '}&mdash; processing necessary to provide
                 your account and the sharing service you signed up for.
               </li>
               <li>
-                <strong>Legitimate interest</strong> &mdash; anonymous view
+                <strong>Legitimate interest</strong>{' '}&mdash; anonymous view
                 tracking and moderation, where our interest does not override your
                 rights.
               </li>
@@ -95,18 +95,18 @@ export default function PrivacyPage() {
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>
-                <strong>Neon</strong> &mdash; managed PostgreSQL database hosting.
+                <strong>Neon</strong>{' '}&mdash; managed PostgreSQL database hosting.
               </li>
               <li>
-                <strong>Vercel</strong> &mdash; web application hosting and edge
+                <strong>Vercel</strong>{' '}&mdash; web application hosting and edge
                 network.
               </li>
               <li>
-                <strong>Cloudflare</strong> &mdash; CDN and DNS.
+                <strong>Cloudflare</strong>{' '}&mdash; CDN and DNS.
               </li>
             </ul>
             <p className="mt-2">
-              We query <strong>OpenAlex</strong> and <strong> Crossref</strong> to
+              We query <strong>OpenAlex</strong> and <strong>Crossref</strong>{' '}to
               look up paper metadata (titles, authors, DOIs). These are outbound
               lookups &mdash; no user personal data is sent to these services.
             </p>
@@ -115,7 +115,7 @@ export default function PrivacyPage() {
           <section>
             <SectionHeading>Cookies</SectionHeading>
             <p className="mt-2">
-              MyEtAl sets <strong>no tracking cookies</strong> on public pages.
+              MyEtAl sets <strong>no tracking cookies</strong>{' '}on public pages.
               When you sign in, we set a strictly necessary httpOnly cookie
               (<code className="text-sm">myetal_session</code>) to manage your
               authenticated session. It is exempt from consent requirements
@@ -157,16 +157,16 @@ export default function PrivacyPage() {
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>
-                <strong>Access</strong> &mdash; view your data via the analytics
+                <strong>Access</strong>{' '}&mdash; view your data via the analytics
                 dashboard and your profile page.
               </li>
               <li>
-                <strong>Deletion</strong> &mdash; delete your account and all
+                <strong>Deletion</strong>{' '}&mdash; delete your account and all
                 associated data at any time from your profile page. This cascades
                 to shares, views, reports, saved papers, and auth tokens.
               </li>
               <li>
-                <strong>Rectification</strong> &mdash; update your name, email,
+                <strong>Rectification</strong>{' '}&mdash; update your name, email,
                 and profile details via the profile edit page.
               </li>
             </ul>
@@ -204,7 +204,6 @@ export default function PrivacyPage() {
             </p>
           </section>
         </div>
-
       </main>
       <SiteFooter />
     </>

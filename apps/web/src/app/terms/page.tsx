@@ -7,7 +7,7 @@ export const metadata = { title: 'Terms of Service' };
 export default function TermsPage() {
   return (
     <>
-      <main className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-10 sm:py-14">
+      <main className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-14">
         <div className="text-sm text-ink-muted">
           <Link href="/" className="hover:text-ink">
             MyEtAl
@@ -63,7 +63,7 @@ export default function TermsPage() {
           <section>
             <SectionHeading>Takedown</SectionHeading>
             <p className="mt-2">
-              Every public share page includes a <em>Report</em> button. If you
+              Every public share page includes a <em>Report</em>{' '}button. If you
               believe content violates these terms or infringes your rights, use
               that button or email{' '}
               <a
@@ -146,7 +146,6 @@ export default function TermsPage() {
             </p>
           </section>
         </div>
-
       </main>
       <SiteFooter />
     </>

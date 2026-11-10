@@ -587,7 +587,7 @@ function WorkCard({
   const { paper } = work;
   const meta = [paper.authors, paper.year ? String(paper.year) : null, paper.venue]
     .filter(Boolean)
-    .join(' · ');
+    .join(' \u00b7\u00a0');
 
   const isHidden = work.hidden_at !== null;
   const isOrcidImport = work.added_via === 'orcid';
