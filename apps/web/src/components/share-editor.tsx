@@ -81,13 +81,15 @@ const SHARE_TYPES: ShareType[] = [
 // Per-kind validation. Paper only requires title. Repo and link require both
 // title and a URL — that's what makes them useful as a destination. PDF items
 // require `file_url` (set by the upload flow before the item lands here).
-// The form is noValidate, so this stands in for the browser's type="url" check.
-const webUrl = z
-  .string()
-  .trim()
-  .max(2000)
-  .refine((v) => v === '' || isWebUrl(v), 'Use a full link starting with https://')
-  .optional();
+// The form is noValidate, so this stands in for the browser's type="url"
+// check. Only fields the item's kind shows are checked, so a bad stored
+// value on a hidden field can't block saving with nowhere to fix it.
+const VISIBLE_URL_FIELDS = {
+  paper: ['scholar_url'],
+  repo: ['url', 'image_url'],
+  link: ['url', 'image_url'],
+  pdf: [],
+} as const satisfies Record<ShareItemKind, readonly ('scholar_url' | 'url' | 'image_url')[]>;
 
 const itemSchema = z
   .object({
@@ -95,16 +97,16 @@ const itemSchema = z
     id: z.string().optional(),
     kind: z.enum(['paper', 'repo', 'link', 'pdf']),
     title: z.string().trim().min(1, 'Item title required').max(500),
-    scholar_url: webUrl,
+    scholar_url: z.string().trim().max(2000).optional().or(z.literal('')),
     doi: z.string().trim().max(255).optional().or(z.literal('')),
     authors: z.string().trim().optional().or(z.literal('')),
     year: z
       .union([z.string().regex(/^\d{4}$/, '4-digit year'), z.literal('')])
       .optional(),
     notes: z.string().trim().optional().or(z.literal('')),
-    url: webUrl,
+    url: z.string().trim().max(2000).optional().or(z.literal('')),
     subtitle: z.string().trim().optional().or(z.literal('')),
-    image_url: webUrl,
+    image_url: z.string().trim().max(2000).optional().or(z.literal('')),
     file_url: z.string().trim().max(2000).optional().or(z.literal('')),
     thumbnail_url: z.string().trim().max(2000).optional().or(z.literal('')),
     // nonnegative (not positive) — the empty-item placeholder defaults to 0
@@ -124,7 +126,15 @@ const itemSchema = z
       message: 'Add a URL',
       path: ['url'],
     },
-  );
+  )
+  .superRefine((it, ctx) => {
+    for (const field of VISIBLE_URL_FIELDS[it.kind]) {
+      const value = it[field]?.trim();
+      if (value && !isWebUrl(value)) {
+        ctx.addIssue({ code: 'custom', path: [field], message: 'Use a full link starting with https://' });
+      }
+    }
+  });
 
 const shareSchema = z.object({
   name: z.string().trim().min(1, 'Name required').max(200),
@@ -134,7 +144,7 @@ const shareSchema = z.object({
 });
 
 /** User-facing error per field for one item (first message wins). */
-function itemIssues(item: DraftItem): Record<string, string> {
+export function itemIssues(item: DraftItem): Record<string, string> {
   const parsed = itemSchema.safeParse(item);
   const out: Record<string, string> = {};
   if (parsed.success) return out;
@@ -203,7 +213,7 @@ interface DraftItem {
 let _itemKeySeed = 0;
 const newKey = () => `item_${++_itemKeySeed}_${Date.now()}`;
 
-const emptyItem = (): DraftItem => ({
+export const emptyItem = (): DraftItem => ({
   _key: newKey(),
   kind: 'paper',
   title: '',
