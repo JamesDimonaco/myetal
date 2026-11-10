@@ -229,7 +229,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
           className="mb-4 rounded-md border border-rule bg-paper-soft px-4 py-3 text-sm text-ink-muted"
         >
           None of your shares are listed in discovery yet. Open one and toggle{' '}
-          <span className="font-medium text-ink">Publish</span>{' '}to make it
+          <span className="font-medium text-ink">Publish</span> to make it
           findable.
         </div>
       ) : null}

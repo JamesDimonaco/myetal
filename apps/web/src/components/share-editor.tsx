@@ -953,7 +953,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
         {!isNew && initial ? (
           <Card className="flex items-center gap-3">
             <div className="flex-1">
-              <p className="text-sm font-semibold text-ink">QR Code</p>
+              <p className="text-sm font-semibold text-ink">QR code</p>
               <p className="mt-0.5 text-sm text-ink-muted">
                 View or share the QR code for this share.
               </p>
