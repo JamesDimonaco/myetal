@@ -60,7 +60,7 @@ export function ShareCard({ result, showViews }: Props) {
 
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
         {result.owner_name ? <span>{result.owner_name}</span> : null}
-        <span className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] uppercase tracking-wider text-ink-muted">
+        <span className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium capitalize text-ink-muted">
           {result.type}
         </span>
         <span>
@@ -76,7 +76,7 @@ export function ShareCard({ result, showViews }: Props) {
       </div>
 
       {previewText ? (
-        <p className="mt-1.5 text-xs italic text-ink-faint">{previewText}</p>
+        <p className="mt-1.5 text-sm italic text-ink-faint">{previewText}</p>
       ) : null}
 
       {result.tags && result.tags.length > 0 ? (

@@ -469,7 +469,7 @@ function OwnerFilterBar({
       </span>
       <Link
         href="/browse"
-        className="ml-auto text-xs text-ink-muted transition hover:text-ink"
+        className="inline-flex min-h-11 items-center sm:min-h-8 ml-auto text-xs text-ink-muted transition hover:text-ink"
       >
         Show all
       </Link>
@@ -582,7 +582,7 @@ function FilterSummary({
           {tagList.map((slug, i) => (
             <span
               key={slug}
-              className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink"
+              className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium text-ink"
             >
               {/* Use the real label for the first chip when known. */}
               {i === 0 && activeTagLabel ? activeTagLabel : prettifySlug(slug)}
@@ -592,7 +592,7 @@ function FilterSummary({
       ) : null}
       <Link
         href="/browse"
-        className="ml-auto text-xs text-accent transition hover:opacity-80"
+        className="inline-flex min-h-11 items-center sm:min-h-8 ml-auto text-xs text-accent transition hover:opacity-80"
       >
         Clear filters
       </Link>
@@ -616,7 +616,7 @@ function EmptyAppState() {
       </p>
       <Link
         href="/sign-up"
-        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+        className="mt-6 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
       >
         Sign up
       </Link>
@@ -676,7 +676,7 @@ function OwnerNotFound() {
       </p>
       <Link
         href="/browse"
-        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+        className="mt-6 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
       >
         Browse all collections
       </Link>

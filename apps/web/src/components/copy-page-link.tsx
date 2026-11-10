@@ -17,7 +17,7 @@ export function CopyPageLink({ url }: { url: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+      className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
     >
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
         <rect

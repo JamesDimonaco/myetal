@@ -57,7 +57,7 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
                 href={`https://orcid.org/${owner.orcid_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] items-center gap-1.5 underline-offset-2 transition hover:text-ink hover:underline"
+                className="inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 underline-offset-2 transition hover:text-ink hover:underline"
               >
                 <OrcidIcon size={16} />
                 {owner.orcid_id}
@@ -111,13 +111,13 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
               <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                 <Link
                   href="/dashboard/share/new"
-                  className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
                 >
                   Create your first share
                 </Link>
                 <Link
                   href="/dashboard"
-                  className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
                 >
                   Back to dashboard
                 </Link>
@@ -138,7 +138,7 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
               <div className="mb-4 flex justify-end">
                 <Link
                   href="/dashboard/share/new"
-                  className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
                 >
                   + New share
                 </Link>

@@ -37,7 +37,7 @@ export function SavedSharesSection() {
                   {s.owner_name ? `${s.owner_name} · ` : ''}
                   {s.item_count} {s.item_count === 1 ? 'item' : 'items'}
                   {' · '}
-                  <span className="uppercase tracking-wide">{s.type}</span>
+                  <span className="capitalize">{s.type}</span>
                 </p>
               </div>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-ink-faint">

@@ -167,7 +167,7 @@ export function DemoTour() {
       <section aria-labelledby="demo-editor-heading" className="order-2 lg:order-1">
         <h2
           id="demo-editor-heading"
-          className="font-mono text-xs uppercase tracking-widest text-ink-faint"
+          className="font-mono text-sm text-ink-muted"
         >
           Editor
         </h2>
@@ -212,7 +212,7 @@ export function DemoTour() {
           </Field>
         </div>
 
-        <h3 className="mt-8 font-mono text-xs uppercase tracking-widest text-ink-faint">
+        <h3 className="mt-8 font-mono text-sm text-ink-muted">
           Items ({items.length})
         </h3>
 
@@ -223,13 +223,13 @@ export function DemoTour() {
               className="rounded-lg border border-rule bg-paper-soft p-3 sm:p-5"
             >
               <div className="flex items-baseline justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                <span className="font-mono text-xs font-medium capitalize text-ink-faint">
                   Item {index + 1} · {item.kind}
                 </span>
                 <button
                   type="button"
                   onClick={() => removeItem(item.id)}
-                  className="text-xs text-ink-muted hover:text-danger"
+                  className="inline-flex min-h-11 items-center sm:min-h-8 text-xs text-ink-muted hover:text-danger"
                 >
                   Remove
                 </button>
@@ -358,7 +358,7 @@ export function DemoTour() {
           </button>
         </div>
 
-        <p className="mt-6 text-xs text-ink-faint">
+        <p className="mt-6 text-sm text-ink-faint">
           In the real app, you can paste a DOI or a GitHub URL and the metadata
           is pulled in automatically.
         </p>
@@ -370,7 +370,7 @@ export function DemoTour() {
       >
         <h2
           id="demo-preview-heading"
-          className="font-mono text-xs uppercase tracking-widest text-ink-faint"
+          className="font-mono text-sm text-ink-muted"
         >
           Public scan view
         </h2>
@@ -395,7 +395,7 @@ export function DemoTour() {
                 <span aria-hidden>·</span>
                 <span>just now</span>
                 <span aria-hidden>·</span>
-                <span className="uppercase tracking-wide text-ink-faint">
+                <span className="capitalize text-ink-faint">
                   {shareType}
                 </span>
               </div>
@@ -408,7 +408,7 @@ export function DemoTour() {
 
             <div className="mt-6">
               {previewItems.length === 0 ? (
-                <p className="py-8 text-center text-xs text-ink-muted">
+                <p className="py-8 text-center text-sm text-ink-muted">
                   Add an item on the left to see it here.
                 </p>
               ) : (
@@ -440,7 +440,7 @@ export function DemoTour() {
           </div>
         </div>
 
-        <p className="mt-4 text-xs text-ink-faint">
+        <p className="mt-4 text-sm text-ink-faint">
           The QR encodes{' '}
           <code className="text-ink">{publicUrl}</code> — try scanning it
           with your phone. (It&apos;s a fake URL for the demo, so it won&apos;t
@@ -469,7 +469,7 @@ function Field({
 }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-[10px] font-medium uppercase tracking-widest text-ink-faint">
+      <span className="text-sm font-medium text-ink">
         {label}
       </span>
       {children}

@@ -33,7 +33,7 @@ export default function DemoPage() {
       </div>
 
       <section className="mt-12 max-w-2xl">
-        <p className="text-xs uppercase tracking-widest text-ink-faint">
+        <p className="text-sm text-ink-muted">
           Live demo · nothing is saved
         </p>
         <h1 className="mt-3 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
@@ -60,7 +60,7 @@ export default function DemoPage() {
         </h2>
         <ol className="mt-6 grid gap-6 text-sm leading-relaxed text-ink-muted sm:grid-cols-3">
           <li>
-            <span className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+            <span className="font-mono text-xs text-ink-faint">
               01
             </span>
             <p className="mt-2 font-serif text-base text-ink">Add a paper</p>
@@ -70,7 +70,7 @@ export default function DemoPage() {
             </p>
           </li>
           <li>
-            <span className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+            <span className="font-mono text-xs text-ink-faint">
               02
             </span>
             <p className="mt-2 font-serif text-base text-ink">Get a QR</p>
@@ -80,7 +80,7 @@ export default function DemoPage() {
             </p>
           </li>
           <li>
-            <span className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+            <span className="font-mono text-xs text-ink-faint">
               03
             </span>
             <p className="mt-2 font-serif text-base text-ink">Edit any time</p>

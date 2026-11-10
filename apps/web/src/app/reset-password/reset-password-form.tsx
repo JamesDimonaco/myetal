@@ -57,7 +57,7 @@ export function ResetPasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="mt-8 grid gap-4">
       <label className="grid gap-1.5">
-        <span className="text-xs uppercase tracking-wider text-ink-muted">
+        <span className="text-sm font-medium text-ink">
           New password{' '}
           <span className="lowercase text-ink-faint">(8+ chars)</span>
         </span>
@@ -70,7 +70,7 @@ export function ResetPasswordForm() {
           maxLength={128}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+          className="min-h-11 sm:min-h-9 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent"
         />
       </label>
 
@@ -83,7 +83,7 @@ export function ResetPasswordForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="mt-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+        className="mt-1 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
       >
         {submitting ? 'Saving…' : 'Set new password'}
       </button>

@@ -183,7 +183,7 @@ export default async function PublicSharePage({ params }: PageProps) {
   if (!share && gone) {
     return (
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
-        <p className="text-xs uppercase tracking-widest text-ink-faint">410</p>
+        <p className="text-sm text-ink-muted">410</p>
         <h1 className="mt-4 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
           Collection removed
         </h1>
@@ -193,7 +193,7 @@ export default async function PublicSharePage({ params }: PageProps) {
         </p>
         <Link
           href="/"
-          className="mt-8 inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-2.5 text-sm font-medium text-ink hover:border-ink/40"
+          className="mt-8 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-ink/20 px-5 py-2 sm:py-1.5 text-sm font-medium text-ink hover:border-ink/40"
         >
           Back to MyEtAl
         </Link>
@@ -257,7 +257,7 @@ export default async function PublicSharePage({ params }: PageProps) {
           {share.owner_name ? <span aria-hidden>·</span> : null}
           <span>Updated {formatRelativeTime(share.updated_at)}</span>
           <span aria-hidden>·</span>
-          <span className="uppercase tracking-wide text-ink-faint">{share.type}</span>
+          <span className="capitalize text-ink-faint">{share.type}</span>
         </div>
         <div className="mt-4">
           <SaveButton
@@ -373,7 +373,7 @@ export default async function PublicSharePage({ params }: PageProps) {
             </p>
             <Link
               href={`/c/${share.short_code}/present`}
-              className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="mt-4 inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               <PresentIcon />
               Present fullscreen

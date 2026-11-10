@@ -164,7 +164,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
           </p>
           <Link
             href="/dashboard/share/new"
-            className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+            className="mt-6 inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
           >
             Create a share
           </Link>
@@ -185,13 +185,13 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/dashboard/library"
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Open library
             </Link>
             <Link
               href="/dashboard/share/new"
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+              className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
             >
               Create a share
             </Link>
@@ -208,7 +208,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
         </p>
         <Link
           href="/dashboard/share/new"
-          className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+          className="mt-6 inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
         >
           Create a share
         </Link>
@@ -261,7 +261,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
                     {share.short_code}
                   </p>
                   {share.published_at === null ? (
-                    <span className="inline-flex items-center rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+                    <span className="inline-flex items-center rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
                       Unlisted
                     </span>
                   ) : null}

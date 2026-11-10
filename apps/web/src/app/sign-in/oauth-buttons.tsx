@@ -99,12 +99,12 @@ export function OAuthButtons({
     return (
       <div className="mt-8 grid gap-3 sm:mt-10">
         {orcidButton}
-        <p className="text-xs text-ink-muted">
+        <p className="text-sm text-ink-muted">
           We&apos;ll import your publications from ORCID automatically.
         </p>
         {googleButton}
         {githubButton}
-        <p className="text-xs text-ink-muted">
+        <p className="text-sm text-ink-muted">
           Already signed up with Google or GitHub? Add your ORCID iD on your
           profile instead — signing in with ORCID will create a separate
           account.
@@ -118,7 +118,7 @@ export function OAuthButtons({
       {googleButton}
       {githubButton}
       {orcidButton}
-      <p className="text-xs text-ink-muted">
+      <p className="text-sm text-ink-muted">
         Already signed up with Google or GitHub? Add your ORCID iD on your
         profile instead — signing in with ORCID will create a separate
         account.

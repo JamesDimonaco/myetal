@@ -73,13 +73,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/sign-in"
-                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
+                className="inline-flex min-h-11 sm:min-h-9 items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
               >
                 Sign in
               </Link>
               <Link
                 href="/sign-in"
-                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 sm:min-h-9 items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
               >
                 Get started
               </Link>
@@ -103,13 +103,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/dashboard"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
               >
                 Go to dashboard
               </Link>
               <Link
                 href="/dashboard/share/new"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-ink/20 px-5 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:border-ink/40"
               >
                 + New share
               </Link>
@@ -118,13 +118,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/sign-in"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
               >
                 Sign in
               </Link>
               <Link
                 href="/demo"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-ink/20 px-5 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:border-ink/40"
               >
                 Try the demo
               </Link>

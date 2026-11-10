@@ -326,12 +326,12 @@ export function LibraryList({
             value={doi}
             onChange={(e) => setDoi(e.target.value)}
             placeholder="Paste a DOI (e.g. 10.1234/example)"
-            className="min-h-[44px] flex-1 rounded-md border border-rule bg-paper px-4 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            className="min-h-11 sm:min-h-9 flex-1 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-base sm:text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
           />
           <button
             type="submit"
             disabled={addWork.isPending || !doi.trim()}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
           >
             {addWork.isPending ? 'Adding...' : '+ Add paper'}
           </button>
@@ -342,13 +342,13 @@ export function LibraryList({
             onClick={() => syncOrcid.mutate()}
             disabled={importDisabled}
             aria-label={importLabel}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+            className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
           >
             <OrcidIcon size={16} />
             {importLabel}
           </button>
           {!orcidId ? (
-            <p className="mt-1 text-xs text-ink-muted">
+            <p className="mt-1 text-sm text-ink-muted">
               Add your ORCID iD on your profile first
             </p>
           ) : null}
@@ -375,7 +375,7 @@ export function LibraryList({
             type="button"
             onClick={() => syncOrcid.mutate()}
             disabled={syncOrcid.isPending}
-            className="rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft disabled:opacity-50"
+            className="inline-flex min-h-11 items-center sm:min-h-8 rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft disabled:opacity-50"
           >
             {syncOrcid.isPending ? 'Retrying…' : 'Retry'}
           </button>
@@ -632,7 +632,7 @@ function WorkCard({
             <button
               onClick={onRestore}
               disabled={isRestoring}
-              className="inline-flex min-h-[40px] items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
             >
               Restore
             </button>
@@ -640,7 +640,7 @@ function WorkCard({
             <button
               onClick={onHide}
               disabled={isHiding}
-              className="inline-flex min-h-[40px] items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink-muted transition hover:border-danger hover:text-danger disabled:opacity-50"
+              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink-muted transition hover:border-danger hover:text-danger disabled:opacity-50"
             >
               Hide
             </button>
@@ -658,7 +658,7 @@ function WorkCard({
  */
 function OrcidProvenanceBadge({ orcidId }: { orcidId: string | null }) {
   const baseClass =
-    'mt-1.5 inline-flex items-center gap-1 rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted';
+    'mt-1.5 inline-flex items-center gap-1 rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium text-ink-muted';
   if (!orcidId) {
     return <span className={baseClass}>Imported from ORCID</span>;
   }
@@ -738,7 +738,7 @@ function AddToShareMenu({
         disabled={isAdding}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex min-h-[40px] items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+        className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
       >
         {isAdding ? 'Adding…' : 'Add to share…'}
       </button>
@@ -748,16 +748,16 @@ function AddToShareMenu({
           className="absolute left-0 z-20 mt-1 w-72 overflow-hidden rounded-md border border-rule bg-paper shadow-lg"
         >
           {isLoading ? (
-            <div className="px-3 py-2 text-xs text-ink-muted">
+            <div className="px-3 py-2 text-sm text-ink-muted">
               Loading shares…
             </div>
           ) : isError ? (
-            <div className="px-3 py-3 text-xs text-ink">
+            <div className="px-3 py-3 text-sm text-ink">
               <p>Couldn&apos;t load your shares.</p>
               <button
                 type="button"
                 onClick={() => refetch()}
-                className="mt-2 rounded-md border border-ink/20 px-2 py-1 text-[11px] font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-11 items-center sm:min-h-8 mt-2 rounded-md border border-ink/20 px-2 py-1 text-xs font-medium text-ink transition hover:border-ink/40"
               >
                 Try again
               </button>
@@ -770,13 +770,13 @@ function AddToShareMenu({
               <p className="text-sm font-medium text-ink">
                 You don&apos;t have any shares yet.
               </p>
-              <p className="mt-1 text-xs text-ink-muted">
+              <p className="mt-1 text-sm text-ink-muted">
                 Create your first share with this paper attached.
               </p>
               <Link
                 href={newShareHref}
                 onClick={() => setOpen(false)}
-                className="mt-3 inline-flex items-center justify-center rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 items-center sm:min-h-8 mt-3 justify-center rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
               >
                 Create share with this paper
               </Link>
@@ -795,7 +795,7 @@ function AddToShareMenu({
                     className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-ink transition hover:bg-paper-soft"
                   >
                     <span className="truncate">{share.name}</span>
-                    <span className="flex-shrink-0 text-[10px] uppercase tracking-wider text-ink-faint">
+                    <span className="flex-shrink-0 text-xs text-ink-faint">
                       {share.items.length}{' '}
                       {share.items.length === 1 ? 'item' : 'items'}
                     </span>

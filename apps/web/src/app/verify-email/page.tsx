@@ -13,7 +13,7 @@ export default function VerifyEmailPage() {
     >
       <Link
         href="/sign-in"
-        className="inline-flex min-h-[40px] items-center self-start text-sm text-ink-muted hover:text-ink"
+        className="inline-flex min-h-11 sm:min-h-9 items-center self-start text-sm text-ink-muted hover:text-ink"
       >
         &larr; Back to sign in
       </Link>

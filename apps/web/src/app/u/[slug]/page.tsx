@@ -165,13 +165,13 @@ function SoftEmptyState() {
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <Link
           href="/browse"
-          className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+          className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
         >
           Browse collections
         </Link>
         <Link
           href="/"
-          className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+          className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
         >
           What is MyEtAl?
         </Link>

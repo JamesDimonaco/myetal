@@ -416,7 +416,7 @@ function LibraryPane({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter by title, author, or DOI"
-          className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+          className="min-h-11 sm:min-h-9 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent"
         />
       ) : null}
       <ul className="grid max-h-80 gap-2 overflow-y-auto">
@@ -476,7 +476,7 @@ function DoiPane({ onPick }: { onPick: (p: Paper) => void }) {
   return (
     <div className="grid gap-4">
       <label className="grid gap-1.5">
-        <span className="text-xs uppercase tracking-wider text-ink-muted">
+        <span className="text-sm font-medium text-ink">
           DOI
         </span>
         <input
@@ -490,7 +490,7 @@ function DoiPane({ onPick }: { onPick: (p: Paper) => void }) {
           spellCheck={false}
           className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
         />
-        <span className="text-xs text-ink-faint">
+        <span className="text-sm text-ink-faint">
           Paste a DOI from a paper, a doi.org URL, or arXiv.
         </span>
       </label>
@@ -572,7 +572,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
   return (
     <div className="grid gap-4">
       <label className="grid gap-1.5">
-        <span className="text-xs uppercase tracking-wider text-ink-muted">
+        <span className="text-sm font-medium text-ink">
           Search by title
         </span>
         <input
@@ -590,7 +590,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
           spellCheck={false}
           className="rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
         />
-        <span className="text-xs text-ink-faint">
+        <span className="text-sm text-ink-faint">
           Powered by OpenAlex. Best with title or first author + year.
         </span>
       </label>
@@ -602,7 +602,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                <span className="text-sm font-medium text-ink">
                   Sort
                 </span>
                 <select
@@ -643,7 +643,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                 </svg>
                 Filters
                 {hasActiveFilters ? (
-                  <span className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-paper">
+                  <span className="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-bold text-paper">
                     {(oaOnly ? 1 : 0) +
                       activeTypes.size +
                       (yearFrom ? 1 : 0) +
@@ -680,7 +680,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
               {/* Type pills */}
               {availableTypes.length > 0 ? (
                 <div>
-                  <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                  <span className="mb-1.5 block text-sm font-medium text-ink">
                     Type
                   </span>
                   <div className="flex flex-wrap gap-1">
@@ -692,7 +692,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                           type="button"
                           onClick={() => toggleType(t)}
                           className={[
-                            'rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider transition',
+                            'rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize transition',
                             active
                               ? 'border-accent bg-accent-soft text-accent'
                               : 'border-rule bg-paper text-ink-muted hover:text-ink',
@@ -708,7 +708,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
 
               {/* Year range */}
               <div>
-                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                <span className="mb-1.5 block text-sm font-medium text-ink">
                   Year range
                 </span>
                 <div className="flex items-center gap-2">
@@ -738,7 +738,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
 
               {/* Author filter */}
               <div>
-                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
+                <span className="mb-1.5 block text-sm font-medium text-ink">
                   Filter by author
                 </span>
                 <input
@@ -762,7 +762,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                     setYearTo('');
                     setAuthorFilter('');
                   }}
-                  className="text-left text-[11px] font-medium text-accent hover:underline"
+                  className="inline-flex min-h-11 items-center sm:min-h-8 text-left text-xs font-medium text-accent hover:underline"
                 >
                   Clear all filters
                 </button>
@@ -804,7 +804,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                   className="block w-full rounded-md border border-rule bg-paper-soft p-3 text-left transition hover:bg-paper"
                 >
                   {r.is_retracted ? (
-                    <p className="mb-1.5 rounded bg-danger/10 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-danger">
+                    <p className="mb-1.5 rounded bg-danger/10 px-2 py-1 text-sm font-semibold text-danger">
                       Retracted
                     </p>
                   ) : null}
@@ -819,12 +819,12 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                     {r.container && (r.publication_date || r.year) ? <span aria-hidden>·</span> : null}
                     <span>{r.publication_date ?? r.year}</span>
                     {r.type ? (
-                      <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+                      <span className="rounded bg-paper px-1.5 py-0.5 text-xs font-medium capitalize text-ink-muted">
                         {r.type.replace('-', ' ')}
                       </span>
                     ) : null}
                     {r.open_access?.is_oa ? (
-                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-800">
+                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-800">
                         OA{r.open_access.oa_status ? ` · ${r.open_access.oa_status}` : ''}
                       </span>
                     ) : null}
@@ -840,7 +840,7 @@ function SearchPane({ onPick }: { onPick: (p: Paper) => void }) {
                       {r.keywords.slice(0, 4).map((kw) => (
                         <span
                           key={kw}
-                          className="rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] text-ink-muted"
+                          className="rounded-full border border-rule bg-paper px-2 py-0.5 text-xs text-ink-muted"
                         >
                           {kw}
                         </span>
@@ -883,7 +883,7 @@ function ManualPane({ onPick }: { onPick: (p: Paper) => void }) {
 
   return (
     <div className="grid gap-3">
-      <p className="text-xs text-ink-faint">
+      <p className="text-sm text-ink-faint">
         For preprints, posters, grey literature — anything not in Crossref /
         OpenAlex.
       </p>
@@ -991,7 +991,7 @@ function RepoKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
   return (
     <div className="grid gap-4">
       <label className="grid gap-1.5">
-        <span className="text-xs uppercase tracking-wider text-ink-muted">
+        <span className="text-sm font-medium text-ink">
           GitHub URL
         </span>
         <div className="flex gap-2">
@@ -1021,7 +1021,7 @@ function RepoKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
             {loading ? '…' : 'Fetch'}
           </button>
         </div>
-        <span className="text-xs text-ink-faint">
+        <span className="text-sm text-ink-faint">
           We pull the description, stars, language, and license from GitHub.
         </span>
       </label>
@@ -1120,7 +1120,7 @@ function LinkKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
 
   return (
     <div className="grid gap-3">
-      <p className="text-xs text-ink-faint">
+      <p className="text-sm text-ink-faint">
         For blog posts, slides, lab pages, datasets — anything with a URL.
       </p>
       <ManualField
@@ -1445,7 +1445,7 @@ function PdfKindPane({
   if (!shareId && draftSaving) {
     return (
       <div className="grid gap-3">
-        <p className="text-xs text-ink-faint">
+        <p className="text-sm text-ink-faint">
           Upload a PDF (poster, slide deck, preprint) and we&apos;ll attach it
           to this share.
         </p>
@@ -1489,7 +1489,7 @@ function PdfKindPane({
           <p className="text-sm font-semibold text-danger">
             Couldn&apos;t start the upload draft.
           </p>
-          <p className="mt-1 text-xs text-ink-muted">
+          <p className="mt-1 text-sm text-ink-muted">
             Save the share from the main form first, then come back and
             attach a PDF.
           </p>
@@ -1511,7 +1511,7 @@ function PdfKindPane({
 
   return (
     <div className="grid gap-4">
-      <p className="text-xs text-ink-faint">
+      <p className="text-sm text-ink-faint">
         Upload a PDF (poster, slide deck, preprint). Up to 25 MB.
       </p>
 
@@ -1545,7 +1545,7 @@ function PdfKindPane({
             />
           </svg>
           <p className="text-sm font-semibold text-ink">Choose a PDF</p>
-          <p className="text-xs text-ink-muted">Click to browse — 25 MB max</p>
+          <p className="text-sm text-ink-muted">Click to browse — 25 MB max</p>
           <input
             id={fileInputId}
             type="file"
@@ -1593,7 +1593,7 @@ function PdfKindPane({
             type="button"
             onClick={removeFile}
             disabled={busy}
-            className="text-xs font-medium text-ink-muted transition hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-11 items-center sm:min-h-8 text-xs font-medium text-ink-muted transition hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
           >
             Remove
           </button>
@@ -1602,13 +1602,13 @@ function PdfKindPane({
 
       {/* W5 — trust signal near the picker, ORCID-style. */}
       {!file ? (
-        <p className="text-xs text-ink-faint">{PDF_TRUST_NOTE}</p>
+        <p className="text-sm text-ink-faint">{PDF_TRUST_NOTE}</p>
       ) : null}
 
       {/* Title — required, defaults to filename via heuristic (W2). */}
       {file ? (
         <label className="grid gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+          <span className="text-sm font-medium text-ink">
             Title (required)
           </span>
           <input
@@ -1632,7 +1632,7 @@ function PdfKindPane({
             disabled={busy}
             className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded border-rule accent-accent"
           />
-          <span className="text-xs text-ink">{PDF_COPYRIGHT_LABEL}</span>
+          <span className="text-sm text-ink">{PDF_COPYRIGHT_LABEL}</span>
         </label>
       ) : null}
 
@@ -1652,7 +1652,7 @@ function PdfKindPane({
           <button
             type="button"
             onClick={cancel}
-            className="self-start text-xs font-medium text-ink-muted transition hover:text-ink"
+            className="inline-flex min-h-11 items-center sm:min-h-8 self-start text-xs font-medium text-ink-muted transition hover:text-ink"
           >
             Cancel
           </button>
@@ -1673,7 +1673,7 @@ function PdfKindPane({
       {/* Inline error */}
       {error ? (
         <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2">
-          <p className="text-xs text-danger">{error}</p>
+          <p className="text-sm text-danger">{error}</p>
         </div>
       ) : null}
 
@@ -1713,7 +1713,7 @@ function PaperPreview({
   return (
     <div className="rounded-md border border-rule bg-paper-soft p-4">
       {sr?.is_retracted ? (
-        <p className="mb-2 rounded bg-danger/10 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-danger">
+        <p className="mb-2 rounded bg-danger/10 px-2 py-1 text-sm font-semibold text-danger">
           Retracted — verify before citing
         </p>
       ) : null}
@@ -1728,9 +1728,9 @@ function PaperPreview({
         {paper.container && (sr?.publication_date || paper.year) ? <span aria-hidden>·</span> : null}
         <span>{sr?.publication_date ?? paper.year}</span>
         <span aria-hidden>·</span>
-        <span className="uppercase tracking-wider">{paper.source}</span>
+        <span className="capitalizer">{paper.source}</span>
         {sr?.type ? (
-          <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+          <span className="rounded bg-paper px-1.5 py-0.5 text-xs font-medium capitalize text-ink-muted">
             {sr.type.replace('-', ' ')}
           </span>
         ) : null}
@@ -1738,7 +1738,7 @@ function PaperPreview({
       {sr ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {sr.open_access?.is_oa ? (
-            <span className="rounded bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-green-800">
+            <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
               Open Access{sr.open_access.oa_status ? ` · ${sr.open_access.oa_status}` : ''}
             </span>
           ) : null}
@@ -1753,7 +1753,7 @@ function PaperPreview({
               target="_blank"
               rel="noreferrer noopener"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 rounded bg-accent-soft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent hover:opacity-80"
+              className="inline-flex items-center gap-1 rounded bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent hover:opacity-80"
             >
               PDF ↗
             </a>
@@ -1768,7 +1768,7 @@ function PaperPreview({
           {sr.keywords.slice(0, 5).map((kw) => (
             <span
               key={kw}
-              className="rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] text-ink-muted"
+              className="rounded-full border border-rule bg-paper px-2 py-0.5 text-xs text-ink-muted"
             >
               {kw}
             </span>
@@ -1780,7 +1780,7 @@ function PaperPreview({
           {sr.topics.slice(0, 3).map((t) => (
             <span
               key={t.name}
-              className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-accent"
+              className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent"
             >
               {t.name}
             </span>
@@ -1884,7 +1884,7 @@ function ManualField({
 }) {
   return (
     <label className="grid gap-1">
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+      <span className="text-sm font-medium text-ink">
         {label}
       </span>
       <input

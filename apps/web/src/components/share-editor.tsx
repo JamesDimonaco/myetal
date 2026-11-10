@@ -18,7 +18,16 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -118,18 +127,22 @@ const shareSchema = z.object({
 // (file_size_bytes, file_mime, thumbnail_url, etc.) routes through the
 // hidden-field banner instead of leaking raw Zod messages — see
 // docs/tickets/to-do/form-error-surfacing.md.
-/** User-facing messages for one item, deduped. */
-function itemIssues(item: DraftItem): string[] {
+/** User-facing error per field for one item (first message wins). */
+function itemIssues(item: DraftItem): Record<string, string> {
   const parsed = itemSchema.safeParse(item);
-  if (parsed.success) return [];
-  return [
-    ...new Set(
-      parsed.error.issues
-        .filter((issue) => USER_EDITABLE_FIELDS.has(`items.*.${issue.path.join('.')}`))
-        .map((issue) => issue.message),
-    ),
-  ];
+  const out: Record<string, string> = {};
+  if (parsed.success) return out;
+  for (const issue of parsed.error.issues) {
+    const field = issue.path.join('.');
+    if (USER_EDITABLE_FIELDS.has(`items.*.${field}`) && !out[field]) out[field] = issue.message;
+  }
+  return out;
 }
+
+const NO_ERRORS: Record<string, string> = {};
+
+/** Per-field errors for the item being rendered; read by ItemField. */
+const ItemErrorsContext = createContext<Record<string, string>>({});
 
 const USER_EDITABLE_FIELDS = new Set([
   'name',
@@ -393,6 +406,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
   );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [checkedItemKeys, setCheckedItemKeys] = useState<Set<string>>(new Set());
   // Unsaved-changes guard. `isDirty` flips true the first time any tracked
   // form field changes after mount; flips back to false on successful save
   // or explicit discard. Used by both the beforeunload listener and the
@@ -496,6 +510,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
+    setCheckedItemKeys(new Set());
 
     const parsed = shareSchema.safeParse({
       name,
@@ -522,6 +537,9 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
         }
       }
       setFieldErrors(inline);
+      if (Object.keys(inline).some((key) => key.startsWith('items.'))) {
+        setCheckedItemKeys(new Set(items.map((it) => it._key)));
+      }
       // Prefer surfacing a user-editable message (clear, actionable). Fall
       // back to a generic banner only when every issue is on a hidden field
       // — the previous code leaked raw Zod text in that case.
@@ -720,16 +738,18 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
   // Errors clear as soon as the field is fixed, not on the next save.
   const nameError = name.trim() ? null : fieldErrors['name'];
   const itemsError = items.length > 0 ? null : fieldErrors['items'];
-  // After a failed save, items re-validate live so their errors follow
-  // reordering and clear the moment they're fixed.
-  const checkItems = Object.keys(fieldErrors).some((key) => key.startsWith('items.'));
+  // Items that failed the last save re-validate live, so their errors follow
+  // reordering and clear the moment they're fixed. Items added since stay
+  // quiet until the next save.
   const itemErrors = new Map(
-    checkItems ? items.map((it) => [it._key, itemIssues(it)] as const) : [],
+    items
+      .filter((it) => checkedItemKeys.has(it._key))
+      .map((it) => [it._key, itemIssues(it)] as const),
   );
   const openErrorCount =
     (nameError ? 1 : 0) +
     (itemsError ? 1 : 0) +
-    [...itemErrors.values()].filter((messages) => messages.length > 0).length;
+    [...itemErrors.values()].reduce((n, errs) => n + Object.keys(errs).length, 0);
   const bannerError =
     error ??
     (openErrorCount > 0
@@ -784,7 +804,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
             aria-invalid={nameError ? true : undefined}
             aria-describedby={nameError ? 'share-name-error' : undefined}
             className={[
-              'min-h-[44px] rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
+              'min-h-11 sm:min-h-9 rounded-md border bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent',
               nameError ? 'border-danger' : 'border-rule',
             ].join(' ')}
           />
@@ -805,7 +825,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                   type="button"
                   onClick={() => setShareType(t)}
                   className={[
-                    'inline-flex min-h-[40px] items-center rounded-full border px-4 py-2 text-sm font-medium capitalize transition',
+                    'inline-flex min-h-11 sm:min-h-9 items-center rounded-full border px-4 py-2 sm:py-1.5 text-sm font-medium capitalize transition',
                     active
                       ? 'border-ink bg-ink text-paper'
                       : 'border-rule bg-paper text-ink hover:bg-paper-soft',
@@ -899,7 +919,8 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
               );
             }}
             className={[
-              'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60',
+              // after: widens the tap area to 44px without changing the look.
+              "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition after:absolute after:-inset-2.5 after:content-[''] disabled:cursor-not-allowed disabled:opacity-60",
               publishedAt ? 'bg-accent' : 'bg-ink-faint',
             ].join(' ')}
           >
@@ -918,7 +939,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
           <Card className="flex items-center gap-3">
             <div className="flex-1">
               <p className="text-sm font-semibold text-ink">QR Code</p>
-              <p className="mt-0.5 text-xs text-ink-muted">
+              <p className="mt-0.5 text-sm text-ink-muted">
                 View or share the QR code for this share.
               </p>
             </div>
@@ -929,7 +950,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                 setQrMode('quick-access');
                 setShowQr(true);
               }}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Show QR
             </button>
@@ -943,7 +964,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
               <SectionHeading>
                 Items
               </SectionHeading>
-              <p className="mt-1 text-xs text-ink-faint">
+              <p className="mt-1 text-sm text-ink-faint">
                 {items.length} {items.length === 1 ? 'item' : 'items'} -- use the arrows to reorder
               </p>
             </div>
@@ -951,7 +972,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
               type="button"
               aria-describedby={itemsError ? 'share-items-error' : undefined}
               onClick={() => setShowAddItem(true)}
-              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                 <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -972,14 +993,14 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                   <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <p className="text-sm font-medium text-ink">No items yet</p>
-                <p className="text-xs text-ink-faint">
+                <p className="text-sm text-ink-faint">
                   A bundle gathers papers, repos, and PDFs behind one QR. Start
                   by adding an item.
                 </p>
                 <button
                   type="button"
                   onClick={() => setShowAddItem(true)}
-                  className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+                  className="mt-2 inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                     <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -1007,7 +1028,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                     onMove={moveItem}
                     onRemove={removeItem}
                     onUpdate={updateItem}
-                    errors={itemErrors.get(it._key) ?? []}
+                    errors={itemErrors.get(it._key) ?? NO_ERRORS}
                   />
                 ))}
               </SortableContext>
@@ -1027,7 +1048,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
             onClick={() => setMoreOpen((open) => !open)}
             aria-expanded={moreOpen}
             aria-controls="share-more-options"
-            className="inline-flex min-h-[44px] items-center gap-2 justify-self-start text-sm font-medium text-ink-muted transition hover:text-ink"
+            className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 justify-self-start text-sm font-medium text-ink-muted transition hover:text-ink"
           >
             <svg
               width="12"
@@ -1092,7 +1113,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
+              className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
             >
               Delete share
             </button>
@@ -1100,7 +1121,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
           <button
             type="submit"
             disabled={submitting}
-            className="ml-auto inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+            className="ml-auto inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
           >
             {submitting
               ? 'Saving…'
@@ -1182,7 +1203,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
       </Dialog>
 
       {/* Discard-changes guard — fires when the user clicks an in-editor
-          nav surface (today: "Back to dashboard") while `isDirty`. The
+          nav surface (today: the "Your shares" back link) while `isDirty`. The
           beforeunload listener covers tab close / refresh separately. */}
       <Dialog
         open={pendingDiscardHref !== null}
@@ -1244,7 +1265,7 @@ function SortableItemRow({
   onMove: (key: string, direction: -1 | 1) => void;
   onRemove: (key: string) => void;
   onUpdate: (key: string, patch: Partial<DraftItem>) => void;
-  errors: string[];
+  errors: Record<string, string>;
 }) {
   const {
     attributes,
@@ -1267,8 +1288,9 @@ function SortableItemRow({
     <Card
       ref={setNodeRef}
       style={style}
-      className={errors.length > 0 ? 'border-danger' : undefined}
+      className={Object.keys(errors).length > 0 ? 'border-danger' : undefined}
     >
+      <ItemErrorsContext.Provider value={errors}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Drag handle — sm:flex hides on phones, where arrow buttons
@@ -1282,7 +1304,7 @@ function SortableItemRow({
           >
             <GripIcon />
           </button>
-          <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+          <span className="text-xs font-semibold text-ink-muted">
             #{idx + 1}
           </span>
           <KindBadge kind={item.kind} />
@@ -1308,12 +1330,6 @@ function SortableItemRow({
         </div>
       </div>
 
-      <div role="alert" className="mt-2 text-sm text-danger empty:hidden">
-        {errors.map((message) => (
-          <p key={message}>{message}</p>
-        ))}
-      </div>
-
       <div className="mt-3 grid gap-3">
         {item.kind === 'paper' ? (
           <PaperFields
@@ -1328,6 +1344,7 @@ function SortableItemRow({
           <LinkFields item={item} onChange={(p) => onUpdate(item._key, p)} />
         )}
         <ItemField
+          field="notes"
           label="Notes"
           value={item.notes}
           onChange={(v) => onUpdate(item._key, { notes: v })}
@@ -1335,6 +1352,7 @@ function SortableItemRow({
           multiline
         />
       </div>
+      </ItemErrorsContext.Provider>
     </Card>
   );
 }
@@ -1370,12 +1388,14 @@ function PaperFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
         placeholder="Paper title"
       />
       <ItemField
+        field="scholar_url"
         label="Scholar URL"
         value={item.scholar_url}
         onChange={(v) => onChange({ scholar_url: v })}
@@ -1384,12 +1404,14 @@ function PaperFields({
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ItemField
+          field="doi"
           label="DOI"
           value={item.doi}
           onChange={(v) => onChange({ doi: v })}
           placeholder="10.1000/xyz123"
         />
         <ItemField
+          field="year"
           label="Year"
           value={item.year}
           onChange={(v) =>
@@ -1400,6 +1422,7 @@ function PaperFields({
         />
       </div>
       <ItemField
+        field="authors"
         label="Authors"
         value={item.authors}
         onChange={(v) => onChange({ authors: v })}
@@ -1419,12 +1442,14 @@ function RepoFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title (owner/repo)"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
         placeholder="owner/repo"
       />
       <ItemField
+        field="url"
         label="GitHub URL"
         value={item.url}
         onChange={(v) => onChange({ url: v })}
@@ -1432,12 +1457,14 @@ function RepoFields({
         type="url"
       />
       <ItemField
+        field="subtitle"
         label="Description"
         value={item.subtitle}
         onChange={(v) => onChange({ subtitle: v })}
         placeholder="One-liner from the repo's About"
       />
       <ItemField
+        field="image_url"
         label="Image URL"
         value={item.image_url}
         onChange={(v) => onChange({ image_url: v })}
@@ -1458,12 +1485,14 @@ function LinkFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
         placeholder="What is this?"
       />
       <ItemField
+        field="url"
         label="URL"
         value={item.url}
         onChange={(v) => onChange({ url: v })}
@@ -1471,12 +1500,14 @@ function LinkFields({
         type="url"
       />
       <ItemField
+        field="subtitle"
         label="Description"
         value={item.subtitle}
         onChange={(v) => onChange({ subtitle: v })}
         placeholder="Optional one-liner"
       />
       <ItemField
+        field="image_url"
         label="Image URL"
         value={item.image_url}
         onChange={(v) => onChange({ image_url: v })}
@@ -1490,7 +1521,7 @@ function LinkFields({
 function KindBadge({ kind }: { kind: ShareItemKind }) {
   if (kind === 'repo') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
         <GitHubIcon size={11} />
         Repo
       </span>
@@ -1498,20 +1529,20 @@ function KindBadge({ kind }: { kind: ShareItemKind }) {
   }
   if (kind === 'link') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
         Link
       </span>
     );
   }
   if (kind === 'pdf') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
         PDF
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+    <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
       Paper
     </span>
   );
@@ -1530,6 +1561,7 @@ function PdfFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
@@ -1548,7 +1580,7 @@ function PdfFields({
             />
           ) : (
             <div className="flex h-20 w-16 flex-shrink-0 items-center justify-center rounded border border-rule bg-paper-soft text-ink-muted">
-              <span className="text-[9px] font-semibold uppercase">PDF</span>
+              <span className="text-xs font-semibold">PDF</span>
             </div>
           )}
           <div className="min-w-0 flex-1 text-xs text-ink-muted">
@@ -1585,11 +1617,11 @@ function Field({
   return (
     <label className="grid gap-1.5">
       <span className="flex items-baseline justify-between gap-2">
-        <span className="text-xs uppercase tracking-wider text-ink-muted">
+        <span className="text-sm font-medium text-ink">
           {label}
         </span>
         {hint ? (
-          <span className="text-[11px] tabular-nums text-ink-faint">
+          <span className="text-sm tabular-nums text-ink-faint">
             {hint}
           </span>
         ) : null}
@@ -1600,6 +1632,7 @@ function Field({
 }
 
 function ItemField({
+  field,
   label,
   value,
   onChange,
@@ -1608,6 +1641,7 @@ function ItemField({
   inputMode,
   multiline,
 }: {
+  field: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -1616,31 +1650,36 @@ function ItemField({
   inputMode?: 'numeric';
   multiline?: boolean;
 }) {
-  const sharedClass =
-    'rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent';
+  const error = useContext(ItemErrorsContext)[field];
+  const errorId = useId();
+  const controlProps = {
+    value,
+    placeholder,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': error ? errorId : undefined,
+    className: [
+      'min-h-11 rounded-md border bg-paper px-3 py-2 text-base text-ink outline-none focus:border-accent sm:min-h-9 sm:py-1.5 sm:text-sm',
+      error ? 'border-danger' : 'border-rule',
+    ].join(' '),
+  };
   return (
     <label className="grid gap-1">
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
-        {label}
-      </span>
+      <span className="text-sm font-medium text-ink">{label}</span>
       {multiline ? (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={2}
-          className={sharedClass}
-        />
+        <textarea {...controlProps} onChange={(e) => onChange(e.target.value)} rows={2} />
       ) : (
         <input
+          {...controlProps}
           type={type}
           inputMode={inputMode}
-          value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={sharedClass}
         />
       )}
+      {error ? (
+        <span id={errorId} className="text-sm text-danger">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -1662,7 +1701,7 @@ function IconBtn({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-10 w-10 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 sm:h-8 sm:w-8"
+      className="inline-flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 sm:h-8 sm:w-8"
     >
       {children}
     </button>

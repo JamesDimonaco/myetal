@@ -297,7 +297,7 @@ export function HandleSection({ initialHandle }: Props) {
           <span className="font-mono">{siteUrl.replace(/^https?:\/\//, '')}/u/drsmith</span>.
           Add it to your business card, slide deck, or email signature.
         </p>
-        <p className="mt-1 text-xs text-ink-muted">
+        <p className="mt-1 text-sm text-ink-muted">
           Lowercase letters, digits, <span className="font-mono">_</span> or{' '}
           <span className="font-mono">-</span>. 3–30 characters. Your old{' '}
           <span className="font-mono">/u/&lt;id&gt;</span> URL keeps working
@@ -320,7 +320,7 @@ export function HandleSection({ initialHandle }: Props) {
 
         <form onSubmit={handleSubmit} className="mt-4 grid gap-2">
           <label className="grid gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+            <span className="text-sm font-medium text-ink">
               Your handle
             </span>
             <div className="flex items-stretch overflow-hidden rounded-md border border-rule bg-paper focus-within:border-accent">
@@ -395,7 +395,7 @@ export function HandleSection({ initialHandle }: Props) {
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
                 >
                   {submitting ? 'Saving…' : 'Save'}
                 </button>
@@ -404,7 +404,7 @@ export function HandleSection({ initialHandle }: Props) {
                   type="button"
                   onClick={handleRemove}
                   disabled={submitting}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
                 >
                   {submitting ? 'Removing…' : 'Remove'}
                 </button>

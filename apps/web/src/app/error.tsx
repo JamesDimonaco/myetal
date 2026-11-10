@@ -33,13 +33,13 @@ export default function Error({
         <button
           type="button"
           onClick={reset}
-          className="inline-flex min-h-[44px] items-center justify-center rounded bg-accent px-4 py-2 text-sm text-paper transition-colors hover:bg-accent/90"
+          className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded bg-accent px-4 py-2 sm:py-1.5 text-sm text-paper transition-colors hover:bg-accent/90"
         >
           Try again
         </button>
         <a
           href="/dashboard"
-          className="inline-flex min-h-[44px] items-center justify-center rounded border border-rule px-4 py-2 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
+          className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded border border-rule px-4 py-2 sm:py-1.5 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
         >
           Go to dashboard
         </a>

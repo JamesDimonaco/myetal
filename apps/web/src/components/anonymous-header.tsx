@@ -15,13 +15,13 @@ export function AnonymousHeader() {
         <nav aria-label="Main" className="flex items-center gap-2 text-sm sm:gap-6">
           <Link
             href="/sign-in"
-            className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
+            className="inline-flex min-h-11 sm:min-h-9 items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
           >
             Sign in
           </Link>
           <Link
             href="/sign-up"
-            className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
+            className="inline-flex min-h-11 sm:min-h-9 items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
           >
             Get started
           </Link>

@@ -125,13 +125,13 @@ export function FeedbackForm({ userEmail }: Props) {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={handleReset}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-paper-soft"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule px-4 py-2 sm:py-1.5 text-sm font-medium text-ink hover:bg-paper-soft"
           >
             Submit another
           </button>
           <Link
             href="/"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-white hover:opacity-90"
           >
             Back to app
           </Link>
@@ -297,7 +297,7 @@ export function FeedbackForm({ userEmail }: Props) {
                   <button
                     type="button"
                     onClick={() => setUseCustomEmail(true)}
-                    className="ml-auto text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
+                    className="inline-flex min-h-11 items-center sm:min-h-8 ml-auto text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
                   >
                     Use a different email
                   </button>
@@ -317,7 +317,7 @@ export function FeedbackForm({ userEmail }: Props) {
                         setUseCustomEmail(false);
                         setEmail(userEmail ?? '');
                       }}
-                      className="text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
+                      className="inline-flex min-h-11 items-center sm:min-h-8 text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
                     >
                       Use {userEmail}
                     </button>
@@ -334,7 +334,7 @@ export function FeedbackForm({ userEmail }: Props) {
                 </div>
               )
             ) : (
-              <p className="text-xs text-ink-faint">
+              <p className="text-sm text-ink-faint">
                 Your feedback will be anonymous — we won&apos;t be able to
                 follow up.
               </p>
@@ -358,12 +358,12 @@ export function FeedbackForm({ userEmail }: Props) {
               placeholder="your@email.com"
               className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <p className="mt-1.5 text-xs text-ink-faint">
+            <p className="mt-1.5 text-sm text-ink-faint">
               Without an email, we can&apos;t follow up — but we still read
               every submission.
             </p>
             {email ? (
-              <p className="mt-1 flex items-center gap-1 text-xs text-accent">
+              <p className="mt-1 flex items-center gap-1 text-sm text-accent">
                 <svg
                   className="h-3.5 w-3.5"
                   fill="none"
@@ -380,7 +380,7 @@ export function FeedbackForm({ userEmail }: Props) {
                 You&apos;ll hear back from us.
               </p>
             ) : (
-              <p className="mt-1 text-xs text-ink-faint">
+              <p className="mt-1 text-sm text-ink-faint">
                 Anonymous — no reply possible.
               </p>
             )}
@@ -399,7 +399,7 @@ export function FeedbackForm({ userEmail }: Props) {
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex min-h-[44px] w-full items-center justify-center rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-11 sm:min-h-9 w-full items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Sending...' : 'Submit feedback'}
       </button>

@@ -267,7 +267,7 @@ export function SearchResults() {
             <button
               key={type}
               onClick={() => toggleType(type)}
-              className={`inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-wider transition ${
+              className={`inline-flex min-h-11 sm:min-h-8 items-center rounded-full border px-3 py-1 text-xs font-medium capitalize transition ${
                 activeTypes.has(type)
                   ? 'border-ink bg-ink text-paper'
                   : 'border-rule bg-paper-soft text-ink-muted hover:border-ink/40'
@@ -281,7 +281,7 @@ export function SearchResults() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortOption)}
-              className="min-h-[36px] rounded-md border border-rule bg-paper px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted focus:border-accent focus:outline-none"
+              className="min-h-11 sm:min-h-8 rounded-md border border-rule bg-paper px-2 py-1 text-sm font-medium text-ink-muted focus:border-accent focus:outline-none"
               aria-label="Sort results"
             >
               {SORT_OPTIONS.map((opt) => (
@@ -320,12 +320,12 @@ export function SearchResults() {
           </p>
           <Link
             href="/browse"
-            className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+            className="mt-5 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
           >
             Browse all
           </Link>
           {debouncedQuery.length <= 3 ? (
-            <p className="mt-3 text-xs text-ink-faint">
+            <p className="mt-3 text-sm text-ink-faint">
               Try a longer search term for better results.
             </p>
           ) : null}
@@ -334,7 +334,7 @@ export function SearchResults() {
 
       {/* users-empty branch when shares matched (E5, W-FIX-8) */}
       {showNoUsersLine && hasSharesResults ? (
-        <p className="mt-3 text-xs text-ink-faint">
+        <p className="mt-3 text-sm text-ink-faint">
           No people matched &lsquo;{debouncedQuery}&rsquo;.
         </p>
       ) : null}
@@ -344,7 +344,7 @@ export function SearchResults() {
         <div className="mt-8 text-center">
           <button
             onClick={handleLoadMore}
-            className="inline-flex min-h-[44px] items-center justify-center text-sm font-medium text-accent transition hover:opacity-80"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center text-sm font-medium text-accent transition hover:opacity-80"
           >
             Show more results
           </button>
@@ -366,7 +366,7 @@ function SearchError({ onRetry }: { onRetry: () => void }) {
       <button
         type="button"
         onClick={onRetry}
-        className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+        className="mt-5 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
       >
         Try again
       </button>
@@ -424,7 +424,7 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
       <p className="mt-8 text-center">
         <Link
           href="/browse"
-          className="inline-flex min-h-[44px] items-center text-sm font-medium text-accent transition hover:opacity-80"
+          className="inline-flex min-h-11 sm:min-h-9 items-center text-sm font-medium text-accent transition hover:opacity-80"
         >
           Browse all {total_published >= 5 ? `${total_published} ` : ''}collections &rarr;
         </Link>

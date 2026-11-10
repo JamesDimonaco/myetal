@@ -179,7 +179,7 @@ export function ShowTourButton({ className }: ShowTourButtonProps) {
       onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
       className={
         className ??
-        'text-xs text-ink-muted underline-offset-4 transition hover:text-ink hover:underline'
+        'inline-flex min-h-11 items-center sm:min-h-8 text-xs text-ink-muted underline-offset-4 transition hover:text-ink hover:underline'
       }
     >
       Show tour

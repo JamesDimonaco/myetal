@@ -54,7 +54,7 @@ export function VerifyEmailRunner() {
 
   return (
     <div className="mt-8">
-      <p className="text-xs uppercase tracking-widest text-danger">
+      <p className="text-sm text-danger">
         Verification failed
       </p>
       <h1 className="mt-3 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
@@ -62,7 +62,7 @@ export function VerifyEmailRunner() {
       </h1>
       <a
         href="/sign-in"
-        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-2 text-sm font-medium text-ink hover:border-ink/40"
+        className="mt-6 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-ink/20 px-5 py-2 sm:py-1.5 text-sm font-medium text-ink hover:border-ink/40"
       >
         Back to sign in
       </a>

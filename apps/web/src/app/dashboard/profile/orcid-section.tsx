@@ -160,7 +160,7 @@ export function OrcidSection({ initialOrcidId }: Props) {
 
         <form onSubmit={handleSave} className="mt-4 grid gap-2">
           <label className="grid gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+            <span className="text-sm font-medium text-ink">
               Your ORCID iD
             </span>
             <input
@@ -185,7 +185,7 @@ export function OrcidSection({ initialOrcidId }: Props) {
             />
           </label>
 
-          <p className="text-xs text-ink-muted">
+          <p className="text-sm text-ink-muted">
             <a
               href="https://orcid.org"
               target="_blank"
@@ -212,7 +212,7 @@ export function OrcidSection({ initialOrcidId }: Props) {
                 <button
                   type="submit"
                   disabled={submitting || !formatValid}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
                 >
                   {submitting ? 'Saving…' : 'Save'}
                 </button>
@@ -221,7 +221,7 @@ export function OrcidSection({ initialOrcidId }: Props) {
                   type="button"
                   onClick={handleRemove}
                   disabled={submitting}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
                 >
                   {submitting ? 'Removing…' : 'Remove'}
                 </button>

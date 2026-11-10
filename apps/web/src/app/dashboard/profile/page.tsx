@@ -37,7 +37,7 @@ export default async function ProfilePage() {
         <section>
           <dl className="grid gap-4 sm:grid-cols-2">
             <div>
-              <dt className="text-xs uppercase tracking-wider text-ink-muted">
+              <dt className="text-sm font-medium text-ink">
                 Name
               </dt>
               <dd className="mt-1 text-base text-ink">
@@ -45,7 +45,7 @@ export default async function ProfilePage() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wider text-ink-muted">
+              <dt className="text-sm font-medium text-ink">
                 Email
               </dt>
               <dd className="mt-1 text-base text-ink">
