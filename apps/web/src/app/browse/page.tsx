@@ -19,6 +19,7 @@ import type {
   UserPublicOut,
 } from '@/types/share';
 import type { UserResponse } from '@/types/auth';
+import { SectionHeading } from '@/components/ui/page-header';
 
 /**
  * Public discovery page (PR-B §4 + §5). Anonymous-readable — no /sign-in
@@ -218,20 +219,20 @@ function SearchBox({ initialQuery }: { initialQuery: string }) {
         type="search"
         name="q"
         defaultValue={initialQuery}
-        placeholder="Search collections and researchers"
+        placeholder="Search collections or people"
         autoComplete="off"
-        className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none transition focus:border-ink"
+        className="min-h-11 min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink outline-none transition focus:border-ink sm:min-h-9 sm:py-1.5 sm:text-sm"
       />
       <button
         type="submit"
-        className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90"
+        className="inline-flex min-h-11 items-center rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90 sm:min-h-9 sm:py-1.5"
       >
         Search
       </button>
       {initialQuery ? (
         <Link
           href="/browse"
-          className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+          className="inline-flex min-h-11 items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft sm:min-h-9 sm:py-1.5"
         >
           Clear
         </Link>
@@ -260,7 +261,7 @@ function SearchResultsView({
   return (
     <section>
       <header>
-        <h1 className="font-serif text-2xl tracking-tight text-ink sm:text-3xl">
+        <h1 className="font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
           Results for &ldquo;{query}&rdquo;
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
@@ -274,7 +275,7 @@ function SearchResultsView({
 
       {hasUsers ? (
         <div className="mt-8">
-          <h2 className="font-serif text-lg text-ink">Researchers</h2>
+          <SectionHeading>Researchers</SectionHeading>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {users.map((u) => (
               <SearchUserCard key={u.id} user={u} />
@@ -285,7 +286,7 @@ function SearchResultsView({
 
       {hasShares ? (
         <div className="mt-8">
-          <h2 className="font-serif text-lg text-ink">Collections</h2>
+          <SectionHeading>Collections</SectionHeading>
           <div className="mt-3 grid gap-4">
             {shares.map((s) => (
               <SearchShareCard key={s.short_code} result={s} />
@@ -468,7 +469,7 @@ function OwnerFilterBar({
       </span>
       <Link
         href="/browse"
-        className="ml-auto text-xs text-ink-muted transition hover:text-ink"
+        className="inline-flex min-h-11 items-center sm:min-h-8 ml-auto text-xs text-ink-muted transition hover:text-ink"
       >
         Show all
       </Link>
@@ -491,9 +492,9 @@ function DefaultBrowse({
     <div className="mt-8">
       {showTrending ? (
         <section>
-          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+          <SectionHeading>
             Trending this week
-          </h2>
+          </SectionHeading>
           <div role="list" className="mt-2">
             {trending.map((item) => (
               <ShareCard key={item.short_code} result={item} showViews />
@@ -503,9 +504,9 @@ function DefaultBrowse({
       ) : null}
 
       <section className={showTrending ? 'mt-12' : ''}>
-        <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+        <SectionHeading>
           Recently published
-        </h2>
+        </SectionHeading>
         <div role="list" className="mt-2">
           {recent.map((item) => (
             <ShareCard key={item.short_code} result={item} />
@@ -581,7 +582,7 @@ function FilterSummary({
           {tagList.map((slug, i) => (
             <span
               key={slug}
-              className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink"
+              className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium text-ink"
             >
               {/* Use the real label for the first chip when known. */}
               {i === 0 && activeTagLabel ? activeTagLabel : prettifySlug(slug)}
@@ -591,7 +592,7 @@ function FilterSummary({
       ) : null}
       <Link
         href="/browse"
-        className="ml-auto text-xs text-accent transition hover:opacity-80"
+        className="inline-flex min-h-11 items-center sm:min-h-8 ml-auto text-xs text-accent transition hover:opacity-80"
       >
         Clear filters
       </Link>
@@ -615,7 +616,7 @@ function EmptyAppState() {
       </p>
       <Link
         href="/sign-up"
-        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+        className="mt-6 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
       >
         Sign up
       </Link>
@@ -675,7 +676,7 @@ function OwnerNotFound() {
       </p>
       <Link
         href="/browse"
-        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+        className="mt-6 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
       >
         Browse all collections
       </Link>

@@ -5,6 +5,9 @@ import { OrcidIcon } from '@/components/orcid-icon';
 import { ShareCard } from '@/components/share-card';
 import { UserAvatar } from '@/components/user-avatar';
 import type { BrowseResponse } from '@/types/share';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
 
 /**
  * Renders the body of ``/u/{slug}`` once a valid owner has been resolved.
@@ -56,7 +59,7 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
                 href={`https://orcid.org/${owner.orcid_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] items-center gap-1.5 underline-offset-2 transition hover:text-ink hover:underline"
+                className="inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 underline-offset-2 transition hover:text-ink hover:underline"
               >
                 <OrcidIcon size={16} />
                 {owner.orcid_id}
@@ -66,33 +69,35 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
         </div>
       </header>
 
-      <aside className="mt-10 rounded-lg border border-rule bg-paper-soft p-5">
-        <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:gap-6 sm:text-left">
-          <div>
-            <p className="font-serif text-lg text-ink">
-              One QR for everything published here
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Put it on your slides, poster corner, or business card — it
-              always points to the latest collections.
-            </p>
-            <p className="mt-2 break-all font-mono text-sm text-ink">
-              {displayUrl}
-            </p>
-            <div className="mt-4">
-              <CopyPageLink url={pageUrl} />
+      <Card asChild className="mt-10">
+        <aside>
+          <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:justify-between sm:gap-6 sm:text-left">
+            <div>
+              <p className="font-serif text-lg text-ink">
+                One QR for everything published here
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">
+                Put it on your slides, poster corner, or business card — it
+                always points to the latest collections.
+              </p>
+              <p className="mt-2 break-all font-mono text-sm text-ink">
+                {displayUrl}
+              </p>
+              <div className="mt-4">
+                <CopyPageLink url={pageUrl} />
+              </div>
             </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrUrl}
+              alt={`QR code for ${owner.name ?? 'this researcher'}'s page`}
+              width={144}
+              height={144}
+              className="h-36 w-36 shrink-0 rounded-md border border-rule bg-white p-2"
+            />
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrUrl}
-            alt={`QR code for ${owner.name ?? 'this researcher'}'s page`}
-            width={144}
-            height={144}
-            className="h-36 w-36 shrink-0 rounded-md border border-rule bg-white p-2"
-          />
-        </div>
-      </aside>
+        </aside>
+      </Card>
 
       <section className="mt-10">
         {shares.length === 0 ? (
@@ -100,31 +105,25 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
             // Owner-on-empty: friendly nudge + a clear path to fixing the
             // emptiness. Without this the owner sees an empty page about
             // themselves and has to navigate back to /dashboard manually.
-            <div className="rounded-lg border border-rule bg-paper-soft p-8 text-center">
-              <p className="text-sm text-ink-muted">
-                Nothing published here yet. Your researcher page lists every
-                share you publish — start with one.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                <Link
-                  href="/dashboard/share/new"
-                  className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-                >
-                  Create your first share
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-                >
-                  Back to dashboard
-                </Link>
-              </div>
-            </div>
+            <EmptyState
+              title="Nothing published here yet"
+              description="Your researcher page lists every share you publish. Start with one."
+              actions={
+                <>
+                  <Button asChild>
+                    <Link href="/dashboard/share/new">Create your first share</Link>
+                  </Button>
+                  <Button asChild variant="secondary">
+                    <Link href="/dashboard">Back to dashboard</Link>
+                  </Button>
+                </>
+              }
+            />
           ) : (
-            <p className="py-10 text-center text-sm text-ink-muted">
-              Nothing published yet — collections will appear here as soon as
-              they go live.
-            </p>
+            <EmptyState
+              title="Nothing published yet"
+              description="Collections will appear here as soon as they go live."
+            />
           )
         ) : (
           <>
@@ -135,13 +134,13 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
               <div className="mb-4 flex justify-end">
                 <Link
                   href="/dashboard/share/new"
-                  className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
                 >
                   + New share
                 </Link>
               </div>
             ) : null}
-            <div className="grid gap-4">
+            <div role="list" className="grid gap-4">
               {shares.map((share) => (
                 <ShareCard key={share.short_code} result={share} />
               ))}

@@ -9,6 +9,8 @@ import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 import type { BrowseResponse } from '@/types/share';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
 
 /**
  * Researcher page — one permanent URL + QR per researcher, for the business
@@ -156,26 +158,20 @@ export default async function ResearcherPage({ params }: PageProps) {
  */
 function SoftEmptyState() {
   return (
-    <div className="rounded-lg border border-rule bg-paper-soft p-8 text-center">
-      <h1 className="font-serif text-2xl text-ink">Nothing published here yet</h1>
-      <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-muted">
-        When collections are published, this page will list them — check back
-        soon, or explore what other researchers are sharing.
-      </p>
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/browse"
-          className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-        >
-          Browse collections
-        </Link>
-        <Link
-          href="/"
-          className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-        >
-          What is MyEtAl?
-        </Link>
-      </div>
-    </div>
+    <EmptyState
+      headingLevel="h1"
+      title="Nothing published here yet"
+      description="When collections are published, this page will list them. Check back soon, or explore what other researchers are sharing."
+      actions={
+        <>
+          <Button asChild>
+            <Link href="/browse">Browse collections</Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href="/">What is MyEtAl?</Link>
+          </Button>
+        </>
+      }
+    />
   );
 }

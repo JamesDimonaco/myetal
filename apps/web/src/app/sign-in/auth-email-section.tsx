@@ -94,7 +94,7 @@ export function AuthEmailSection({
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="mt-4 inline-flex min-h-[44px] items-center text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+        className="mt-4 inline-flex min-h-11 sm:min-h-9 items-center text-sm text-ink-muted underline-offset-2 hover:text-ink hover:underline"
       >
         Sign in with email
       </button>
@@ -111,7 +111,7 @@ export function AuthEmailSection({
             setTab('sign-in');
             setError(null);
           }}
-          className={`inline-flex min-h-[44px] items-center pb-2 transition ${
+          className={`inline-flex min-h-11 sm:min-h-9 items-center pb-2 transition ${
             tab === 'sign-in'
               ? 'border-b-2 border-ink font-medium text-ink'
               : 'text-ink-muted hover:text-ink'
@@ -125,7 +125,7 @@ export function AuthEmailSection({
             setTab('create-account');
             setError(null);
           }}
-          className={`inline-flex min-h-[44px] items-center pb-2 transition ${
+          className={`inline-flex min-h-11 sm:min-h-9 items-center pb-2 transition ${
             tab === 'create-account'
               ? 'border-b-2 border-ink font-medium text-ink'
               : 'text-ink-muted hover:text-ink'
@@ -139,7 +139,7 @@ export function AuthEmailSection({
       {tab === 'sign-in' && (
         <form onSubmit={handleSignIn} className="mt-5 grid gap-4">
           <label className="grid gap-1.5">
-            <span className="text-xs uppercase tracking-wider text-ink-muted">
+            <span className="text-sm font-medium text-ink">
               Email
             </span>
             <input
@@ -149,12 +149,12 @@ export function AuthEmailSection({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-11 sm:min-h-9 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent"
             />
           </label>
 
           <label className="grid gap-1.5">
-            <span className="text-xs uppercase tracking-wider text-ink-muted">
+            <span className="text-sm font-medium text-ink">
               Password
             </span>
             <input
@@ -165,7 +165,7 @@ export function AuthEmailSection({
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-11 sm:min-h-9 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent"
             />
           </label>
 
@@ -178,21 +178,21 @@ export function AuthEmailSection({
           <button
             type="submit"
             disabled={submitting}
-            className="mt-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+            className="mt-1 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
           >
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
 
-          <p className="text-xs text-ink-faint">
+          <p className="text-sm text-ink-faint">
             <a
               href="/forgot-password"
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline underline-offset-2"
             >
               Forgot your password?
             </a>
           </p>
 
-          <p className="text-xs text-ink-faint">
+          <p className="text-sm text-ink-faint">
             New here?{' '}
             <button
               type="button"
@@ -200,7 +200,7 @@ export function AuthEmailSection({
                 setTab('create-account');
                 setError(null);
               }}
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline underline-offset-2"
             >
               Create an account
             </button>
@@ -212,7 +212,7 @@ export function AuthEmailSection({
       {tab === 'create-account' && (
         <form onSubmit={handleCreateAccount} className="mt-5 grid gap-4">
           <label className="grid gap-1.5">
-            <span className="text-xs uppercase tracking-wider text-ink-muted">
+            <span className="text-sm font-medium text-ink">
               Name{' '}
               <span className="lowercase text-ink-faint">(optional)</span>
             </span>
@@ -222,12 +222,12 @@ export function AuthEmailSection({
               autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-11 sm:min-h-9 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent"
             />
           </label>
 
           <label className="grid gap-1.5">
-            <span className="text-xs uppercase tracking-wider text-ink-muted">
+            <span className="text-sm font-medium text-ink">
               Email
             </span>
             <input
@@ -237,12 +237,12 @@ export function AuthEmailSection({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-11 sm:min-h-9 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent"
             />
           </label>
 
           <label className="grid gap-1.5">
-            <span className="text-xs uppercase tracking-wider text-ink-muted">
+            <span className="text-sm font-medium text-ink">
               Password{' '}
               <span className="lowercase text-ink-faint">(8+ chars)</span>
             </span>
@@ -255,7 +255,7 @@ export function AuthEmailSection({
               maxLength={128}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="min-h-[44px] rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent"
+              className="min-h-11 sm:min-h-9 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent"
             />
           </label>
 
@@ -268,12 +268,12 @@ export function AuthEmailSection({
           <button
             type="submit"
             disabled={submitting}
-            className="mt-1 inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+            className="mt-1 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
           >
             {submitting ? 'Creating…' : 'Create account'}
           </button>
 
-          <p className="text-xs text-ink-faint">
+          <p className="text-sm text-ink-faint">
             Already have an account?{' '}
             <button
               type="button"
@@ -281,7 +281,7 @@ export function AuthEmailSection({
                 setTab('sign-in');
                 setError(null);
               }}
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline underline-offset-2"
             >
               Sign in
             </button>

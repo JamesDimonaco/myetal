@@ -40,7 +40,7 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
 
   if (submitted) {
     return (
-      <p className="text-xs text-ink-muted">
+      <p className="text-sm text-ink-muted">
         Report submitted. Thank you for helping keep MyEtAl safe.
       </p>
     );
@@ -50,7 +50,7 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-xs text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
+        className="inline-flex min-h-11 items-center sm:min-h-8 text-sm text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
       >
         Report this share
       </button>
@@ -63,7 +63,7 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
       <select
         value={reason}
         onChange={(e) => setReason(e.target.value as ShareReportReason)}
-        className="min-h-[44px] w-full rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink focus:border-accent focus:outline-none"
+        className="min-h-11 sm:min-h-9 w-full rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink focus:border-accent focus:outline-none"
       >
         {REASONS.map((r) => (
           <option key={r.value} value={r.value}>
@@ -79,19 +79,19 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
         rows={3}
         className="w-full rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
       />
-      {error ? <p className="text-xs text-danger">{error}</p> : null}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex min-h-[40px] items-center justify-center rounded-md bg-danger px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          className="inline-flex min-h-11 sm:min-h-8 items-center justify-center rounded-md bg-danger px-3 py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
         >
           {submitting ? 'Sending...' : 'Submit report'}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="inline-flex min-h-[40px] items-center justify-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40"
+          className="inline-flex min-h-11 sm:min-h-8 items-center justify-center rounded-md border border-ink/20 px-3 py-1.5 text-sm font-medium text-ink transition hover:border-ink/40"
         >
           Cancel
         </button>

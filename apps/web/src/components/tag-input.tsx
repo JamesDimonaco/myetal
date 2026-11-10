@@ -270,7 +270,7 @@ export function TagInput({
     <div ref={containerRef} className="relative grid gap-1">
       <div
         className={[
-          'flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-md border bg-paper px-2 py-1.5',
+          'flex min-h-11 sm:min-h-9 flex-wrap items-center gap-1.5 rounded-md border bg-paper px-2 py-1.5',
           atCap ? 'border-rule' : 'border-rule focus-within:border-accent',
           disabled ? 'opacity-60' : '',
         ].join(' ')}
@@ -281,7 +281,7 @@ export function TagInput({
         {value.map((slug, idx) => (
           <span
             key={slug}
-            className="inline-flex items-center gap-1 rounded-full border border-ink bg-ink px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-paper"
+            className="inline-flex items-center gap-1 rounded-full border border-ink bg-ink px-2.5 py-0.5 text-xs font-medium text-paper"
           >
             {labelFromSlug(slug)}
             <button
@@ -292,7 +292,7 @@ export function TagInput({
                 removeAt(idx);
               }}
               disabled={disabled}
-              className="-mr-0.5 rounded-full px-1 leading-none text-paper/80 transition hover:text-paper"
+              className="-mr-0.5 inline-flex min-h-11 items-center rounded-full px-1 leading-none sm:min-h-8 text-paper/80 transition hover:text-paper"
             >
               ×
             </button>
@@ -335,7 +335,7 @@ export function TagInput({
         />
       </div>
 
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-sm text-ink-faint">
         {atCap ? `${max} max — remove one to add another` : `${max} max`}
         {loading ? ' · searching…' : ''}
       </p>
@@ -348,7 +348,7 @@ export function TagInput({
         >
           {!trimmed && visibleSuggestions.length > 0 ? (
             <li
-              className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-ink-faint"
+              className="px-3 py-1.5 text-sm text-ink-muted"
               aria-hidden
             >
               Popular
@@ -375,7 +375,7 @@ export function TagInput({
                 ].join(' ')}
               >
                 <span className="truncate">{tag.label}</span>
-                <span className="flex-shrink-0 text-[10px] uppercase tracking-wider text-ink-faint">
+                <span className="flex-shrink-0 text-xs text-ink-faint">
                   {tag.usage_count}
                 </span>
               </li>
@@ -419,14 +419,14 @@ export function TagInput({
                   </span>
                 </span>
               </span>
-              <span className="flex-shrink-0 text-[10px] uppercase tracking-wider text-ink-faint">
+              <span className="flex-shrink-0 text-xs text-ink-faint">
                 New
               </span>
             </li>
           ) : null}
           {visibleSuggestions.length === 0 && !showCreateNew ? (
             <li
-              className="px-3 py-2.5 text-xs text-ink-faint"
+              className="px-3 py-2.5 text-sm text-ink-faint"
               aria-hidden
             >
               {trimmed

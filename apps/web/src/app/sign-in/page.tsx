@@ -66,7 +66,7 @@ export default async function SignInPage({
     >
       <Link
         href={fromShare ? `/c/${fromShare}` : '/'}
-        className="inline-flex min-h-[40px] items-center text-sm text-ink-muted hover:text-ink"
+        className="inline-flex min-h-11 sm:min-h-9 items-center text-sm text-ink-muted hover:text-ink"
       >
         &larr; {fromShare ? 'Back to the collection' : 'MyEtAl'}
       </Link>
@@ -91,7 +91,7 @@ export default async function SignInPage({
       <OAuthButtons returnTo={returnTo} highlightOrcid={fromShare !== null} />
 
       {/* --- Divider --- */}
-      <div className="mt-8 flex items-center gap-3 text-xs uppercase tracking-widest text-ink-faint">
+      <div className="mt-8 flex items-center gap-3 text-sm text-ink-muted">
         <span className="h-px flex-1 bg-rule" />
         <span>or sign in / sign up with email</span>
         <span className="h-px flex-1 bg-rule" />

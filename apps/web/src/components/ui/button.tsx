@@ -26,7 +26,7 @@ const buttonVariants = cva(
     'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium',
     'transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
     'focus-visible:ring-offset-2 focus-visible:ring-offset-paper',
-    'disabled:cursor-not-allowed disabled:opacity-50',
+    'disabled:cursor-not-allowed disabled:opacity-70',
   ),
   {
     variants: {
@@ -39,9 +39,9 @@ const buttonVariants = cva(
           'border border-danger/40 bg-danger text-paper hover:opacity-90',
       },
       size: {
-        sm: 'h-9 px-3',
-        md: 'h-10 px-4 py-2.5',
-        icon: 'h-8 w-8 -m-1',
+        sm: 'min-h-11 px-3 sm:min-h-8 sm:h-8',
+        md: 'min-h-11 px-4 py-2 sm:min-h-9 sm:h-9 sm:py-1.5',
+        icon: 'h-11 w-11 sm:h-8 sm:w-8 -m-1',
       },
     },
     defaultVariants: {

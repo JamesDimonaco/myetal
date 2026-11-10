@@ -10,7 +10,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { formatBytes, formatItemCount, formatRelativeTime } from './format';
+import { formatBytes, formatDayMonth, formatItemCount, formatRelativeTime } from './format';
 
 const NOW = new Date('2026-07-06T12:00:00.000Z');
 
@@ -109,5 +109,14 @@ describe('formatBytes', () => {
 
   it('caps at TB rather than inventing units', () => {
     expect(formatBytes(1024 ** 5)).toBe('1024 TB');
+  });
+});
+
+describe('formatDayMonth', () => {
+  // User-facing dates are DMY. The API sends a bare ISO date; it must not
+  // shift a day through the local timezone.
+  it('renders an ISO date as day then short month', () => {
+    expect(formatDayMonth('2026-10-12')).toBe('12 Oct');
+    expect(formatDayMonth('2026-01-01')).toBe('1 Jan');
   });
 });

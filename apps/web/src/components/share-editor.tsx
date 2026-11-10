@@ -17,9 +17,18 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import posthog from 'posthog-js';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -31,6 +40,7 @@ import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
 import { TagInput } from '@/components/tag-input';
 import { Button } from '@/components/ui/button';
+import { BackLink, PageHeader, SectionHeading } from '@/components/ui/page-header';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +66,9 @@ import type {
   ShareType,
 } from '@/types/share';
 import type { PaperOut } from '@/types/works';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { isWebUrl } from '@/lib/validate';
 
 const SHARE_TYPES: ShareType[] = [
   'paper',
@@ -68,22 +81,30 @@ const SHARE_TYPES: ShareType[] = [
 // Per-kind validation. Paper only requires title. Repo and link require both
 // title and a URL — that's what makes them useful as a destination. PDF items
 // require `file_url` (set by the upload flow before the item lands here).
+// The form is noValidate, so this stands in for the browser's type="url" check.
+const webUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((v) => v === '' || isWebUrl(v), 'Use a full link starting with https://')
+  .optional();
+
 const itemSchema = z
   .object({
     _key: z.string(),
     id: z.string().optional(),
     kind: z.enum(['paper', 'repo', 'link', 'pdf']),
     title: z.string().trim().min(1, 'Item title required').max(500),
-    scholar_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    scholar_url: webUrl,
     doi: z.string().trim().max(255).optional().or(z.literal('')),
     authors: z.string().trim().optional().or(z.literal('')),
     year: z
       .union([z.string().regex(/^\d{4}$/, '4-digit year'), z.literal('')])
       .optional(),
     notes: z.string().trim().optional().or(z.literal('')),
-    url: z.string().trim().max(2000).optional().or(z.literal('')),
+    url: webUrl,
     subtitle: z.string().trim().optional().or(z.literal('')),
-    image_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    image_url: webUrl,
     file_url: z.string().trim().max(2000).optional().or(z.literal('')),
     thumbnail_url: z.string().trim().max(2000).optional().or(z.literal('')),
     // nonnegative (not positive) — the empty-item placeholder defaults to 0
@@ -100,7 +121,7 @@ const itemSchema = z
       return Boolean(it.url && it.url.length > 0);
     },
     {
-      message: 'URL required for repo/link/pdf items',
+      message: 'Add a URL',
       path: ['url'],
     },
   );
@@ -111,6 +132,29 @@ const shareSchema = z.object({
   type: z.enum(['paper', 'collection', 'bundle', 'grant', 'project']),
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
+
+/** User-facing error per field for one item (first message wins). */
+function itemIssues(item: DraftItem): Record<string, string> {
+  const parsed = itemSchema.safeParse(item);
+  const out: Record<string, string> = {};
+  if (parsed.success) return out;
+  for (const issue of parsed.error.issues) {
+    const field = issue.path.join('.');
+    if (USER_EDITABLE_FIELDS.has(`items.*.${field}`) && !out[field]) out[field] = issue.message;
+  }
+  // PDF cards have no URL field, so a missing file shows on the title.
+  if (item.kind === 'pdf' && out.url) {
+    const noFile = 'This PDF has no file. Remove it and upload it again.';
+    out.title = out.title ? `${out.title}. ${noFile}` : noFile;
+    delete out.url;
+  }
+  return out;
+}
+
+const NO_ERRORS: Record<string, string> = {};
+
+/** Per-field errors for the item being rendered; read by ItemField. */
+const ItemErrorsContext = createContext<Record<string, string>>({});
 
 // Validation paths the user has a visible field for. Anything else
 // (file_size_bytes, file_mime, thumbnail_url, etc.) routes through the
@@ -298,6 +342,8 @@ interface Props {
    * popover. Ignored in edit mode (`initial` takes precedence).
    */
   initialPaper?: PaperOut;
+  /** Page title block, rendered under the (unsaved-changes-guarded) back link. */
+  header: { eyebrow?: ReactNode; title: ReactNode; description?: ReactNode };
 }
 
 /**
@@ -311,7 +357,7 @@ interface Props {
  * After a successful save we surface the QR via <QrModal>. Closing it bounces
  * back to /dashboard so the new share appears in the list.
  */
-export function ShareEditor({ initial, id, initialPaper }: Props) {
+export function ShareEditor({ initial, id, initialPaper, header }: Props) {
   const router = useRouter();
 
   // `effectiveId` mirrors `id` until an auto-save (W1 — PDF tab on a brand-new
@@ -364,6 +410,21 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     'post-save',
   );
   const [showAddItem, setShowAddItem] = useState(false);
+  // Quick-share: spins one item off into its own single-item share + QR,
+  // independent of the share being edited here. `quickSharePendingKey`
+  // tracks which row triggered the in-flight request, but gates every
+  // row's button while it's set (see handleQuickShare) — not just that
+  // row's — to avoid racing two concurrent quick-shares. `quickShareResult`
+  // holds the *new* share's short_code + name once created — deliberately
+  // separate from `savedShare`/`showQr`, which belong to the share this
+  // editor is actually editing.
+  const [quickSharePendingKey, setQuickSharePendingKey] = useState<
+    string | null
+  >(null);
+  const [quickShareResult, setQuickShareResult] = useState<{
+    shortCode: string;
+    name: string;
+  } | null>(null);
   // "More options" disclosure — description + tags fold away so the default
   // editor reads name → items → publish (conference-core simplification).
   // One-shot initializer off `initial` only: open when the share already
@@ -376,6 +437,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
   );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [checkedItemKeys, setCheckedItemKeys] = useState<Set<string>>(new Set());
   // Unsaved-changes guard. `isDirty` flips true the first time any tracked
   // form field changes after mount; flips back to false on successful save
   // or explicit discard. Used by both the beforeunload listener and the
@@ -451,6 +513,105 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     });
   };
 
+  /**
+   * Quick-share one item as its own single-item share (docs/tickets/to-do/
+   * quick-share-single-item.md). Reuses `create_share` + `publish_share`
+   * unchanged — no new backend route. Publish is NOT optional here (unlike
+   * the main save flow's Publish toggle): both the public viewer and the
+   * QR route 404 on a draft (published_at = NULL), so a quick-share that
+   * only created a draft would open a QR modal pointing at a broken image.
+   * If publish fails, the share still exists (owner can publish it later
+   * from the dashboard) — surfaced as a non-fatal toast, not a thrown error.
+   *
+   * Runs the item through the same `itemSchema` the main Save flow uses
+   * (not just a bare title check) — otherwise this can publish a repo/link
+   * item with no URL (schema requires one, this route didn't), or 422 on a
+   * mid-typing partial year with an opaque "Unprocessable Entity" toast
+   * (FastAPI's validation `detail` is an array; `clientApi` only surfaces
+   * string details, see `client-api.ts`).
+   *
+   * `quickSharePendingKey` gates every row's button, not just the clicked
+   * one — a second click on a different row while the first is in flight
+   * would otherwise let two creates race, with `quickShareResult` (single,
+   * not per-row) showing whichever resolves last regardless of which the
+   * user actually clicked. One in-flight quick-share at a time avoids that;
+   * the round-trip is short enough that this isn't a real limitation.
+   */
+  const handleQuickShare = async (item: DraftItem) => {
+    if (item.kind === 'pdf') return; // guarded in the UI too; belt and braces
+    const parsedItem = itemSchema.safeParse(item);
+    if (!parsedItem.success) {
+      toast.error(
+        parsedItem.error.issues[0]?.message ?? 'Fix this item before sharing it',
+      );
+      return;
+    }
+    const it = parsedItem.data;
+    setQuickSharePendingKey(item._key);
+    // Both flip only once creation actually succeeds — the event fires for
+    // "created, published or not" (worth seeing either way), never for a
+    // failed create (nothing happened, nothing to log).
+    let didCreate = false;
+    let didPublish = false;
+    try {
+      const payload: ShareCreateInput = {
+        name: it.title.slice(0, 200),
+        description: null,
+        // A repo/link mini-share labelled "paper" reads oddly on the public
+        // page and dashboard list (both render `share.type` verbatim) —
+        // `bundle` is the closest existing type for "single non-paper item".
+        type: it.kind === 'paper' ? 'paper' : 'bundle',
+        items: [
+          {
+            kind: it.kind,
+            title: it.title,
+            scholar_url: it.scholar_url ? it.scholar_url : null,
+            doi: it.doi ? it.doi : null,
+            authors: it.authors ? it.authors : null,
+            year: it.year ? Number(it.year) : null,
+            notes: it.notes ? it.notes : null,
+            url: it.url ? it.url : null,
+            subtitle: it.subtitle ? it.subtitle : null,
+            image_url: it.image_url ? it.image_url : null,
+          },
+        ],
+        tags: null,
+      };
+      let created = await createMutation.mutateAsync(payload);
+      didCreate = true;
+      try {
+        created = await clientApi<typeof created>(
+          `/shares/${created.id}/publish`,
+          { method: 'POST' },
+        );
+        didPublish = true;
+      } catch (publishErr) {
+        toast.error(
+          publishErr instanceof ApiError
+            ? `Created, but publishing failed — ${publishErr.detail}. Publish it from the dashboard to get a working QR.`
+            : "Created, but publishing failed — publish it from the dashboard to get a working QR.",
+        );
+        return;
+      }
+      setQuickShareResult({ shortCode: created.short_code, name: created.name });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Couldn't create share");
+    } finally {
+      // Fires whenever the share was actually created — published or not —
+      // since a created-but-unpublished share is exactly the case worth
+      // seeing, not just the happy path. Never fires on a failed create;
+      // nothing happened, nothing to log.
+      if (didCreate && posthog.__loaded) {
+        posthog.capture('quick_share_created', {
+          source_share_id: effectiveId ?? null,
+          item_kind: item.kind,
+          published: didPublish,
+        });
+      }
+      setQuickSharePendingKey(null);
+    }
+  };
+
   // dnd-kit sensors — pointer for mouse/touch, keyboard for accessibility.
   // PointerSensor's activation distance keeps the up/down icon buttons and
   // form inputs click-targets usable; a drag only kicks in once the cursor
@@ -479,6 +640,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     e.preventDefault();
     setError(null);
     setFieldErrors({});
+    setCheckedItemKeys(new Set());
 
     const parsed = shareSchema.safeParse({
       name,
@@ -505,18 +667,18 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         }
       }
       setFieldErrors(inline);
-      // Prefer surfacing a user-editable message (clear, actionable). Fall
-      // back to a generic banner only when every issue is on a hidden field
-      // — the previous code leaked raw Zod text in that case.
-      const firstInline = Object.values(inline)[0];
-      if (firstInline) {
-        setError(firstInline);
-      } else if (hidden.length > 0) {
+      if (Object.keys(inline).some((key) => key.startsWith('items.'))) {
+        setCheckedItemKeys(new Set(items.map((it) => it._key)));
+      }
+      // Inline errors render next to their fields, plus a summary by the
+      // save button; both are derived, so they clear as they're fixed. The
+      // banner is only for issues with no visible field.
+      if (Object.keys(inline).length === 0 && hidden.length > 0) {
         console.warn('[share-editor] hidden-field validation failed:', hidden);
         setError(
           "Something didn't validate. Try again, or remove and re-add the last item.",
         );
-      } else {
+      } else if (Object.keys(inline).length === 0) {
         setError('Invalid input');
       }
       // Description lives behind the "More options" fold — open it when a
@@ -524,9 +686,14 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       if (parsed.error.issues.some((issue) => issue.path[0] === 'description')) {
         setMoreOpen(true);
       }
-      // Scroll error into view so the user sees what went wrong.
+      // Take the user to the first bad field (or the message, if no field
+      // is marked). Focus also makes screen readers read its error.
       setTimeout(() => {
-        document.querySelector('[role="alert"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const target =
+          document.querySelector<HTMLElement>('form [aria-invalid="true"]') ??
+          document.querySelector<HTMLElement>('[role="alert"]:not(:empty)');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (target?.matches('input, textarea')) target.focus({ preventScroll: true });
       }, 50);
       return;
     }
@@ -701,8 +868,53 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     }
   };
 
+  // Errors clear as soon as the field is fixed, not on the next save.
+  const nameError = name.trim() ? null : fieldErrors['name'];
+  const itemsError = items.length > 0 ? null : fieldErrors['items'];
+  // Items that failed the last save re-validate live, so their errors follow
+  // reordering and clear the moment they're fixed. Items added since stay
+  // quiet until the next save.
+  const itemErrors = new Map(
+    items
+      .filter((it) => checkedItemKeys.has(it._key))
+      .map((it) => [it._key, itemIssues(it)] as const),
+  );
+  const problems = [
+    ...(nameError ? ['the name'] : []),
+    ...(itemsError ? ['the items list'] : []),
+    ...items.flatMap((it, idx) =>
+      Object.keys(itemErrors.get(it._key) ?? {}).length > 0 ? [`item ${idx + 1}`] : [],
+    ),
+  ];
+  const bannerError =
+    error ??
+    (problems.length > 0
+      ? `Check ${new Intl.ListFormat('en', { type: 'conjunction' }).format(problems)}, marked in red above.`
+      : null);
+
   return (
     <>
+      <PageHeader
+        {...header}
+        back={
+          <BackLink
+            href="/dashboard"
+            onClick={(e) => {
+              // Guard against silent loss of unsaved edits. The guard is
+              // intentionally NOT applied to the publish toggle, save
+              // submission, delete, or the post-save QR — only this
+              // explicit "leave the editor without saving" surface.
+              if (isDirty) {
+                e.preventDefault();
+                setPendingDiscardHref('/dashboard');
+              }
+            }}
+          >
+            Your shares
+          </BackLink>
+        }
+      />
+
       {/* Success toast — shown briefly after save */}
       {justSaved && !showQr ? (
         <div className="mb-4 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
@@ -713,7 +925,9 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         </div>
       ) : null}
 
-      <form onSubmit={handleSave} className="grid gap-6">
+      {/* noValidate: zod errors render inline next to each field instead of
+          the browser's own pop-ups. */}
+      <form onSubmit={handleSave} noValidate className="grid gap-6">
         {/* Name */}
         <Field label="Name" hint={`${name.length}/200`}>
           <input
@@ -723,19 +937,22 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             placeholder="e.g. My ASMS 2026 bundle"
             required
             maxLength={200}
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? 'share-name-error' : undefined}
             className={[
-              'min-h-[44px] rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
-              fieldErrors['name'] ? 'border-danger' : 'border-rule',
+              'min-h-11 sm:min-h-9 rounded-md border bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink outline-none focus:border-accent',
+              nameError ? 'border-danger' : 'border-rule',
             ].join(' ')}
           />
-          {fieldErrors['name'] ? (
-            <span className="text-xs text-danger">{fieldErrors['name']}</span>
-          ) : null}
+          {/* Always mounted so screen readers announce the message when it appears. */}
+          <span id="share-name-error" role="alert" className="text-sm text-danger empty:hidden">
+            {nameError}
+          </span>
         </Field>
 
         {/* Type pills */}
         <Field label="Type" hint="What kind of content is this?">
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
             {SHARE_TYPES.map((t) => {
               const active = shareType === t;
               return (
@@ -744,7 +961,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                   type="button"
                   onClick={() => setShareType(t)}
                   className={[
-                    'inline-flex min-h-[40px] items-center rounded-full border px-4 py-2 text-sm font-medium capitalize transition',
+                    'inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-full border px-4 py-2 sm:py-1.5 text-sm font-medium capitalize transition',
                     active
                       ? 'border-ink bg-ink text-paper'
                       : 'border-rule bg-paper text-ink hover:bg-paper-soft',
@@ -771,7 +988,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           ].join(' ')}
         >
           <div>
-            <p className="text-sm font-semibold text-ink">
+            <p id="publish-label" className="text-sm font-semibold text-ink">
               {publishedAt ? 'Published' : 'Publish to discovery'}
             </p>
             <p className="mt-1 text-sm text-ink-muted">
@@ -786,6 +1003,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             type="button"
             role="switch"
             aria-checked={publishedAt !== null}
+            aria-labelledby="publish-label"
             aria-busy={
               publishMutation.isPending || unpublishMutation.isPending
             }
@@ -837,7 +1055,8 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
               );
             }}
             className={[
-              'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60',
+              // after: widens the tap area to 44px without changing the look.
+              "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition after:absolute after:-inset-2.5 after:content-[''] disabled:cursor-not-allowed disabled:opacity-70",
               publishedAt ? 'bg-accent' : 'bg-ink-faint',
             ].join(' ')}
           >
@@ -853,10 +1072,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         {/* Quick-access QR button — edit mode only, lets you view the QR
             without re-saving. */}
         {!isNew && initial ? (
-          <div className="flex items-center gap-3 rounded-md border border-rule bg-paper-soft p-4">
+          <Card className="flex items-center gap-3">
             <div className="flex-1">
-              <p className="text-sm font-semibold text-ink">QR Code</p>
-              <p className="mt-0.5 text-xs text-ink-muted">
+              <p className="text-sm font-semibold text-ink">QR code</p>
+              <p className="mt-0.5 text-sm text-ink-muted">
                 View or share the QR code for this share.
               </p>
             </div>
@@ -867,63 +1086,68 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                 setQrMode('quick-access');
                 setShowQr(true);
               }}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Show QR
             </button>
-          </div>
+          </Card>
         ) : null}
 
         {/* Items */}
         <div>
           <div className="flex items-end justify-between">
             <div>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+              <SectionHeading>
                 Items
-              </h2>
-              <p className="mt-1 text-xs text-ink-faint">
-                {items.length} {items.length === 1 ? 'item' : 'items'} -- use the arrows to reorder
+              </SectionHeading>
+              <p className="mt-1 text-sm text-ink-faint">
+                {items.length} {items.length === 1 ? 'item' : 'items'}
+                {items.length > 1 ? '. Use the arrows to reorder.' : null}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowAddItem(true)}
-              className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              Add item
-            </button>
+            {/* Empty list: the empty state below has the only "Add item". */}
+            {items.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowAddItem(true)}
+                className="inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                Add item
+              </button>
+            ) : null}
           </div>
 
-          {fieldErrors['items'] ? (
-            <p className="mt-2 text-xs text-danger">{fieldErrors['items']}</p>
-          ) : null}
+          <p id="share-items-error" role="alert" className="mt-2 text-sm text-danger empty:hidden">
+            {itemsError}
+          </p>
 
           <div className="mt-3 grid gap-3">
             {items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-rule py-12 text-ink-muted">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <p className="text-sm font-medium text-ink">No items yet</p>
-                <p className="text-xs text-ink-faint">
-                  A bundle gathers papers, repos, and PDFs behind one QR. Start
-                  by adding an item.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowAddItem(true)}
-                  className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                    <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <EmptyState
+                icon={
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Add item
-                </button>
-              </div>
+                }
+                headingLevel="h3"
+                title="No items yet"
+                description="A bundle gathers papers, repos, and PDFs behind one QR. Start by adding an item."
+                actions={
+                  <Button
+                    aria-describedby={itemsError ? 'share-items-error' : undefined}
+                    onClick={() => setShowAddItem(true)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                      <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                    Add item
+                  </Button>
+                }
+              />
             ) : null}
 
             <DndContext
@@ -944,6 +1168,12 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
                     onMove={moveItem}
                     onRemove={removeItem}
                     onUpdate={updateItem}
+                    errors={itemErrors.get(it._key) ?? NO_ERRORS}
+                    onQuickShare={handleQuickShare}
+                    // Gates every row, not just the clicked one — see the
+                    // comment on handleQuickShare for why concurrent
+                    // quick-shares are disallowed rather than raced.
+                    quickSharePending={quickSharePendingKey !== null || submitting}
                   />
                 ))}
               </SortableContext>
@@ -963,7 +1193,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             onClick={() => setMoreOpen((open) => !open)}
             aria-expanded={moreOpen}
             aria-controls="share-more-options"
-            className="inline-flex min-h-[44px] items-center gap-2 justify-self-start text-sm font-medium text-ink-muted transition hover:text-ink"
+            className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 justify-self-start text-sm font-medium text-ink-muted transition hover:text-ink"
           >
             <svg
               width="12"
@@ -1008,60 +1238,45 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           </div>
         </div>
 
-        {error ? (
-          <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-4 py-3" role="alert">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="mt-0.5 flex-shrink-0 text-danger">
-              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <p className="text-sm text-danger">
-              {error}
-            </p>
-          </div>
-        ) : null}
+        <div role="alert" className="empty:hidden">
+          {bannerError ? (
+            <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 px-4 py-3">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="mt-0.5 flex-shrink-0 text-danger">
+                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M8 4.5v4M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <p className="text-sm text-danger">
+                {bannerError}
+              </p>
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6">
-          <Link
-            href="/dashboard"
-            onClick={(e) => {
-              // Guard against silent loss of unsaved edits. The guard is
-              // intentionally NOT applied to the publish toggle, save
-              // submission, delete, or the post-save QR — only this
-              // explicit "leave the editor without saving" surface.
-              if (isDirty) {
-                e.preventDefault();
-                setPendingDiscardHref('/dashboard');
-              }
-            }}
-            className="inline-flex min-h-[44px] items-center gap-1 text-sm text-ink-muted transition hover:text-ink"
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Back to dashboard
-          </Link>
-          <div className="flex flex-wrap gap-3">
-            {!isNew ? (
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(true)}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
-              >
-                Delete share
-              </button>
-            ) : null}
+          {/* Delete sits apart from Save so it isn't hit by mistake. */}
+          {!isNew ? (
             <button
-              type="submit"
-              disabled={submitting || !name.trim()}
-              className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-danger transition hover:bg-paper-soft"
             >
-              {submitting
-                ? 'Saving…'
-                : isNew
-                  ? 'Create share'
-                  : 'Save changes'}
+              Delete share
             </button>
-          </div>
+          ) : null}
+          <button
+            type="submit"
+            // Also disabled mid-quick-share: without this, Save can
+            // resolve first and open its own post-save QrModal while the
+            // quick-share modal is still pending, stacking two Dialogs.
+            disabled={submitting || quickSharePendingKey !== null}
+            className="ml-auto inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
+          >
+            {submitting
+              ? 'Saving…'
+              : isNew
+                ? 'Create share'
+                : 'Save changes'}
+          </button>
         </div>
       </form>
 
@@ -1096,6 +1311,20 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           onKeepEditing={
             qrMode === 'post-save' ? closeQrAndKeepEditing : undefined
           }
+        />
+      ) : null}
+
+      {/* Quick-share QR — a different share from the one being edited here,
+          so it gets its own modal instance, independent of savedShare/showQr.
+          Closing just dismisses; there's nowhere to navigate to. Gated on
+          `!showQr` as a second guard (alongside disabling Save while a
+          quick-share is pending, above) against stacking two Dialogs if
+          both resolve close together. */}
+      {quickShareResult && !showQr ? (
+        <QrModal
+          shortCode={quickShareResult.shortCode}
+          collectionName={quickShareResult.name}
+          onClose={() => setQuickShareResult(null)}
         />
       ) : null}
 
@@ -1136,7 +1365,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
       </Dialog>
 
       {/* Discard-changes guard — fires when the user clicks an in-editor
-          nav surface (today: "Back to dashboard") while `isDirty`. The
+          nav surface (today: the "Your shares" back link) while `isDirty`. The
           beforeunload listener covers tab close / refresh separately. */}
       <Dialog
         open={pendingDiscardHref !== null}
@@ -1190,6 +1419,9 @@ function SortableItemRow({
   onMove,
   onRemove,
   onUpdate,
+  errors,
+  onQuickShare,
+  quickSharePending,
 }: {
   item: DraftItem;
   idx: number;
@@ -1197,6 +1429,9 @@ function SortableItemRow({
   onMove: (key: string, direction: -1 | 1) => void;
   onRemove: (key: string) => void;
   onUpdate: (key: string, patch: Partial<DraftItem>) => void;
+  errors: Record<string, string>;
+  onQuickShare: (item: DraftItem) => void;
+  quickSharePending: boolean;
 }) {
   const {
     attributes,
@@ -1216,11 +1451,12 @@ function SortableItemRow({
   };
 
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
-      className="rounded-md border border-rule bg-paper-soft p-4"
+      className={Object.keys(errors).length > 0 ? 'border-danger' : undefined}
     >
+      <ItemErrorsContext.Provider value={errors}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {/* Drag handle — sm:flex hides on phones, where arrow buttons
@@ -1234,7 +1470,7 @@ function SortableItemRow({
           >
             <GripIcon />
           </button>
-          <span className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
+          <span className="text-xs font-semibold text-ink-muted">
             #{idx + 1}
           </span>
           <KindBadge kind={item.kind} />
@@ -1254,6 +1490,19 @@ function SortableItemRow({
           >
             <ArrowIcon direction="down" />
           </IconBtn>
+          {item.kind === 'pdf' ? null : (
+            // PDF items can't be quick-shared — ShareItemCreate rejects
+            // kind=pdf server-side (the file columns are server-managed,
+            // set only by the dedicated upload route), so cloning one here
+            // would just 422.
+            <IconBtn
+              label="Share this item"
+              disabled={quickSharePending}
+              onClick={() => onQuickShare(item)}
+            >
+              <QrIcon />
+            </IconBtn>
+          )}
           <IconBtn label="Remove item" onClick={() => onRemove(item._key)}>
             <TrashIcon />
           </IconBtn>
@@ -1274,6 +1523,7 @@ function SortableItemRow({
           <LinkFields item={item} onChange={(p) => onUpdate(item._key, p)} />
         )}
         <ItemField
+          field="notes"
           label="Notes"
           value={item.notes}
           onChange={(v) => onUpdate(item._key, { notes: v })}
@@ -1281,7 +1531,8 @@ function SortableItemRow({
           multiline
         />
       </div>
-    </div>
+      </ItemErrorsContext.Provider>
+    </Card>
   );
 }
 
@@ -1316,12 +1567,14 @@ function PaperFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
         placeholder="Paper title"
       />
       <ItemField
+        field="scholar_url"
         label="Scholar URL"
         value={item.scholar_url}
         onChange={(v) => onChange({ scholar_url: v })}
@@ -1330,12 +1583,14 @@ function PaperFields({
       />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <ItemField
+          field="doi"
           label="DOI"
           value={item.doi}
           onChange={(v) => onChange({ doi: v })}
           placeholder="10.1000/xyz123"
         />
         <ItemField
+          field="year"
           label="Year"
           value={item.year}
           onChange={(v) =>
@@ -1346,6 +1601,7 @@ function PaperFields({
         />
       </div>
       <ItemField
+        field="authors"
         label="Authors"
         value={item.authors}
         onChange={(v) => onChange({ authors: v })}
@@ -1365,12 +1621,14 @@ function RepoFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title (owner/repo)"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
         placeholder="owner/repo"
       />
       <ItemField
+        field="url"
         label="GitHub URL"
         value={item.url}
         onChange={(v) => onChange({ url: v })}
@@ -1378,12 +1636,14 @@ function RepoFields({
         type="url"
       />
       <ItemField
+        field="subtitle"
         label="Description"
         value={item.subtitle}
         onChange={(v) => onChange({ subtitle: v })}
         placeholder="One-liner from the repo's About"
       />
       <ItemField
+        field="image_url"
         label="Image URL"
         value={item.image_url}
         onChange={(v) => onChange({ image_url: v })}
@@ -1404,12 +1664,14 @@ function LinkFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
         placeholder="What is this?"
       />
       <ItemField
+        field="url"
         label="URL"
         value={item.url}
         onChange={(v) => onChange({ url: v })}
@@ -1417,12 +1679,14 @@ function LinkFields({
         type="url"
       />
       <ItemField
+        field="subtitle"
         label="Description"
         value={item.subtitle}
         onChange={(v) => onChange({ subtitle: v })}
         placeholder="Optional one-liner"
       />
       <ItemField
+        field="image_url"
         label="Image URL"
         value={item.image_url}
         onChange={(v) => onChange({ image_url: v })}
@@ -1436,7 +1700,7 @@ function LinkFields({
 function KindBadge({ kind }: { kind: ShareItemKind }) {
   if (kind === 'repo') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
         <GitHubIcon size={11} />
         Repo
       </span>
@@ -1444,20 +1708,20 @@ function KindBadge({ kind }: { kind: ShareItemKind }) {
   }
   if (kind === 'link') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
         Link
       </span>
     );
   }
   if (kind === 'pdf') {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+      <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
         PDF
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
+    <span className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper px-2 py-0.5 text-xs font-medium text-ink-muted">
       Paper
     </span>
   );
@@ -1476,6 +1740,7 @@ function PdfFields({
   return (
     <>
       <ItemField
+        field="title"
         label="Title"
         value={item.title}
         onChange={(v) => onChange({ title: v })}
@@ -1494,7 +1759,7 @@ function PdfFields({
             />
           ) : (
             <div className="flex h-20 w-16 flex-shrink-0 items-center justify-center rounded border border-rule bg-paper-soft text-ink-muted">
-              <span className="text-[9px] font-semibold uppercase">PDF</span>
+              <span className="text-xs font-semibold">PDF</span>
             </div>
           )}
           <div className="min-w-0 flex-1 text-xs text-ink-muted">
@@ -1531,11 +1796,11 @@ function Field({
   return (
     <label className="grid gap-1.5">
       <span className="flex items-baseline justify-between gap-2">
-        <span className="text-xs uppercase tracking-wider text-ink-muted">
+        <span className="text-sm font-medium text-ink">
           {label}
         </span>
         {hint ? (
-          <span className="text-[11px] tabular-nums text-ink-faint">
+          <span className="text-sm tabular-nums text-ink-faint">
             {hint}
           </span>
         ) : null}
@@ -1546,6 +1811,7 @@ function Field({
 }
 
 function ItemField({
+  field,
   label,
   value,
   onChange,
@@ -1554,6 +1820,7 @@ function ItemField({
   inputMode,
   multiline,
 }: {
+  field: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -1562,31 +1829,36 @@ function ItemField({
   inputMode?: 'numeric';
   multiline?: boolean;
 }) {
-  const sharedClass =
-    'rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent';
+  const error = useContext(ItemErrorsContext)[field];
+  const errorId = useId();
+  const controlProps = {
+    value,
+    placeholder,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': error ? errorId : undefined,
+    className: [
+      'min-h-11 rounded-md border bg-paper px-3 py-2 text-base text-ink outline-none focus:border-accent sm:min-h-9 sm:py-1.5 sm:text-sm',
+      error ? 'border-danger' : 'border-rule',
+    ].join(' '),
+  };
   return (
     <label className="grid gap-1">
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
-        {label}
-      </span>
+      <span className="text-sm font-medium text-ink">{label}</span>
       {multiline ? (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={2}
-          className={sharedClass}
-        />
+        <textarea {...controlProps} onChange={(e) => onChange(e.target.value)} rows={2} />
       ) : (
         <input
+          {...controlProps}
           type={type}
           inputMode={inputMode}
-          value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={sharedClass}
         />
       )}
+      {error ? (
+        <span id={errorId} className="text-sm text-danger">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -1608,7 +1880,7 @@ function IconBtn({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-10 w-10 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 sm:h-8 sm:w-8"
+      className="inline-flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
     >
       {children}
     </button>
@@ -1625,6 +1897,20 @@ function ArrowIcon({ direction }: { direction: 'up' | 'down' }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function QrIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <rect x="1.5" y="1.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="8.5" y="1.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="1.5" y="8.5" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="8.5" y="8.5" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="11" y="8.5" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="8.5" y="11" width="1.5" height="1.5" fill="currentColor" />
+      <rect x="11" y="11" width="1.5" height="1.5" fill="currentColor" />
     </svg>
   );
 }

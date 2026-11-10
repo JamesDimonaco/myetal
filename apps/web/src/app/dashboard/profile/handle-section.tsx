@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { API_BASE_URL, ApiError } from '@/lib/api';
 import { clientApi } from '@/lib/client-api';
 import type { UserResponse } from '@/types/auth';
+import { SectionHeading } from '@/components/ui/page-header';
+import { Card } from '@/components/ui/card';
 
 /**
  * Researcher-page handle entry — claims, changes, and clears the
@@ -285,130 +287,132 @@ export function HandleSection({ initialHandle }: Props) {
     !submitting;
 
   return (
-    <section className="mt-10 rounded-lg border border-rule bg-paper-soft p-6">
-      <header>
-        <h2 className="font-serif text-xl text-ink">Handle</h2>
-      </header>
-      <p className="mt-1 text-sm text-ink-muted">
-        A short, human-readable URL for your researcher page — like{' '}
-        <span className="font-mono">{siteUrl.replace(/^https?:\/\//, '')}/u/drsmith</span>.
-        Add it to your business card, slide deck, or email signature.
-      </p>
-      <p className="mt-1 text-xs text-ink-muted">
-        Lowercase letters, digits, <span className="font-mono">_</span> or{' '}
-        <span className="font-mono">-</span>. 3–30 characters. Your old{' '}
-        <span className="font-mono">/u/&lt;id&gt;</span> URL keeps working
-        regardless.
-      </p>
+    <Card asChild className="mt-8">
+      <section>
+        <header>
+          <SectionHeading>Handle</SectionHeading>
+        </header>
+        <p className="mt-1 text-sm text-ink-muted">
+          A short, human-readable URL for your researcher page — like{' '}
+          <span className="font-mono">{siteUrl.replace(/^https?:\/\//, '')}/u/drsmith</span>.
+          Add it to your business card, slide deck, or email signature.
+        </p>
+        <p className="mt-1 text-sm text-ink-muted">
+          Lowercase letters, digits, <span className="font-mono">_</span> or{' '}
+          <span className="font-mono">-</span>. 3–30 characters. Your old{' '}
+          <span className="font-mono">/u/&lt;id&gt;</span> URL keeps working
+          regardless.
+        </p>
 
-      {savedValue ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-sm">
-          <span className="text-ink-muted">Current:</span>
-          <a
-            href={`/u/${savedValue}`}
-            className="font-mono text-ink underline decoration-ink-faint underline-offset-2 hover:decoration-ink"
-          >
-            /u/{savedValue}
-          </a>
-        </div>
-      ) : (
-        <p className="mt-4 text-sm text-ink-faint">Not set.</p>
-      )}
+        {savedValue ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-sm">
+            <span className="text-ink-muted">Current:</span>
+            <a
+              href={`/u/${savedValue}`}
+              className="font-mono text-ink underline decoration-ink-faint underline-offset-2 hover:decoration-ink"
+            >
+              /u/{savedValue}
+            </a>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-ink-faint">Not set.</p>
+        )}
 
-      <form onSubmit={handleSubmit} className="mt-4 grid gap-2">
-        <label className="grid gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
-            Your handle
-          </span>
-          <div className="flex items-stretch overflow-hidden rounded-md border border-rule bg-paper focus-within:border-accent">
-            <span className="flex items-center bg-paper-soft px-3 font-mono text-sm text-ink-muted">
-              /u/
+        <form onSubmit={handleSubmit} className="mt-4 grid gap-2">
+          <label className="grid gap-1">
+            <span className="text-sm font-medium text-ink">
+              Your handle
             </span>
-            <input
-              type="text"
-              value={draft}
-              onChange={(e) => {
-                setDraft(e.target.value);
-                setServerError(null);
-                setJustSaved(false);
-              }}
-              placeholder="drsmith"
-              inputMode="text"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              maxLength={30}
-              aria-invalid={showFormatError || availability.state === 'taken'}
-              aria-describedby={
-                showFormatError
-                  ? 'handle-format-error'
-                  : serverError
-                    ? 'handle-server-error'
-                    : availability.state === 'taken'
-                      ? 'handle-availability'
-                      : undefined
-              }
-              className="w-full bg-paper px-3 py-2.5 font-mono text-base text-ink outline-none"
-            />
-          </div>
-        </label>
+            <div className="flex items-stretch overflow-hidden rounded-md border border-rule bg-paper focus-within:border-accent">
+              <span className="flex items-center bg-paper-soft px-3 font-mono text-sm text-ink-muted">
+                /u/
+              </span>
+              <input
+                type="text"
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  setServerError(null);
+                  setJustSaved(false);
+                }}
+                placeholder="drsmith"
+                inputMode="text"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={30}
+                aria-invalid={showFormatError || availability.state === 'taken'}
+                aria-describedby={
+                  showFormatError
+                    ? 'handle-format-error'
+                    : serverError
+                      ? 'handle-server-error'
+                      : availability.state === 'taken'
+                        ? 'handle-availability'
+                        : undefined
+                }
+                className="min-h-11 w-full bg-paper px-3 py-2 font-mono text-base text-ink outline-none sm:min-h-9 sm:py-1.5 sm:text-sm"
+              />
+            </div>
+          </label>
 
-        {showFormatError ? (
-          <p id="handle-format-error" className="text-sm text-danger" role="alert">
-            {formatError}
-          </p>
-        ) : null}
+          {showFormatError ? (
+            <p id="handle-format-error" className="text-sm text-danger" role="alert">
+              {formatError}
+            </p>
+          ) : null}
 
-        {availabilityHint && !showFormatError ? (
-          <p
-            id={availability.state === 'taken' ? 'handle-availability' : undefined}
-            className={[
-              'text-sm',
-              availability.state === 'taken'
-                ? 'text-danger'
-                : availability.state === 'available'
-                  ? 'text-ink'
-                  : 'text-ink-muted',
-            ].join(' ')}
-            role={availability.state === 'taken' ? 'alert' : undefined}
-          >
-            {availabilityHint}
-          </p>
-        ) : null}
+          {availabilityHint && !showFormatError ? (
+            <p
+              id={availability.state === 'taken' ? 'handle-availability' : undefined}
+              className={[
+                'text-sm',
+                availability.state === 'taken'
+                  ? 'text-danger'
+                  : availability.state === 'available'
+                    ? 'text-ink'
+                    : 'text-ink-muted',
+              ].join(' ')}
+              role={availability.state === 'taken' ? 'alert' : undefined}
+            >
+              {availabilityHint}
+            </p>
+          ) : null}
 
-        {serverError ? (
-          <p id="handle-server-error" className="text-sm text-danger" role="alert">
-            {serverError}
-          </p>
-        ) : null}
+          {serverError ? (
+            <p id="handle-server-error" className="text-sm text-danger" role="alert">
+              {serverError}
+            </p>
+          ) : null}
 
-        {justSaved && !serverError ? (
-          <p className="text-sm text-ink-muted">Saved.</p>
-        ) : null}
+          {justSaved && !serverError ? (
+            <p className="text-sm text-ink-muted">Saved.</p>
+          ) : null}
 
-        {buttonMode !== 'none' ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {buttonMode === 'save' ? (
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
-              >
-                {submitting ? 'Saving…' : 'Save'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleRemove}
-                disabled={submitting}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
-              >
-                {submitting ? 'Removing…' : 'Remove'}
-              </button>
-            )}
-          </div>
-        ) : null}
-      </form>
-    </section>
+          {buttonMode !== 'none' ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {buttonMode === 'save' ? (
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
+                >
+                  {submitting ? 'Saving…' : 'Save'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRemove}
+                  disabled={submitting}
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-70"
+                >
+                  {submitting ? 'Removing…' : 'Remove'}
+                </button>
+              )}
+            </div>
+          ) : null}
+        </form>
+      </section>
+    </Card>
   );
 }

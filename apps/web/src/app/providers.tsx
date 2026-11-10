@@ -51,7 +51,7 @@ export function Providers({ children }: { children: ReactNode }) {
             toast:
               'border border-rule bg-paper text-ink shadow-md rounded-md',
             title: 'text-sm font-medium text-ink',
-            description: 'text-xs text-ink-muted',
+            description: 'text-sm text-ink-muted',
             success: 'border-accent/30',
             error: 'border-danger/40',
           },
