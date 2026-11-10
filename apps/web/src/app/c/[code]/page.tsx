@@ -243,10 +243,10 @@ export default async function PublicSharePage({ params }: PageProps) {
           <h1 className="break-words font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
             {share.name}
           </h1>
-          {/* Gaps, not dot separators: dots dangle when a long name wraps. */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
-            {share.owner_name ? (
-              share.owner_id || share.owner_handle ? (
+          <p className="mt-3 text-sm text-ink-muted">
+          {share.owner_name ? (
+            <>
+              {share.owner_id || share.owner_handle ? (
                 <Link
                   href={`/u/${share.owner_handle ?? share.owner_id}`}
                   className="underline-offset-2 transition hover:text-ink hover:underline"
@@ -254,12 +254,15 @@ export default async function PublicSharePage({ params }: PageProps) {
                   by {share.owner_name}
                 </Link>
               ) : (
-                <span>by {share.owner_name}</span>
-              )
-            ) : null}
-            <span>Updated {formatRelativeTime(share.updated_at)}</span>
-            <span className="capitalize text-ink-faint">{share.type}</span>
-          </div>
+                <>by {share.owner_name}</>
+              )}
+              {' · '}
+            </>
+          ) : null}
+          Updated {formatRelativeTime(share.updated_at)}
+          {' · '}
+          <span className="capitalize">{share.type}</span>
+        </p>
           <div className="mt-4">
             <SaveButton
               shortCode={share.short_code}
@@ -392,17 +395,10 @@ export default async function PublicSharePage({ params }: PageProps) {
           <div className="mt-8 flex justify-center sm:justify-start">
             <EmailMeButton shortCode={share.short_code} />
           </div>
+          <div className="mt-6 flex justify-center sm:justify-start">
+            <ReportButton shortCode={share.short_code} />
+          </div>
         </aside>
-
-        <footer className="mt-16 space-y-4 border-t border-rule pt-8">
-          <ReportButton shortCode={share.short_code} />
-          <p className="text-sm text-ink-muted">
-            Built with{' '}
-            <Link href="/" className="underline underline-offset-2 hover:text-ink">
-              MyEtAl
-            </Link>
-          </p>
-        </footer>
 
         <ShareSignupBar
           shortCode={share.short_code}

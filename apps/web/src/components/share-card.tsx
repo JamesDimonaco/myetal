@@ -58,22 +58,18 @@ export function ShareCard({ result, showViews }: Props) {
         </p>
       ) : null}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
-        {result.owner_name ? <span>{result.owner_name}</span> : null}
-        <span className="rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium capitalize text-ink-muted">
-          {result.type}
-        </span>
-        <span>
-          {result.item_count} {result.item_count === 1 ? 'paper' : 'papers'}
-        </span>
-        {showViews && hasViews(result) && result.view_count != null ? (
-          <span>
-            {result.view_count} {result.view_count === 1 ? 'view' : 'views'}
-          </span>
-        ) : (
-          <span>{formatRelativeTime(result.published_at)}</span>
-        )}
-      </div>
+      <p className="mt-2 text-xs text-ink-faint">
+        {[
+          result.owner_name,
+          result.type.charAt(0).toUpperCase() + result.type.slice(1),
+          `${result.item_count} ${result.item_count === 1 ? 'paper' : 'papers'}`,
+          showViews && hasViews(result) && result.view_count != null
+            ? `${result.view_count} ${result.view_count === 1 ? 'view' : 'views'}`
+            : formatRelativeTime(result.published_at),
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </p>
 
       {previewText ? (
         <p className="mt-1.5 text-sm italic text-ink-faint">{previewText}</p>

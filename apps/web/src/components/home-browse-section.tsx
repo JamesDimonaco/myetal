@@ -96,7 +96,7 @@ export async function HomeBrowseSection() {
 
       {showTrending ? (
         <div className="mt-8">
-          <h3 className="text-base font-semibold text-ink">
+          <h3 className="text-lg font-semibold text-ink">
             Trending now
           </h3>
           <div role="list" className="mt-2">
@@ -108,7 +108,7 @@ export async function HomeBrowseSection() {
       ) : null}
 
       <div className={showTrending ? 'mt-10' : 'mt-8'}>
-        <h3 className="text-base font-semibold text-ink">
+        <h3 className="text-lg font-semibold text-ink">
           Recently published
         </h3>
         <div role="list" className="mt-2">

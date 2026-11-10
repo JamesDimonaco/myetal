@@ -9,11 +9,10 @@ export function SiteFooter() {
     <footer className="border-t border-rule">
       <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 px-6 py-4 sm:flex-row">
         <span className="text-sm text-ink-faint">&copy; 2026 MyEtAl</span>
-        {/* Phones: no dot separators (they dangle when the row wraps) and
-            44px-tall links. */}
+        {/* Phones: a 3-column grid of 44px-tall links, no dot separators. */}
         <nav
           aria-label="Footer"
-          className="flex flex-wrap items-center justify-center gap-x-4 text-sm text-ink-faint sm:gap-3 [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center sm:[&>a]:min-h-0 [&>span]:hidden sm:[&>span]:inline"
+          className="grid grid-cols-3 justify-items-center gap-x-4 text-sm sm:flex sm:flex-wrap sm:items-center text-ink-faint sm:gap-3 [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center sm:[&>a]:min-h-0 [&>span]:hidden sm:[&>span]:inline"
         >
           <Link
             href="/privacy"
