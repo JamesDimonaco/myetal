@@ -352,9 +352,7 @@ async def get_share_analytics(
         total_views=agg_row.total,
         views_last_7d=agg_row.last_7d,
         views_last_30d=agg_row.last_30d,
-        daily_views=fill_daily_views(
-            {str(r.date): r.count for r in daily_rows}, today=today
-        ),
+        daily_views=fill_daily_views({str(r.date): r.count for r in daily_rows}, today=today),
     )
 
 
