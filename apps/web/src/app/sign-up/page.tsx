@@ -19,7 +19,7 @@ export default function SignUpPage() {
       data-ph-no-capture
       className="mx-auto flex min-h-screen max-w-md flex-col px-4 py-8 sm:px-6 sm:py-16"
     >
-      <Link href="/" className="inline-flex min-h-[40px] items-center text-sm text-ink-muted hover:text-ink">
+      <Link href="/" className="inline-flex min-h-11 sm:min-h-9 items-center text-sm text-ink-muted hover:text-ink">
         &larr; MyEtAl
       </Link>
 
@@ -37,7 +37,7 @@ export default function SignUpPage() {
         Prefer Google, GitHub, or ORCID?{' '}
         <Link
           href="/sign-in"
-          className="text-ink underline-offset-2 hover:underline"
+          className="text-ink underline underline-offset-2"
         >
           Sign in here
         </Link>

@@ -4,7 +4,7 @@ import { HomeBrowseSection } from '@/components/home-browse-section';
 import { SavedSharesSection } from '@/components/saved-shares-section';
 import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
-import { UserAvatar } from '@/components/user-avatar';
+import { avatarLabel, UserAvatar } from '@/components/user-avatar';
 import { serverFetch } from '@/lib/server-api';
 import type { UserResponse } from '@/types/auth';
 
@@ -40,7 +40,7 @@ export default async function LandingPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8 sm:px-6 sm:py-16">
       <header className="flex items-center justify-between gap-3">
         <span className="font-serif text-xl tracking-tight text-ink">MyEtAl</span>
-        <nav className="flex items-center gap-3 text-sm sm:gap-6">
+        <nav aria-label="Main" className="flex items-center gap-3 text-sm sm:gap-6">
           {signedIn ? (
             <>
               {/* "Dashboard" hidden on mobile — avatar tap goes to profile,
@@ -55,8 +55,9 @@ export default async function LandingPage() {
               </Link>
               <Link
                 href="/dashboard/profile"
-                className="transition hover:opacity-80"
+                className="inline-flex h-11 w-11 items-center justify-center transition hover:opacity-80"
                 title={displayName ?? 'Profile'}
+                aria-label={avatarLabel(user!.name, 'profile')}
               >
                 <UserAvatar
                   name={user!.name}
@@ -70,13 +71,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/sign-in"
-                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
+                className="inline-flex min-h-11 sm:min-h-9 items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"
               >
                 Sign in
               </Link>
               <Link
                 href="/sign-in"
-                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 sm:min-h-9 items-center whitespace-nowrap rounded-md bg-ink px-3 text-paper transition hover:opacity-90"
               >
                 Get started
               </Link>
@@ -100,13 +101,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/dashboard"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
               >
                 Go to dashboard
               </Link>
               <Link
                 href="/dashboard/share/new"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-ink/20 px-5 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:border-ink/40"
               >
                 + New share
               </Link>
@@ -115,13 +116,13 @@ export default async function LandingPage() {
             <>
               <Link
                 href="/sign-in"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
               >
                 Sign in
               </Link>
               <Link
                 href="/demo"
-                className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-ink/20 px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-ink/20 px-5 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:border-ink/40"
               >
                 Try the demo
               </Link>

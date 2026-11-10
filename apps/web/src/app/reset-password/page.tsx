@@ -11,7 +11,7 @@ export default function ResetPasswordPage() {
       data-ph-no-capture
       className="mx-auto flex min-h-screen max-w-md flex-col px-4 py-8 sm:px-6 sm:py-16"
     >
-      <Link href="/sign-in" className="inline-flex min-h-[40px] items-center text-sm text-ink-muted hover:text-ink">
+      <Link href="/sign-in" className="inline-flex min-h-11 sm:min-h-9 items-center text-sm text-ink-muted hover:text-ink">
         &larr; Back to sign in
       </Link>
 

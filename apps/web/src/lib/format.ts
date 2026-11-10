@@ -31,6 +31,15 @@ export function formatRelativeTime(iso: string): string {
   return rtf.format(seconds < 0 ? value : -value, unit);
 }
 
+/** "2026-10-12" → "12 Oct". Formats in UTC so a bare date never shifts a day. */
+export function formatDayMonth(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
+
 export function formatItemCount(n: number): string {
   return `${n} ${n === 1 ? 'paper' : 'papers'}`;
 }

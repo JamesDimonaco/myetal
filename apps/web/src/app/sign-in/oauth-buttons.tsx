@@ -62,8 +62,8 @@ export function OAuthButtons({
       disabled={pending !== null}
       className={
         highlightOrcid
-          ? 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60'
-          : 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60'
+          ? 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70'
+          : 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70'
       }
     >
       <OrcidIcon size={18} />
@@ -76,7 +76,7 @@ export function OAuthButtons({
       type="button"
       onClick={() => startSocial('google')}
       disabled={pending !== null}
-      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70"
     >
       <GoogleIcon size={18} />
       {pending === 'google' ? 'Redirecting…' : 'Continue with Google'}
@@ -88,7 +88,7 @@ export function OAuthButtons({
       type="button"
       onClick={() => startSocial('github')}
       disabled={pending !== null}
-      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70"
     >
       <GitHubIcon size={18} />
       {pending === 'github' ? 'Redirecting…' : 'Continue with GitHub'}
@@ -99,12 +99,12 @@ export function OAuthButtons({
     return (
       <div className="mt-8 grid gap-3 sm:mt-10">
         {orcidButton}
-        <p className="text-xs text-ink-muted">
+        <p className="text-sm text-ink-muted">
           We&apos;ll import your publications from ORCID automatically.
         </p>
         {googleButton}
         {githubButton}
-        <p className="text-xs text-ink-muted">
+        <p className="text-sm text-ink-muted">
           Already signed up with Google or GitHub? Add your ORCID iD on your
           profile instead — signing in with ORCID will create a separate
           account.
@@ -118,7 +118,7 @@ export function OAuthButtons({
       {googleButton}
       {githubButton}
       {orcidButton}
-      <p className="text-xs text-ink-muted">
+      <p className="text-sm text-ink-muted">
         Already signed up with Google or GitHub? Add your ORCID iD on your
         profile instead — signing in with ORCID will create a separate
         account.

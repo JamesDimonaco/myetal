@@ -55,7 +55,7 @@ export function EmailMeButton({ shortCode }: { shortCode: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+        className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
       >
         <MailIcon />
         Email me this collection
@@ -79,17 +79,17 @@ export function EmailMeButton({ shortCode }: { shortCode: string }) {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@university.edu"
-        className="min-h-[44px] flex-1 rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+        className="min-h-11 sm:min-h-9 flex-1 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-base sm:text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
       />
       <button
         type="submit"
         disabled={submitting || !email.trim()}
-        className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+        className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
       >
         {submitting ? 'Sending…' : 'Send link'}
       </button>
       {error ? (
-        <p className="text-xs text-danger sm:w-full" role="alert">
+        <p className="text-sm text-danger sm:w-full" role="alert">
           {error}
         </p>
       ) : null}

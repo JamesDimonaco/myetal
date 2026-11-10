@@ -10,8 +10,8 @@
   --color-paper: #FAFAF7;
   --color-paper-soft: #F2F1EB;
   --color-ink: #1A1A1A;
-  --color-ink-muted: #6B6B66;
-  --color-ink-faint: #A3A39C;
+  --color-ink-muted: #4F4F4B;
+  --color-ink-faint: #666661;
   --color-rule: #E5E3DA;
   --color-accent: #0E4145;
   --color-accent-soft: #DCE9EA;
@@ -43,4 +43,16 @@ body {
 ::selection {
   background: var(--color-accent);
   color: var(--color-paper);
+}
+
+/*
+ * Touch tablets are wider than the `sm` breakpoint, so they get the 14px
+ * desktop input text. iOS Safari zooms in on focus for anything under 16px.
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
 }

@@ -39,6 +39,7 @@ from myetal_api.models import (
     Tag,
     User,
 )
+from myetal_api.services.share import fill_daily_views
 
 PAGE_SIZE = 50
 
@@ -399,12 +400,7 @@ async def get_share_detail(
         )
     ).all()
     by_date = {str(b.date): int(b.count) for b in bucket_rows}
-    daily_views_90d: list[dict[str, Any]] = []
-    today = now.date()
-    for offset in range(89, -1, -1):
-        d = today - timedelta(days=offset)
-        key = d.isoformat()
-        daily_views_90d.append({"date": key, "count": by_date.get(key, 0)})
+    daily_views_90d = [d.model_dump() for d in fill_daily_views(by_date, now.date(), days=90)]
 
     # Reports against this share
     report_rows = (

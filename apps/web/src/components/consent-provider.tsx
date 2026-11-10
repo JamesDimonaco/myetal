@@ -92,14 +92,14 @@ function CookieBanner({
           <button
             type="button"
             onClick={onDecline}
-            className="inline-flex min-h-[44px] items-center justify-center rounded border border-rule px-4 py-1.5 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded border border-rule px-4 py-1.5 text-sm text-ink-muted transition-colors hover:bg-paper-soft hover:text-ink"
           >
             Decline
           </button>
           <button
             type="button"
             onClick={onAccept}
-            className="inline-flex min-h-[44px] items-center justify-center rounded bg-accent px-4 py-1.5 text-sm text-paper transition-colors hover:bg-accent/90"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded bg-accent px-4 py-1.5 text-sm text-paper transition-colors hover:bg-accent/90"
           >
             Accept
           </button>

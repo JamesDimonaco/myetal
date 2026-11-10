@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import Date, cast, func, select, text, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -298,6 +298,15 @@ async def unpublish_share(db: AsyncSession, share: Share) -> Share:
     return share
 
 
+def fill_daily_views(by_date: dict[str, int], today: date, days: int = 30) -> list[DailyViewCount]:
+    """One entry per day for the last `days` days ending `today`, oldest
+    first, with no-view days as 0 — the chart needs a fixed axis."""
+    return [
+        DailyViewCount(date=d.isoformat(), count=by_date.get(d.isoformat(), 0))
+        for d in (today - timedelta(days=offset) for offset in range(days - 1, -1, -1))
+    ]
+
+
 async def get_share_analytics(
     db: AsyncSession,
     share_id: uuid.UUID,
@@ -323,18 +332,18 @@ async def get_share_analytics(
 
     agg_row = (await db.execute(agg_stmt)).one()
 
-    # Daily breakdown (last 30 days)
+    # Daily breakdown: the same 30 UTC calendar days the chart shows, so no
+    # bucket falls outside its axis whatever the DB session timezone is.
+    today = datetime.now(UTC).date()
+    utc_day = cast(func.timezone("UTC", ShareView.viewed_at), Date)
     daily_stmt = (
-        select(
-            cast(ShareView.viewed_at, Date).label("date"),
-            func.count().label("count"),
-        )
+        select(utc_day.label("date"), func.count().label("count"))
         .where(
             ShareView.share_id == share_id,
-            ShareView.viewed_at > now_expr - text("interval '30 days'"),
+            utc_day >= today - timedelta(days=29),
         )
-        .group_by(cast(ShareView.viewed_at, Date))
-        .order_by(cast(ShareView.viewed_at, Date))
+        .group_by(utc_day)
+        .order_by(utc_day)
     )
 
     daily_rows = (await db.execute(daily_stmt)).all()
@@ -343,7 +352,7 @@ async def get_share_analytics(
         total_views=agg_row.total,
         views_last_7d=agg_row.last_7d,
         views_last_30d=agg_row.last_30d,
-        daily_views=[DailyViewCount(date=str(r.date), count=r.count) for r in daily_rows],
+        daily_views=fill_daily_views({str(r.date): r.count for r in daily_rows}, today=today),
     )
 
 

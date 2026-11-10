@@ -6,6 +6,7 @@ import type { UserResponse } from '@/types/auth';
 import type { WorkResponse } from '@/types/works';
 
 import { LibraryList } from './library-list';
+import { PageHeader } from '@/components/ui/page-header';
 
 export const metadata = { title: 'Library' };
 export const dynamic = 'force-dynamic';
@@ -27,19 +28,12 @@ export default async function LibraryPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-3xl tracking-tight text-ink sm:text-4xl">
-            Your library
-          </h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            Papers you&apos;ve saved by DOI. Add papers here, then attach them
-            to shares.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Your library"
+        description="Papers you've saved by DOI. Add papers here, then attach them to shares."
+      />
 
-      <div className="mt-10">
+      <div>
         <LibraryList
           initialWorks={works}
           orcidId={user.orcid_id}

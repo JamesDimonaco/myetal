@@ -2,6 +2,12 @@
 
 import { useState } from 'react';
 
+/** Accessible name for an avatar button: the initials it shows, then its purpose. */
+export function avatarLabel(name: string | null, purpose: string): string {
+  if (!name?.trim()) return purpose.charAt(0).toUpperCase() + purpose.slice(1);
+  return `${getInitials(name)} ${purpose}`;
+}
+
 function getInitials(name: string | null): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
@@ -32,8 +38,10 @@ export function UserAvatar({
 
   const showImage = avatarUrl && !imgError;
 
+  // Decorative: every caller shows the name (or an aria-label) beside it.
   return (
     <span
+      aria-hidden="true"
       className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-rule ${
         showImage ? '' : 'bg-accent-soft text-accent'
       } ${className}`}
@@ -42,7 +50,7 @@ export function UserAvatar({
       {showImage ? (
         <img
           src={avatarUrl}
-          alt={name ?? 'User avatar'}
+          alt=""
           width={size}
           height={size}
           className="h-full w-full rounded-full object-cover"

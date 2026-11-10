@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { QrModal } from '@/components/qr-modal';
 import { TagChips } from '@/components/tag-chips';
@@ -16,6 +16,8 @@ import {
 import { ApiError } from '@/lib/api';
 import { useDeleteShare, useShares } from '@/lib/hooks/useShares';
 import type { ShareItemKind, ShareResponse } from '@/types/share';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 
 function kindSummary(items: ShareResponse['items']): string {
   if (items.length === 0) return '0 items';
@@ -102,12 +104,10 @@ interface Props {
 }
 
 /**
- * Interactive share list. Cards are clickable (navigate to editor); action
- * buttons are icon-only with tooltips and use stopPropagation so they don't
- * trigger navigation.
+ * Interactive share list. The whole card links to the editor via the title
+ * link; the icon-only action buttons sit above that link.
  */
 export function ShareList({ initialShares, libraryCount = 0 }: Props) {
-  const router = useRouter();
   const { data, refetch } = useShares(initialShares);
   const deleteShare = useDeleteShare();
 
@@ -116,8 +116,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleCopyLink = async (share: ShareResponse, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCopyLink = async (share: ShareResponse) => {
     const url = publicUrlFor(share.short_code);
     try {
       await navigator.clipboard.writeText(url);
@@ -136,6 +135,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
       ta.remove();
     }
     setCopiedId(share.id);
+    toast.success('Link copied');
     setTimeout(() => {
       setCopiedId((current) => (current === share.id ? null : current));
     }, 1800);
@@ -156,64 +156,50 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
     // E5 — every share is item-less (only drafts in flight). Surface a small
     // note instead of the generic empty state, so the user understands why
     // their dashboard looks empty even though they remember starting a share.
+    const createLink = (
+      <Button asChild>
+        <Link href="/dashboard/share/new">Create a share</Link>
+      </Button>
+    );
     if (hiddenDraftCount > 0) {
       return (
-        <div className="rounded-lg border border-rule bg-paper-soft p-12 text-center">
-          <h2 className="font-serif text-xl text-ink">No shares yet</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted">
-            Drafts in progress will appear here once you add an item.
-          </p>
-          <Link
-            href="/dashboard/share/new"
-            className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-          >
-            Create a share
-          </Link>
-        </div>
+        <EmptyState
+          title="No shares yet"
+          description="Drafts in progress will appear here once you add an item."
+          actions={createLink}
+        />
       );
     }
     // E3 — has papers but no shares. Different copy that nudges the user
     // toward the library-driven flow rather than starting from scratch.
     if (libraryCount > 0) {
       return (
-        <div className="rounded-lg border border-rule bg-paper-soft p-12 text-center">
-          <h2 className="font-serif text-xl text-ink">No shares yet</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted">
-            You have {libraryCount}{' '}
-            {libraryCount === 1 ? 'paper' : 'papers'} in your library. Click any
-            to add it to a new share — that&apos;s how you get a QR code.
-          </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/dashboard/library"
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-rule bg-paper px-5 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-            >
-              Open library
-            </Link>
-            <Link
-              href="/dashboard/share/new"
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-            >
-              Create a share
-            </Link>
-          </div>
-        </div>
+        <EmptyState
+          title="No shares yet"
+          description={
+            <>
+              You have {libraryCount} {libraryCount === 1 ? 'paper' : 'papers'} in your
+              library. Click any to add it to a new share — that&apos;s how you get a QR
+              code.
+            </>
+          }
+          actions={
+            <>
+              <Button asChild variant="secondary">
+                <Link href="/dashboard/library">Open library</Link>
+              </Button>
+              {createLink}
+            </>
+          }
+        />
       );
     }
     return (
-      <div className="rounded-lg border border-rule bg-paper-soft p-12 text-center">
-        <h2 className="font-serif text-xl text-ink">No shares yet</h2>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-ink-muted">
-          Create your first share to generate a QR for a poster, a slide, or
-          your CV page.
-        </p>
-        <Link
-          href="/dashboard/share/new"
-          className="mt-6 inline-flex min-h-[44px] items-center gap-2 rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
-        >
-          Create a share
-        </Link>
-      </div>
+      <EmptyState
+        title="No shares yet"
+        description="Create your first share to generate a QR for a poster, a slide, or your CV page."
+        actions={createLink}
+      />
     );
   }
 
@@ -250,91 +236,80 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
 
       <ul className="grid gap-4 sm:grid-cols-2">
         {shares.map((share) => (
-          <li
+          <Card
+            asChild
             key={share.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => router.push(`/dashboard/share/${share.id}`)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                router.push(`/dashboard/share/${share.id}`);
-              }
-            }}
-            className="flex cursor-pointer flex-col rounded-lg border border-rule bg-paper-soft p-5 transition hover:border-ink/30"
+            className="relative flex flex-col transition focus-within:border-ink/30 hover:border-ink/30"
           >
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+            <li>
+              <div className="flex-1">
+                <p className="font-mono text-xs tracking-wider text-ink-faint">
                   {share.short_code}
                 </p>
-                {share.published_at === null ? (
-                  <span className="inline-flex items-center rounded-full border border-rule bg-paper px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted">
-                    Unlisted
-                  </span>
+                {/* The title link covers the whole card (after:inset-0); the
+                    action buttons below sit above it via `relative`. */}
+                <h2 className="mt-2 break-words font-serif text-lg leading-snug text-ink">
+                  <Link
+                    href={`/dashboard/share/${share.id}`}
+                    className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent"
+                  >
+                    {share.name}
+                  </Link>
+                </h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  {kindSummary(share.items)}
+                  {' \u00b7\u00a0'}
+                  <span className="capitalize">{share.type}</span>
+                  {' \u00b7\u00a0'}
+                  {share.published_at !== null ? 'Published' : 'Unlisted'}
+                </p>
+                {share.tags && share.tags.length > 0 ? (
+                  <div className="relative mt-2">
+                    <TagChips tags={share.tags} max={2} linkPattern="browse" />
+                  </div>
                 ) : null}
               </div>
-              <h3 className="mt-2 break-words font-serif text-lg leading-snug text-ink">
-                {share.name}
-              </h3>
-              <p className="mt-1 text-sm text-ink-muted">
-                {kindSummary(share.items)}
-                {' · '}
-                <span className="capitalize">{share.type}</span>
-                {' · '}
-                {share.published_at !== null ? 'Published' : 'Unlisted'}
-              </p>
-              {share.tags && share.tags.length > 0 ? (
-                <div className="mt-2">
-                  <TagChips tags={share.tags} max={2} linkPattern="browse" />
-                </div>
-              ) : null}
-            </div>
 
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                title="Show QR"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setQrTarget(share);
-                }}
-                className={iconBtnClass}
-              >
-                <QrIcon />
-              </button>
-              <button
-                type="button"
-                title={copiedId === share.id ? 'Copied!' : 'Copy link'}
-                onClick={(e) => handleCopyLink(share, e)}
-                className={iconBtnClass}
-              >
-                {copiedId === share.id ? <CheckIcon /> : <ClipboardIcon />}
-              </button>
-              <a
-                href={`/c/${share.short_code}`}
-                target="_blank"
-                rel="noreferrer"
-                title="View share"
-                onClick={(e) => e.stopPropagation()}
-                className={iconBtnClass}
-              >
-                <ExternalLinkIcon />
-              </a>
-              <button
-                type="button"
-                title="Delete share"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteError(null);
-                  setDeleteTarget(share);
-                }}
-                className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md border border-rule bg-paper text-ink-muted transition hover:bg-paper-soft hover:text-danger sm:h-9 sm:w-9"
-              >
-                <TrashIcon />
-              </button>
-            </div>
-          </li>
+              <div className="relative mt-4 flex items-center gap-2">
+                <button
+                  type="button"
+                  title="Show QR"
+                  onClick={() => setQrTarget(share)}
+                  className={iconBtnClass}
+                >
+                  <QrIcon />
+                </button>
+                <button
+                  type="button"
+                  title={copiedId === share.id ? 'Copied!' : 'Copy link'}
+                  onClick={() => handleCopyLink(share)}
+                  className={iconBtnClass}
+                >
+                  {copiedId === share.id ? <CheckIcon /> : <ClipboardIcon />}
+                </button>
+                <a
+                  href={`/c/${share.short_code}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="View share"
+                  className={iconBtnClass}
+                >
+                  <ExternalLinkIcon />
+                </a>
+                <button
+                  type="button"
+                  title="Delete share"
+                  onClick={() => {
+                    setDeleteError(null);
+                    setDeleteTarget(share);
+                  }}
+                  className="ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md border border-rule bg-paper text-ink-muted transition hover:bg-paper-soft hover:text-danger sm:h-9 sm:w-9"
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            </li>
+          </Card>
         ))}
       </ul>
 

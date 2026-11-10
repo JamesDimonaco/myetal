@@ -47,14 +47,10 @@ export default async function NewSharePage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
-      <header className="mb-8">
-        <p className="text-xs uppercase tracking-widest text-ink-muted">New</p>
-        <h1 className="mt-1 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
-          {headline}
-        </h1>
-        <p className="mt-2 text-sm text-ink-muted">{lede}</p>
-      </header>
-      <ShareEditor initialPaper={initialPaper} />
+      <ShareEditor
+        initialPaper={initialPaper}
+        header={{ title: headline, description: lede }}
+      />
     </div>
   );
 }

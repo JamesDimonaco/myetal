@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { UserAvatar } from '@/components/user-avatar';
+import { avatarLabel, UserAvatar } from '@/components/user-avatar';
 import type { UserResponse } from '@/types/auth';
 
 /**
@@ -88,7 +88,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
 
         {/* Desktop nav — slim link row plus an avatar dropdown holding the
             account-scoped destinations and sign-out. Hidden on mobile. */}
-        <nav className="hidden items-center gap-6 text-sm sm:flex">
+        <nav aria-label="Main" className="hidden items-center gap-6 text-sm sm:flex">
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href} className={NAV_LINK_CLASS}>
               {link.label}
@@ -96,9 +96,9 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
           ))}
           <DropdownMenu>
             <DropdownMenuTrigger
-              aria-label="Account menu"
+              aria-label={avatarLabel(user.name, 'account menu')}
               title={user.name ?? user.email ?? 'Account'}
-              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full sm:h-9 sm:w-9 transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >
               <UserAvatar
                 name={user.name}
@@ -126,8 +126,9 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
         <div className="flex items-center gap-2 sm:hidden">
           <Link
             href="/dashboard/profile"
-            className="transition hover:opacity-80"
+            className="inline-flex h-11 w-11 items-center justify-center transition hover:opacity-80"
             title={user.name ?? user.email ?? 'Profile'}
+            aria-label={avatarLabel(user.name, 'profile')}
           >
             <UserAvatar
               name={user.name}

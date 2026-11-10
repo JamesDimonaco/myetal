@@ -22,14 +22,16 @@ interface Props {
   className?: string;
 }
 
+// 32px pill; the invisible ::after stretches the tap area to 44px. Keep
+// row gaps >= 12px so tap areas on wrapped rows don't overlap.
 const chipClass =
-  'inline-flex min-h-[32px] items-center rounded-full border border-rule bg-paper-soft px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-ink-muted transition hover:border-ink/40 hover:text-ink';
+  "inline-flex min-h-8 relative after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] items-center rounded-full border border-rule bg-paper-soft px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink";
 
 const staticChipClass =
-  'inline-flex items-center rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-muted';
+  'inline-flex items-center rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium text-ink-muted';
 
 const moreClass =
-  'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-faint';
+  'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-ink-faint';
 
 /**
  * Renders a share's topical tags as small pill chips. Same look-and-feel as
@@ -49,7 +51,7 @@ export function TagChips({
   const shown = tags.slice(0, max);
   const overflow = tags.length - shown.length;
 
-  const wrapClass = ['flex flex-wrap items-center gap-1.5', className]
+  const wrapClass = ['flex flex-wrap items-center gap-x-1.5 gap-y-3', className]
     .filter(Boolean)
     .join(' ');
 

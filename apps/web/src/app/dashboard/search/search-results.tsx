@@ -14,6 +14,9 @@ import type {
   ShareType,
   UserPublicOut,
 } from '@/types/share';
+import { SectionHeading } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -78,7 +81,11 @@ export function SearchResults() {
   // E11 surface (PR-B): with `/browse` shipped, we keep the trending/recent
   // cards here as the "what's available" preview, but point users at the
   // dedicated browse page for filtering.
-  const { data: browseData } = useQuery({
+  const {
+    data: browseData,
+    isError: browseError,
+    refetch: refetchBrowse,
+  } = useQuery({
     queryKey: ['browse'],
     queryFn: () => clientApi<BrowseResponse>('/public/browse'),
     staleTime: 5 * 60_000,
@@ -97,7 +104,7 @@ export function SearchResults() {
     }
   }, [debouncedQuery]);
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['share-search', debouncedQuery, offset],
     queryFn: () =>
       clientApi<ShareSearchResponse>(
@@ -164,7 +171,7 @@ export function SearchResults() {
   // Read users from the page-0 snapshot, not the latest fetched page.
   const users = usersSnapshot;
   const showControls = allResults.length > 0;
-  const settled = enabled && !isLoading && !isFetching;
+  const settled = enabled && !isLoading && !isFetching && !isError;
   const hasSharesResults = allResults.length > 0;
   const hasUsersResults = users.length > 0;
   const showNoSharesLine = settled && !hasSharesResults;
@@ -199,21 +206,28 @@ export function SearchResults() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by title, author, or topic..."
           autoFocus
-          className="min-h-[48px] w-full rounded-md border border-rule bg-paper py-3 pl-10 pr-4 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none sm:text-lg"
+          className="min-h-11 w-full rounded-md border border-rule bg-paper py-2 pl-10 pr-4 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none sm:min-h-9 sm:py-1.5 sm:text-sm"
         />
       </div>
 
       {/* Browse sections — shown when query is empty (E11) */}
       {!enabled && browseData ? <BrowseSections data={browseData} /> : null}
+      {!enabled && browseError ? (
+        <SearchError onRetry={() => refetchBrowse()} />
+      ) : null}
+      {enabled && isError && !isFetching ? (
+        <SearchError onRetry={() => refetch()} />
+      ) : null}
 
       {/* Loading spinner */}
-      {(isLoading || isFetching) && enabled ? (
+      {((isLoading || isFetching) && enabled) ||
+      (!enabled && !browseData && !browseError) ? (
         <div className="mt-6 flex justify-center" aria-live="polite">
           <div
-            className="h-5 w-5 animate-spin rounded-full border-2 border-ink-faint border-t-ink"
+            className="h-5 w-5 animate-spin rounded-full border-2 border-rule border-t-ink"
             role="status"
           >
-            <span className="sr-only">Loading...</span>
+            <span className="sr-only">Loading…</span>
           </div>
         </div>
       ) : null}
@@ -237,9 +251,9 @@ export function SearchResults() {
           (separate empty state per result type, per E5). */}
       {enabled && hasUsersResults ? (
         <section className="mt-6">
-          <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
+          <SectionHeading>
             People matching &lsquo;{debouncedQuery}&rsquo;
-          </h2>
+          </SectionHeading>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {users.map((user) => (
               <UserCard key={user.id} user={user} />
@@ -255,7 +269,7 @@ export function SearchResults() {
             <button
               key={type}
               onClick={() => toggleType(type)}
-              className={`inline-flex min-h-[36px] items-center rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-wider transition ${
+              className={`inline-flex min-h-11 sm:min-h-8 items-center rounded-full border px-3 py-1 text-sm font-medium capitalize transition ${
                 activeTypes.has(type)
                   ? 'border-ink bg-ink text-paper'
                   : 'border-rule bg-paper-soft text-ink-muted hover:border-ink/40'
@@ -269,7 +283,7 @@ export function SearchResults() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortOption)}
-              className="min-h-[36px] rounded-md border border-rule bg-paper px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted focus:border-accent focus:outline-none"
+              className="min-h-11 sm:min-h-8 rounded-md border border-rule bg-paper px-2 py-1 text-sm font-medium text-ink-muted focus:border-accent focus:outline-none"
               aria-label="Sort results"
             >
               {SORT_OPTIONS.map((opt) => (
@@ -295,34 +309,27 @@ export function SearchResults() {
           Matches the mobile pattern (apps/mobile/app/search.tsx) so the two
           surfaces feel of-a-piece. (E5 / W-FIX-8.) */}
       {showCombinedFallback ? (
-        <div className="mt-10 text-center">
-          <h2 className="font-serif text-xl tracking-tight text-ink">
-            No matches
-          </h2>
-          <p className="mt-2 text-sm text-ink-muted">
-            No collections or people matched{' '}
-            <span className="font-medium text-ink">
-              &lsquo;{debouncedQuery}&rsquo;
-            </span>
-            .
-          </p>
-          <Link
-            href="/browse"
-            className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
-          >
-            Browse all
-          </Link>
-          {debouncedQuery.length <= 3 ? (
-            <p className="mt-3 text-xs text-ink-faint">
-              Try a longer search term for better results.
-            </p>
-          ) : null}
-        </div>
+        <EmptyState
+          className="mt-10"
+          title="No matches"
+          description={
+            <>
+              No collections or people matched{' '}
+              <span className="font-medium text-ink">&lsquo;{debouncedQuery}&rsquo;</span>.
+              {debouncedQuery.length <= 3 ? ' Try a longer search term.' : null}
+            </>
+          }
+          actions={
+            <Button asChild variant="secondary">
+              <Link href="/browse">Browse all</Link>
+            </Button>
+          }
+        />
       ) : null}
 
       {/* users-empty branch when shares matched (E5, W-FIX-8) */}
       {showNoUsersLine && hasSharesResults ? (
-        <p className="mt-3 text-xs text-ink-faint">
+        <p className="mt-3 text-sm text-ink-faint">
           No people matched &lsquo;{debouncedQuery}&rsquo;.
         </p>
       ) : null}
@@ -332,12 +339,28 @@ export function SearchResults() {
         <div className="mt-8 text-center">
           <button
             onClick={handleLoadMore}
-            className="inline-flex min-h-[44px] items-center justify-center text-sm font-medium text-accent transition hover:opacity-80"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center text-sm font-medium text-accent transition hover:opacity-80"
           >
             Show more results
           </button>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SearchError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="alert" className="mt-10">
+      <EmptyState
+        title="Search isn't working right now"
+        description="Something went wrong on our side. Your search is still in the box."
+        actions={
+          <Button variant="secondary" onClick={onRetry}>
+            Try again
+          </Button>
+        }
+      />
     </div>
   );
 }
@@ -365,23 +388,11 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
 
   return (
     <div className="mt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
-          Public collections — search above or
-        </h2>
-        <Link
-          href="/browse"
-          className="text-xs font-medium text-accent transition hover:opacity-80"
-        >
-          browse all &rarr;
-        </Link>
-      </div>
-
       {showTrending ? (
-        <div className="mt-4">
-          <h3 className="text-[10px] font-medium uppercase tracking-widest text-ink-faint">
+        <div>
+          <SectionHeading>
             Trending this week
-          </h3>
+          </SectionHeading>
           <div role="list" className="mt-2">
             {trending.map((item) => (
               <ShareCard key={item.short_code} result={item} showViews />
@@ -390,10 +401,10 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
         </div>
       ) : null}
 
-      <div className={showTrending ? 'mt-8' : 'mt-4'}>
-        <h3 className="text-[10px] font-medium uppercase tracking-widest text-ink-faint">
+      <div className={showTrending ? 'mt-8' : undefined}>
+        <SectionHeading>
           Recently published
-        </h3>
+        </SectionHeading>
         <div role="list" className="mt-2">
           {recent.map((item) => (
             <ShareCard key={item.short_code} result={item} />
@@ -401,11 +412,14 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
         </div>
       </div>
 
-      {total_published >= 5 ? (
-        <p className="mt-8 text-center text-sm text-ink-faint">
-          Browse {total_published} collections
-        </p>
-      ) : null}
+      <p className="mt-8 text-center">
+        <Link
+          href="/browse"
+          className="inline-flex min-h-11 sm:min-h-9 items-center text-sm font-medium text-accent transition hover:opacity-80"
+        >
+          Browse all {total_published >= 5 ? `${total_published} ` : ''}collections &rarr;
+        </Link>
+      </p>
     </div>
   );
 }
