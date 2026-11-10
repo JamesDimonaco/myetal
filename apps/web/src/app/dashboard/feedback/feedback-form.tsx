@@ -335,7 +335,7 @@ export function FeedbackForm({ userEmail }: Props) {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     aria-invalid={emailError ? true : undefined}
-                    aria-describedby="feedback-email-error"
+                    aria-describedby={emailError ? 'feedback-email-error' : undefined}
                     className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <p id="feedback-email-error" role="alert" className="mt-1 text-sm text-danger empty:hidden">
@@ -367,7 +367,7 @@ export function FeedbackForm({ userEmail }: Props) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               aria-invalid={emailError ? true : undefined}
-              aria-describedby="feedback-email-error"
+              aria-describedby={emailError ? 'feedback-email-error' : undefined}
               className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <p id="feedback-email-error" role="alert" className="mt-1 text-sm text-danger empty:hidden">

@@ -11,6 +11,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { TagChips } from '@/components/tag-chips';
 import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { formatItemCount, formatRelativeTime } from '@/lib/format';
+import { serializeJsonLd } from '@/lib/json-ld';
 import { lookupManyRepos, parseGithubUrl } from '@/lib/github';
 import { lookupManyOpenAccess } from '@/lib/openalex';
 import type { PublicShareResponse } from '@/types/share';
@@ -228,10 +229,9 @@ export default async function PublicSharePage({ params }: PageProps) {
   return (
     <>
       <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-14">
-        {/* eslint-disable-next-line react/no-danger -- JSON.stringify is XSS-safe */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
         <div className="text-sm text-ink-muted">
           <Link href="/" className="hover:text-ink">
