@@ -244,55 +244,55 @@ export default async function PublicSharePage({ params }: PageProps) {
             {share.name}
           </h1>
           <p className="mt-3 text-sm text-ink-muted">
-          {share.owner_name ? (
-            <>
-              {share.owner_id || share.owner_handle ? (
-                <Link
-                  href={`/u/${share.owner_handle ?? share.owner_id}`}
-                  className="underline-offset-2 transition hover:text-ink hover:underline"
-                >
-                  by {share.owner_name}
-                </Link>
-              ) : (
-                <>by {share.owner_name}</>
-              )}
-              {' · '}
-            </>
-          ) : null}
-          Updated {formatRelativeTime(share.updated_at)}
-          {' · '}
-          <span className="capitalize">{share.type}</span>
-        </p>
-          <div className="mt-4">
-            <SaveButton
-              shortCode={share.short_code}
-              name={share.name}
-              description={share.description ?? null}
-              type={share.type}
-              ownerName={share.owner_name ?? null}
-              itemCount={share.items.length}
-            />
-          </div>
-          {share.description ? (
-            <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>
-          ) : null}
-          {share.tags && share.tags.length > 0 ? (
+            {share.owner_name ? (
+              <>
+                {share.owner_id || share.owner_handle ? (
+                  <Link
+                    href={`/u/${share.owner_handle ?? share.owner_id}`}
+                    className="underline-offset-2 transition hover:text-ink hover:underline"
+                  >
+                    by {share.owner_name}
+                  </Link>
+                ) : (
+                  <>by {share.owner_name}</>
+                )}
+                {' \u00b7\u00a0'}
+              </>
+            ) : null}
+            Updated {formatRelativeTime(share.updated_at)}
+            {' \u00b7\u00a0'}
+            <span className="capitalize">{share.type}</span>
+          </p>
             <div className="mt-4">
-              {/* All tags shown on the detail view; each chip links to the
-                  /browse list filtered by that tag (PR-B route). */}
-              <TagChips
-                tags={share.tags}
-                max={share.tags.length}
-                linkPattern="browse"
+              <SaveButton
+                shortCode={share.short_code}
+                name={share.name}
+                description={share.description ?? null}
+                type={share.type}
+                ownerName={share.owner_name ?? null}
+                itemCount={share.items.length}
               />
             </div>
-          ) : null}
-        </header>
+            {share.description ? (
+              <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>
+            ) : null}
+            {share.tags && share.tags.length > 0 ? (
+              <div className="mt-4">
+                {/* All tags shown on the detail view; each chip links to the
+                    /browse list filtered by that tag (PR-B route). */}
+                <TagChips
+                  tags={share.tags}
+                  max={share.tags.length}
+                  linkPattern="browse"
+                />
+              </div>
+            ) : null}
+          </header>
 
-        <section className="mt-10">
-          {itemCount === 0 ? (
-            <p className="py-10 text-center text-sm text-ink-muted">
-              This collection is empty.
+          <section className="mt-10">
+            {itemCount === 0 ? (
+              <p className="py-10 text-center text-sm text-ink-muted">
+                This collection is empty.
             </p>
           ) : (
             share.items.map((item) => {

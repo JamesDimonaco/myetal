@@ -3,8 +3,8 @@ import { SiteFooter } from '@/components/site-footer';
 
 export default function ShareNotFound() {
   return (
-    <>
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-10 text-center">
+    <div className="flex min-h-screen flex-col">
+      <main className="mx-auto flex w-full flex-1 max-w-2xl flex-col items-center justify-center px-6 py-10 text-center">
         <p className="text-sm text-ink-muted">404</p>
         <h1 className="mt-4 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
           Collection not found
@@ -21,6 +21,6 @@ export default function ShareNotFound() {
         </Link>
       </main>
       <SiteFooter />
-    </>
+    </div>
   );
 }

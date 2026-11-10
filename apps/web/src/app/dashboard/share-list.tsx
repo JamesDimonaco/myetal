@@ -258,9 +258,9 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">
                   {kindSummary(share.items)}
-                  {' · '}
+                  {' \u00b7\u00a0'}
                   <span className="capitalize">{share.type}</span>
-                  {' · '}
+                  {' \u00b7\u00a0'}
                   {share.published_at !== null ? 'Published' : 'Unlisted'}
                 </p>
                 {share.tags && share.tags.length > 0 ? (

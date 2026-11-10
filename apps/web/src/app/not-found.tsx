@@ -3,8 +3,8 @@ import { SiteFooter } from '@/components/site-footer';
 
 export default function NotFound() {
   return (
-    <>
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
+    <div className="flex min-h-screen flex-col">
+      <main className="mx-auto flex w-full flex-1 max-w-2xl flex-col items-center justify-center px-4 py-10 text-center sm:px-6">
         <p className="text-sm text-ink-muted">404</p>
         <h1 className="mt-4 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
           Page not found
@@ -28,6 +28,6 @@ export default function NotFound() {
         </div>
       </main>
       <SiteFooter />
-    </>
+    </div>
   );
 }

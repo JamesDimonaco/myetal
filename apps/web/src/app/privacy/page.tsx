@@ -205,11 +205,6 @@ export default function PrivacyPage() {
           </section>
         </div>
 
-        <footer className="mt-16 text-xs text-ink-faint">
-          <Link href="/" className="underline-offset-2 hover:underline">
-            myetal.app
-          </Link>
-        </footer>
       </main>
       <SiteFooter />
     </>

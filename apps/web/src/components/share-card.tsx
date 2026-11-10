@@ -68,7 +68,7 @@ export function ShareCard({ result, showViews }: Props) {
             : formatRelativeTime(result.published_at),
         ]
           .filter(Boolean)
-          .join(' · ')}
+          .join(' \u00b7\u00a0')}
       </p>
 
       {previewText ? (
