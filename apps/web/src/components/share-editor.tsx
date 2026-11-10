@@ -701,6 +701,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
     }
   };
 
+  // Errors clear as soon as the field is fixed, not on the next save.
+  const nameError = name.trim() ? null : fieldErrors['name'];
+  const itemsError = items.length > 0 ? null : fieldErrors['items'];
+
   return (
     <>
       {/* Success toast — shown briefly after save */}
@@ -713,7 +717,9 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
         </div>
       ) : null}
 
-      <form onSubmit={handleSave} className="grid gap-6">
+      {/* noValidate: zod errors render inline next to each field instead of
+          the browser's own pop-ups. */}
+      <form onSubmit={handleSave} noValidate className="grid gap-6">
         {/* Name */}
         <Field label="Name" hint={`${name.length}/200`}>
           <input
@@ -723,13 +729,17 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             placeholder="e.g. My ASMS 2026 bundle"
             required
             maxLength={200}
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? 'share-name-error' : undefined}
             className={[
               'min-h-[44px] rounded-md border bg-paper px-3 py-2.5 text-base text-ink outline-none focus:border-accent',
-              fieldErrors['name'] ? 'border-danger' : 'border-rule',
+              nameError ? 'border-danger' : 'border-rule',
             ].join(' ')}
           />
-          {fieldErrors['name'] ? (
-            <span className="text-xs text-danger">{fieldErrors['name']}</span>
+          {nameError ? (
+            <span id="share-name-error" role="alert" className="text-sm text-danger">
+              {nameError}
+            </span>
           ) : null}
         </Field>
 
@@ -771,7 +781,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
           ].join(' ')}
         >
           <div>
-            <p className="text-sm font-semibold text-ink">
+            <p id="publish-label" className="text-sm font-semibold text-ink">
               {publishedAt ? 'Published' : 'Publish to discovery'}
             </p>
             <p className="mt-1 text-sm text-ink-muted">
@@ -786,6 +796,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             type="button"
             role="switch"
             aria-checked={publishedAt !== null}
+            aria-labelledby="publish-label"
             aria-busy={
               publishMutation.isPending || unpublishMutation.isPending
             }
@@ -897,8 +908,10 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             </button>
           </div>
 
-          {fieldErrors['items'] ? (
-            <p className="mt-2 text-xs text-danger">{fieldErrors['items']}</p>
+          {itemsError ? (
+            <p role="alert" className="mt-2 text-sm text-danger">
+              {itemsError}
+            </p>
           ) : null}
 
           <div className="mt-3 grid gap-3">
@@ -1052,7 +1065,7 @@ export function ShareEditor({ initial, id, initialPaper }: Props) {
             ) : null}
             <button
               type="submit"
-              disabled={submitting || !name.trim()}
+              disabled={submitting}
               className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
             >
               {submitting

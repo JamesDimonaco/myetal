@@ -37,7 +37,7 @@ export default function SignUpPage() {
         Prefer Google, GitHub, or ORCID?{' '}
         <Link
           href="/sign-in"
-          className="text-ink underline-offset-2 hover:underline"
+          className="text-ink underline underline-offset-2"
         >
           Sign in here
         </Link>

@@ -141,7 +141,7 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
                 </Link>
               </div>
             ) : null}
-            <div className="grid gap-4">
+            <div role="list" className="grid gap-4">
               {shares.map((share) => (
                 <ShareCard key={share.short_code} result={share} />
               ))}

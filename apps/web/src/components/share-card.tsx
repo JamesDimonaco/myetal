@@ -44,7 +44,7 @@ export function ShareCard({ result, showViews }: Props) {
   const previewText = previewTextFor(result);
 
   return (
-    <article role="listitem" className="border-b border-rule py-4">
+    <div role="listitem" className="border-b border-rule py-4">
       <Link
         href={`/c/${result.short_code}`}
         className="font-serif text-base text-ink underline decoration-transparent decoration-1 underline-offset-4 transition hover:decoration-ink"
@@ -84,6 +84,6 @@ export function ShareCard({ result, showViews }: Props) {
           <TagChips tags={result.tags} max={2} linkPattern="browse" />
         </div>
       ) : null}
-    </article>
+    </div>
   );
 }

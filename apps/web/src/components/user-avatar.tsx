@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-function getInitials(name: string | null): string {
+export function getInitials(name: string | null): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -32,8 +32,10 @@ export function UserAvatar({
 
   const showImage = avatarUrl && !imgError;
 
+  // Decorative: every caller shows the name (or an aria-label) beside it.
   return (
     <span
+      aria-hidden="true"
       className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-rule ${
         showImage ? '' : 'bg-accent-soft text-accent'
       } ${className}`}
@@ -42,7 +44,7 @@ export function UserAvatar({
       {showImage ? (
         <img
           src={avatarUrl}
-          alt={name ?? 'User avatar'}
+          alt=""
           width={size}
           height={size}
           className="h-full w-full rounded-full object-cover"

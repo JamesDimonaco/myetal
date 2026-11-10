@@ -51,7 +51,7 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-8">
-        <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+        <p className="font-mono text-xs tracking-wider text-ink-muted">
           /c/{share.short_code}
         </p>
         <h1 className="mt-1 font-serif text-3xl tracking-tight text-ink sm:text-4xl">
@@ -73,30 +73,38 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
           Daily views (last 30 days)
         </h2>
 
-        {analytics.daily_views.length === 0 ? (
+        {analytics.views_last_30d === 0 ? (
           <p className="mt-4 text-sm text-ink-muted">No views recorded yet.</p>
         ) : (
-          <div className="mt-4 flex items-end gap-[3px]" style={{ height: 160 }}>
-            {analytics.daily_views.map((d) => {
-              const heightPct = (d.count / maxCount) * 100;
-              return (
-                <div
-                  key={d.date}
-                  className="group relative flex-1"
-                  style={{ height: '100%' }}
-                >
+          <>
+            <div className="mt-4 flex items-end gap-[3px]" style={{ height: 160 }}>
+              {analytics.daily_views.map((d) => {
+                const heightPct = (d.count / maxCount) * 100;
+                return (
                   <div
-                    className="absolute bottom-0 w-full rounded-sm bg-ink/80 transition-colors group-hover:bg-accent"
-                    style={{ height: `${Math.max(heightPct, 2)}%` }}
-                  />
-                  {/* Tooltip */}
-                  <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded border border-rule bg-paper px-2 py-1 text-xs text-ink shadow group-hover:block">
-                    {d.date}: {d.count} view{d.count !== 1 ? 's' : ''}
+                    key={d.date}
+                    className="group relative flex-1"
+                    style={{ height: '100%' }}
+                  >
+                    <div
+                      className={`absolute bottom-0 w-full rounded-sm transition-colors group-hover:bg-accent ${
+                        d.count > 0 ? 'bg-ink/80' : 'bg-rule'
+                      }`}
+                      style={{ height: `${Math.max(heightPct, 2)}%` }}
+                    />
+                    {/* Tooltip */}
+                    <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded border border-rule bg-paper px-2 py-1 text-xs text-ink shadow group-hover:block">
+                      {d.date}: {d.count} view{d.count !== 1 ? 's' : ''}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex justify-between text-xs text-ink-muted">
+              <span>{analytics.daily_views[0]?.date}</span>
+              <span>Today</span>
+            </div>
+          </>
         )}
       </section>
 

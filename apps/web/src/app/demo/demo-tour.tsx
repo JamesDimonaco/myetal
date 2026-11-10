@@ -432,6 +432,7 @@ export function DemoTour() {
                     size={108}
                     level="M"
                     marginSize={0}
+                    title="QR code for this share"
                   />
                 </div>
               </div>

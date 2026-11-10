@@ -78,7 +78,11 @@ export function SearchResults() {
   // E11 surface (PR-B): with `/browse` shipped, we keep the trending/recent
   // cards here as the "what's available" preview, but point users at the
   // dedicated browse page for filtering.
-  const { data: browseData } = useQuery({
+  const {
+    data: browseData,
+    isError: browseError,
+    refetch: refetchBrowse,
+  } = useQuery({
     queryKey: ['browse'],
     queryFn: () => clientApi<BrowseResponse>('/public/browse'),
     staleTime: 5 * 60_000,
@@ -97,7 +101,7 @@ export function SearchResults() {
     }
   }, [debouncedQuery]);
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['share-search', debouncedQuery, offset],
     queryFn: () =>
       clientApi<ShareSearchResponse>(
@@ -164,7 +168,7 @@ export function SearchResults() {
   // Read users from the page-0 snapshot, not the latest fetched page.
   const users = usersSnapshot;
   const showControls = allResults.length > 0;
-  const settled = enabled && !isLoading && !isFetching;
+  const settled = enabled && !isLoading && !isFetching && !isError;
   const hasSharesResults = allResults.length > 0;
   const hasUsersResults = users.length > 0;
   const showNoSharesLine = settled && !hasSharesResults;
@@ -205,15 +209,20 @@ export function SearchResults() {
 
       {/* Browse sections — shown when query is empty (E11) */}
       {!enabled && browseData ? <BrowseSections data={browseData} /> : null}
+      {!enabled && browseError ? (
+        <SearchError onRetry={() => refetchBrowse()} />
+      ) : null}
+      {enabled && isError ? <SearchError onRetry={() => refetch()} /> : null}
 
       {/* Loading spinner */}
-      {(isLoading || isFetching) && enabled ? (
+      {((isLoading || isFetching) && enabled) ||
+      (!enabled && !browseData && !browseError) ? (
         <div className="mt-6 flex justify-center" aria-live="polite">
           <div
             className="h-5 w-5 animate-spin rounded-full border-2 border-ink-faint border-t-ink"
             role="status"
           >
-            <span className="sr-only">Loading...</span>
+            <span className="sr-only">Loading…</span>
           </div>
         </div>
       ) : null}
@@ -342,6 +351,26 @@ export function SearchResults() {
   );
 }
 
+function SearchError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="alert" className="mt-10 text-center">
+      <h2 className="font-serif text-xl tracking-tight text-ink">
+        Search isn&apos;t working right now
+      </h2>
+      <p className="mt-2 text-sm text-ink-muted">
+        Something went wrong on our side. Your search is still in the box.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Browse sections (shown before user types — E11)
 // ---------------------------------------------------------------------------
@@ -367,13 +396,13 @@ function BrowseSections({ data }: { data: BrowseResponse }) {
     <div className="mt-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-medium uppercase tracking-widest text-ink-faint">
-          Public collections — search above or
+          Public collections
         </h2>
         <Link
           href="/browse"
-          className="text-xs font-medium text-accent transition hover:opacity-80"
+          className="text-sm font-medium text-accent transition hover:opacity-80"
         >
-          browse all &rarr;
+          Browse all &rarr;
         </Link>
       </div>
 

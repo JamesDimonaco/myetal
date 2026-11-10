@@ -27,12 +27,20 @@ export function FeedbackForm({ userEmail }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [triedSubmit, setTriedSubmit] = useState(false);
+
+  // Shown after the first submit attempt; each clears as soon as it's fixed.
+  const titleError = triedSubmit && !title.trim() ? 'Add a title.' : null;
+  const descriptionError =
+    triedSubmit && !description.trim() ? 'Add a description.' : null;
 
   const isSignedIn = userEmail !== null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedType) return;
+    setTriedSubmit(true);
+    if (!title.trim() || !description.trim()) return;
 
     setSubmitting(true);
     setError(null);
@@ -75,6 +83,7 @@ export function FeedbackForm({ userEmail }: Props) {
     setError(null);
     setSuccess(false);
     setSubmittedEmail(null);
+    setTriedSubmit(false);
   };
 
   // -- Success state --
@@ -139,9 +148,9 @@ export function FeedbackForm({ userEmail }: Props) {
           className="group rounded-lg border border-rule bg-white p-6 text-left transition-all hover:border-accent hover:shadow-sm"
         >
           <div className="text-3xl">&#x1f4a1;</div>
-          <h3 className="mt-3 text-lg font-semibold text-ink">
+          <h2 className="mt-3 text-lg font-semibold text-ink">
             Request a feature
-          </h3>
+          </h2>
           <p className="mt-1 text-sm text-ink-muted">
             Tell us what would make MyEtAl better for your research
           </p>
@@ -152,9 +161,9 @@ export function FeedbackForm({ userEmail }: Props) {
           className="group rounded-lg border border-rule bg-white p-6 text-left transition-all hover:border-accent hover:shadow-sm"
         >
           <div className="text-3xl">&#x1f41b;</div>
-          <h3 className="mt-3 text-lg font-semibold text-ink">
+          <h2 className="mt-3 text-lg font-semibold text-ink">
             Report an issue
-          </h3>
+          </h2>
           <p className="mt-1 text-sm text-ink-muted">
             Something broken or not working as expected?
           </p>
@@ -178,7 +187,7 @@ export function FeedbackForm({ userEmail }: Props) {
       : 'Steps to reproduce, what you expected, and what happened instead...';
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
       {/* Type badge + change button */}
       <div className="flex items-center gap-3">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-sm font-medium text-accent">
@@ -209,11 +218,16 @@ export function FeedbackForm({ userEmail }: Props) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={titlePlaceholder}
-          className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          aria-invalid={titleError ? true : undefined}
+          aria-describedby={titleError ? 'feedback-title-error' : undefined}
+          className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <p className="mt-1 text-right text-xs text-ink-faint">
-          {title.length}/200
-        </p>
+        <div className="mt-1 flex justify-between gap-2 text-xs text-ink-faint">
+          <span id="feedback-title-error" role="alert" className="text-sm text-danger">
+            {titleError}
+          </span>
+          <span>{title.length}/200</span>
+        </div>
       </div>
 
       {/* Description */}
@@ -232,11 +246,16 @@ export function FeedbackForm({ userEmail }: Props) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={descPlaceholder}
-          className="mt-1.5 w-full resize-y rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          aria-invalid={descriptionError ? true : undefined}
+          aria-describedby={descriptionError ? 'feedback-desc-error' : undefined}
+          className="mt-1.5 w-full resize-y rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <p className="mt-1 text-right text-xs text-ink-faint">
-          {description.length}/2000
-        </p>
+        <div className="mt-1 flex justify-between gap-2 text-xs text-ink-faint">
+          <span id="feedback-desc-error" role="alert" className="text-sm text-danger">
+            {descriptionError}
+          </span>
+          <span>{description.length}/2000</span>
+        </div>
       </div>
 
       {/* Email */}
@@ -311,7 +330,7 @@ export function FeedbackForm({ userEmail }: Props) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
               )
@@ -338,7 +357,7 @@ export function FeedbackForm({ userEmail }: Props) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
-              className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <p className="mt-1.5 text-xs text-ink-faint">
               Without an email, we can&apos;t follow up — but we still read
@@ -372,7 +391,7 @@ export function FeedbackForm({ userEmail }: Props) {
 
       {/* Error */}
       {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-danger">
+        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-danger">
           {error}
         </p>
       )}
@@ -380,7 +399,7 @@ export function FeedbackForm({ userEmail }: Props) {
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitting || !title.trim() || !description.trim()}
+        disabled={submitting}
         className="inline-flex min-h-[44px] w-full items-center justify-center rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitting ? 'Sending...' : 'Submit feedback'}

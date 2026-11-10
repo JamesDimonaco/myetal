@@ -32,7 +32,7 @@ export default async function EditSharePage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
       <header className="mb-8">
-        <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+        <p className="font-mono text-xs tracking-wider text-ink-muted">
           /c/{share.short_code}
         </p>
         <h1 className="mt-1 font-serif text-3xl tracking-tight text-ink sm:text-4xl">

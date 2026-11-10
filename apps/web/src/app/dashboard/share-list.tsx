@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { QrModal } from '@/components/qr-modal';
@@ -102,12 +101,10 @@ interface Props {
 }
 
 /**
- * Interactive share list. Cards are clickable (navigate to editor); action
- * buttons are icon-only with tooltips and use stopPropagation so they don't
- * trigger navigation.
+ * Interactive share list. The whole card links to the editor via the title
+ * link; the icon-only action buttons sit above that link.
  */
 export function ShareList({ initialShares, libraryCount = 0 }: Props) {
-  const router = useRouter();
   const { data, refetch } = useShares(initialShares);
   const deleteShare = useDeleteShare();
 
@@ -116,8 +113,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleCopyLink = async (share: ShareResponse, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleCopyLink = async (share: ShareResponse) => {
     const url = publicUrlFor(share.short_code);
     try {
       await navigator.clipboard.writeText(url);
@@ -252,20 +248,11 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
         {shares.map((share) => (
           <li
             key={share.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => router.push(`/dashboard/share/${share.id}`)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                router.push(`/dashboard/share/${share.id}`);
-              }
-            }}
-            className="flex cursor-pointer flex-col rounded-lg border border-rule bg-paper-soft p-5 transition hover:border-ink/30"
+            className="relative flex flex-col rounded-lg border border-rule bg-paper-soft p-5 transition focus-within:border-ink/30 hover:border-ink/30"
           >
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <p className="font-mono text-xs uppercase tracking-wider text-ink-faint">
+                <p className="font-mono text-xs tracking-wider text-ink-faint">
                   {share.short_code}
                 </p>
                 {share.published_at === null ? (
@@ -274,9 +261,16 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
                   </span>
                 ) : null}
               </div>
-              <h3 className="mt-2 break-words font-serif text-lg leading-snug text-ink">
-                {share.name}
-              </h3>
+              {/* The title link covers the whole card (after:inset-0); the
+                  action buttons below sit above it via `relative`. */}
+              <h2 className="mt-2 break-words font-serif text-lg leading-snug text-ink">
+                <Link
+                  href={`/dashboard/share/${share.id}`}
+                  className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-accent"
+                >
+                  {share.name}
+                </Link>
+              </h2>
               <p className="mt-1 text-sm text-ink-muted">
                 {kindSummary(share.items)}
                 {' · '}
@@ -285,20 +279,17 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
                 {share.published_at !== null ? 'Published' : 'Unlisted'}
               </p>
               {share.tags && share.tags.length > 0 ? (
-                <div className="mt-2">
+                <div className="relative mt-2">
                   <TagChips tags={share.tags} max={2} linkPattern="browse" />
                 </div>
               ) : null}
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
+            <div className="relative mt-4 flex items-center gap-2">
               <button
                 type="button"
                 title="Show QR"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setQrTarget(share);
-                }}
+                onClick={() => setQrTarget(share)}
                 className={iconBtnClass}
               >
                 <QrIcon />
@@ -306,7 +297,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
               <button
                 type="button"
                 title={copiedId === share.id ? 'Copied!' : 'Copy link'}
-                onClick={(e) => handleCopyLink(share, e)}
+                onClick={() => handleCopyLink(share)}
                 className={iconBtnClass}
               >
                 {copiedId === share.id ? <CheckIcon /> : <ClipboardIcon />}
@@ -316,7 +307,6 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
                 target="_blank"
                 rel="noreferrer"
                 title="View share"
-                onClick={(e) => e.stopPropagation()}
                 className={iconBtnClass}
               >
                 <ExternalLinkIcon />
@@ -324,8 +314,7 @@ export function ShareList({ initialShares, libraryCount = 0 }: Props) {
               <button
                 type="button"
                 title="Delete share"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setDeleteError(null);
                   setDeleteTarget(share);
                 }}

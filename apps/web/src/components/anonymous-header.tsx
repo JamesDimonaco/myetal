@@ -12,7 +12,7 @@ export function AnonymousHeader() {
         <Link href="/" className="font-serif text-xl tracking-tight text-ink">
           MyEtAl
         </Link>
-        <nav className="flex items-center gap-2 text-sm sm:gap-6">
+        <nav aria-label="Main" className="flex items-center gap-2 text-sm sm:gap-6">
           <Link
             href="/sign-in"
             className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 hover:text-ink sm:px-3"

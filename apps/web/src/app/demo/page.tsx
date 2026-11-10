@@ -43,7 +43,7 @@ export default function DemoPage() {
           This is what your visitors see when they scan one of your QR codes.
           Edit the share on the left — the public page and the QR update as
           you type. When you&apos;re ready,{' '}
-          <Link href="/sign-in" className="text-ink underline-offset-2 hover:underline">
+          <Link href="/sign-in" className="text-ink underline underline-offset-2">
             sign in
           </Link>{' '}
           to make a real one.

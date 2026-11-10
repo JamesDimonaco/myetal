@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { UserAvatar } from '@/components/user-avatar';
+import { getInitials, UserAvatar } from '@/components/user-avatar';
 import type { UserResponse } from '@/types/auth';
 
 /**
@@ -88,7 +88,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
 
         {/* Desktop nav — slim link row plus an avatar dropdown holding the
             account-scoped destinations and sign-out. Hidden on mobile. */}
-        <nav className="hidden items-center gap-6 text-sm sm:flex">
+        <nav aria-label="Main" className="hidden items-center gap-6 text-sm sm:flex">
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href} className={NAV_LINK_CLASS}>
               {link.label}
@@ -96,7 +96,11 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
           ))}
           <DropdownMenu>
             <DropdownMenuTrigger
-              aria-label="Account menu"
+              // Starts with the visible initials so voice control users can
+              // say what they see (WCAG 2.5.3); falls back when there's a photo.
+              aria-label={
+                user.avatar_url ? 'Account menu' : `${getInitials(user.name)} account menu`
+              }
               title={user.name ?? user.email ?? 'Account'}
               className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >

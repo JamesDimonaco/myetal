@@ -40,7 +40,7 @@ export default async function LandingPage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-4 py-8 sm:px-6 sm:py-16">
       <header className="flex items-center justify-between gap-3">
         <span className="font-serif text-xl tracking-tight text-ink">MyEtAl</span>
-        <nav className="flex items-center gap-3 text-sm sm:gap-6">
+        <nav aria-label="Main" className="flex items-center gap-3 text-sm sm:gap-6">
           {signedIn ? (
             <>
               {/* "Dashboard" hidden on mobile — avatar tap goes to profile,

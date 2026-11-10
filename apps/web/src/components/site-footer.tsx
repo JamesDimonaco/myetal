@@ -9,7 +9,7 @@ export function SiteFooter() {
     <footer className="border-t border-rule">
       <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 px-6 py-4 sm:flex-row">
         <span className="text-xs text-ink-faint">&copy; 2026 MyEtAl</span>
-        <nav className="flex flex-wrap items-center gap-3 text-xs text-ink-faint">
+        <nav aria-label="Footer" className="flex flex-wrap items-center gap-3 text-xs text-ink-faint">
           <Link
             href="/privacy"
             className="hover:text-ink-muted hover:underline"

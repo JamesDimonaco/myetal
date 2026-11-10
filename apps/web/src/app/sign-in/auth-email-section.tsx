@@ -186,7 +186,7 @@ export function AuthEmailSection({
           <p className="text-xs text-ink-faint">
             <a
               href="/forgot-password"
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline underline-offset-2"
             >
               Forgot your password?
             </a>
@@ -200,7 +200,7 @@ export function AuthEmailSection({
                 setTab('create-account');
                 setError(null);
               }}
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline underline-offset-2"
             >
               Create an account
             </button>
@@ -281,7 +281,7 @@ export function AuthEmailSection({
                 setTab('sign-in');
                 setError(null);
               }}
-              className="text-ink underline-offset-2 hover:underline"
+              className="text-ink underline underline-offset-2"
             >
               Sign in
             </button>
