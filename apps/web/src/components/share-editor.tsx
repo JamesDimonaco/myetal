@@ -139,7 +139,8 @@ function itemIssues(item: DraftItem): Record<string, string> {
   }
   // PDF cards have no URL field, so a missing file shows on the title.
   if (item.kind === 'pdf' && out.url) {
-    out.title ??= 'This PDF has no file. Remove it and upload it again.';
+    const noFile = 'This PDF has no file. Remove it and upload it again.';
+    out.title = out.title ? `${out.title}. ${noFile}` : noFile;
     delete out.url;
   }
   return out;
@@ -549,8 +550,8 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
       // Prefer surfacing a user-editable message (clear, actionable). Fall
       // back to a generic banner only when every issue is on a hidden field
       // — the previous code leaked raw Zod text in that case.
-      // Inline errors render next to their fields, plus a derived summary by
-      // the save button (see `openErrorCount`); both clear as they're fixed.
+      // Inline errors render next to their fields, plus a summary by the
+      // save button; both are derived, so they clear as they're fixed.
       if (Object.keys(inline).length === 0 && hidden.length > 0) {
         console.warn('[share-editor] hidden-field validation failed:', hidden);
         setError(
@@ -830,7 +831,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
 
         {/* Type pills */}
         <Field label="Type" hint="What kind of content is this?">
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
             {SHARE_TYPES.map((t) => {
               const active = shareType === t;
               return (
@@ -839,7 +840,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                   type="button"
                   onClick={() => setShareType(t)}
                   className={[
-                    'inline-flex min-h-11 sm:min-h-9 items-center rounded-full border px-4 py-2 sm:py-1.5 text-sm font-medium capitalize transition',
+                    'inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-full border px-4 py-2 sm:py-1.5 text-sm font-medium capitalize transition',
                     active
                       ? 'border-ink bg-ink text-paper'
                       : 'border-rule bg-paper text-ink hover:bg-paper-soft',
@@ -983,17 +984,20 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                 {items.length > 1 ? '. Use the arrows to reorder.' : null}
               </p>
             </div>
-            <button
-              type="button"
-              aria-describedby={itemsError ? 'share-items-error' : undefined}
-              onClick={() => setShowAddItem(true)}
-              className="inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              Add item
-            </button>
+            {/* Empty list: the empty state below has the only "Add item". */}
+            {items.length > 0 ? (
+              <button
+                type="button"
+                aria-describedby={itemsError ? 'share-items-error' : undefined}
+                onClick={() => setShowAddItem(true)}
+                className="inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                Add item
+              </button>
+            ) : null}
           </div>
 
           <p id="share-items-error" role="alert" className="mt-2 text-sm text-danger empty:hidden">
@@ -1013,7 +1017,10 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                 title="No items yet"
                 description="A bundle gathers papers, repos, and PDFs behind one QR. Start by adding an item."
                 actions={
-                  <Button onClick={() => setShowAddItem(true)}>
+                  <Button
+                    aria-describedby={itemsError ? 'share-items-error' : undefined}
+                    onClick={() => setShowAddItem(true)}
+                  >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
                       <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     </svg>

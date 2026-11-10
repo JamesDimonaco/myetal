@@ -360,11 +360,6 @@ export function LibraryList({
             <OrcidIcon size={16} />
             {importLabel}
           </button>
-          {!orcidId ? (
-            <p className="mt-1 text-sm text-ink-muted">
-              Add your ORCID iD on your profile first
-            </p>
-          ) : null}
         </div>
       </div>
       {error ? (

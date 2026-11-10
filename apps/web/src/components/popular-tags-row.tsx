@@ -19,9 +19,10 @@ interface Props {
   className?: string;
 }
 
-// Small pill, but the invisible ::after stretches the tap area to 44px.
+// 32px pill; the invisible ::after stretches the tap area to 44px. Keep
+// row gaps >= 12px so tap areas on wrapped rows don't overlap.
 const baseChip =
-  "inline-flex min-h-7 relative after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] items-center rounded-full border px-3 py-1 text-xs font-medium transition";
+  "inline-flex min-h-8 relative after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] items-center rounded-full border px-3 py-1 text-xs font-medium transition";
 
 const inactiveChip =
   `${baseChip} border-rule bg-paper-soft text-ink-muted hover:border-ink/40 hover:text-ink`;
@@ -55,7 +56,7 @@ export function PopularTagsRow({
     return `${basePath}?${qs.toString()}`;
   };
 
-  const wrapClass = ['flex flex-wrap gap-2', className]
+  const wrapClass = ['flex flex-wrap gap-x-2 gap-y-3', className]
     .filter(Boolean)
     .join(' ');
 

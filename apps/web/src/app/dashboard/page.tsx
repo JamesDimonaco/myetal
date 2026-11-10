@@ -82,7 +82,7 @@ export default async function DashboardPage() {
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/dashboard/profile"
-              className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
+              className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
             >
               Add ORCID
             </Link>

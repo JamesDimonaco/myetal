@@ -7,6 +7,7 @@ import { ReportButton } from '@/components/report-button';
 import { SaveButton } from '@/components/save-button';
 import { ShareItemCard } from '@/components/share-item-card';
 import { ShareSignupBar } from '@/components/share-signup-bar';
+import { SiteFooter } from '@/components/site-footer';
 import { TagChips } from '@/components/tag-chips';
 import { API_BASE_URL, ApiError, api } from '@/lib/api';
 import { formatItemCount, formatRelativeTime } from '@/lib/format';
@@ -225,203 +226,192 @@ export default async function PublicSharePage({ params }: PageProps) {
   const jsonLd = buildJsonLd(share, siteUrl);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-14">
-      {/* eslint-disable-next-line react/no-danger -- JSON.stringify is XSS-safe */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <div className="text-sm text-ink-muted">
-        <Link href="/" className="hover:text-ink">
-          MyEtAl
-        </Link>
-      </div>
+    <>
+      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-14">
+        {/* eslint-disable-next-line react/no-danger -- JSON.stringify is XSS-safe */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <div className="text-sm text-ink-muted">
+          <Link href="/" className="hover:text-ink">
+            MyEtAl
+          </Link>
+        </div>
 
-      <header className="mt-6 sm:mt-8">
-        <h1 className="break-words font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
-          {share.name}
-        </h1>
-        {/* Phones drop the dot separators, which dangle when the line wraps. */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted [&>span[aria-hidden]]:hidden sm:[&>span[aria-hidden]]:inline">
-          {share.owner_name ? (
-            share.owner_id || share.owner_handle ? (
-              <Link
-                href={`/u/${share.owner_handle ?? share.owner_id}`}
-                className="underline-offset-2 transition hover:text-ink hover:underline"
-              >
-                by {share.owner_name}
-              </Link>
-            ) : (
-              <span>by {share.owner_name}</span>
-            )
-          ) : null}
-          {share.owner_name ? <span aria-hidden>·</span> : null}
-          <span>Updated {formatRelativeTime(share.updated_at)}</span>
-          <span aria-hidden>·</span>
-          <span className="capitalize text-ink-faint">{share.type}</span>
-        </div>
-        <div className="mt-4">
-          <SaveButton
-            shortCode={share.short_code}
-            name={share.name}
-            description={share.description ?? null}
-            type={share.type}
-            ownerName={share.owner_name ?? null}
-            itemCount={share.items.length}
-          />
-        </div>
-        {share.description ? (
-          <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>
-        ) : null}
-        {share.tags && share.tags.length > 0 ? (
+        <header className="mt-6 sm:mt-8">
+          <h1 className="break-words font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
+            {share.name}
+          </h1>
+          {/* Gaps, not dot separators: dots dangle when a long name wraps. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+            {share.owner_name ? (
+              share.owner_id || share.owner_handle ? (
+                <Link
+                  href={`/u/${share.owner_handle ?? share.owner_id}`}
+                  className="underline-offset-2 transition hover:text-ink hover:underline"
+                >
+                  by {share.owner_name}
+                </Link>
+              ) : (
+                <span>by {share.owner_name}</span>
+              )
+            ) : null}
+            <span>Updated {formatRelativeTime(share.updated_at)}</span>
+            <span className="capitalize text-ink-faint">{share.type}</span>
+          </div>
           <div className="mt-4">
-            {/* All tags shown on the detail view; each chip links to the
-                /browse list filtered by that tag (PR-B route). */}
-            <TagChips
-              tags={share.tags}
-              max={share.tags.length}
-              linkPattern="browse"
+            <SaveButton
+              shortCode={share.short_code}
+              name={share.name}
+              description={share.description ?? null}
+              type={share.type}
+              ownerName={share.owner_name ?? null}
+              itemCount={share.items.length}
             />
           </div>
-        ) : null}
-      </header>
-
-      <section className="mt-10">
-        {itemCount === 0 ? (
-          <p className="py-10 text-center text-sm text-ink-muted">
-            This collection is empty.
-          </p>
-        ) : (
-          share.items.map((item) => {
-            const repoKey =
-              item.kind === 'repo' && item.url
-                ? (() => {
-                    const p = parseGithubUrl(item.url);
-                    return p ? `${p.owner}/${p.repo}`.toLowerCase() : null;
-                  })()
-                : null;
-            return (
-              <ShareItemCard
-                key={item.id}
-                item={item}
-                oa={item.doi ? oaByDoi.get(item.doi.trim()) ?? null : null}
-                repo={repoKey ? repoByKey.get(repoKey) ?? null : null}
+          {share.description ? (
+            <p className="mt-6 text-base leading-relaxed text-ink">{share.description}</p>
+          ) : null}
+          {share.tags && share.tags.length > 0 ? (
+            <div className="mt-4">
+              {/* All tags shown on the detail view; each chip links to the
+                  /browse list filtered by that tag (PR-B route). */}
+              <TagChips
+                tags={share.tags}
+                max={share.tags.length}
+                linkPattern="browse"
               />
-            );
-          })
-        )}
-      </section>
+            </div>
+          ) : null}
+        </header>
 
-      {share.related_shares && share.related_shares.length > 0 ? (
-        <section className="mt-16 border-t border-rule pt-8">
-          <SectionHeading>Who else shares these papers</SectionHeading>
-          <p className="mt-1 text-sm text-ink-muted">
-            Other public collections with papers in common.
-          </p>
-          <ul className="mt-4 space-y-2">
-            {share.related_shares.map((rs) => (
-              <li key={rs.short_code}>
-                <Link
-                  href={`/c/${rs.short_code}`}
-                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-paper-soft"
-                >
-                  <span className="text-sm font-medium text-ink group-hover:underline">
-                    {rs.name}
-                  </span>
-                  <span className="ml-3 shrink-0 rounded-full bg-paper-soft px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
-                    {rs.papers_in_common} in common
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {share.similar_shares && share.similar_shares.length > 0 ? (
-        <section className="mt-10 border-t border-rule pt-8">
-          <SectionHeading>Similar collections</SectionHeading>
-          <p className="mt-1 text-sm text-ink-muted">
-            Collections with the most overlap in papers.
-          </p>
-          <ul className="mt-4 space-y-2">
-            {share.similar_shares.map((ss) => (
-              <li key={ss.short_code}>
-                <Link
-                  href={`/c/${ss.short_code}`}
-                  className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-paper-soft"
-                >
-                  <span className="text-sm font-medium text-ink group-hover:underline">
-                    {ss.name}
-                  </span>
-                  <span className="ml-3 shrink-0 rounded-full bg-paper-soft px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
-                    {ss.papers_in_common} in common
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <aside className="mt-16 border-t border-rule pt-8">
-        <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:text-left">
-          <div>
-            <p className="font-serif text-lg text-ink">Scan to keep this</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              {formatItemCount(itemCount)} ·{' '}
-              <code className="text-ink">/c/{share.short_code}</code>
+        <section className="mt-10">
+          {itemCount === 0 ? (
+            <p className="py-10 text-center text-sm text-ink-muted">
+              This collection is empty.
             </p>
-            <Link
-              href={`/c/${share.short_code}/present`}
-              className="mt-4 inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-            >
-              <PresentIcon />
-              Present fullscreen
-            </Link>
+          ) : (
+            share.items.map((item) => {
+              const repoKey =
+                item.kind === 'repo' && item.url
+                  ? (() => {
+                      const p = parseGithubUrl(item.url);
+                      return p ? `${p.owner}/${p.repo}`.toLowerCase() : null;
+                    })()
+                  : null;
+              return (
+                <ShareItemCard
+                  key={item.id}
+                  item={item}
+                  oa={item.doi ? oaByDoi.get(item.doi.trim()) ?? null : null}
+                  repo={repoKey ? repoByKey.get(repoKey) ?? null : null}
+                />
+              );
+            })
+          )}
+        </section>
+
+        {share.related_shares && share.related_shares.length > 0 ? (
+          <section className="mt-16 border-t border-rule pt-8">
+            <SectionHeading>Who else shares these papers</SectionHeading>
+            <p className="mt-1 text-sm text-ink-muted">
+              Other public collections with papers in common.
+            </p>
+            <ul className="mt-4 space-y-2">
+              {share.related_shares.map((rs) => (
+                <li key={rs.short_code}>
+                  <Link
+                    href={`/c/${rs.short_code}`}
+                    className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-paper-soft"
+                  >
+                    <span className="text-sm font-medium text-ink group-hover:underline">
+                      {rs.name}
+                    </span>
+                    <span className="ml-3 shrink-0 rounded-full bg-paper-soft px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
+                      {rs.papers_in_common} in common
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {share.similar_shares && share.similar_shares.length > 0 ? (
+          <section className="mt-10 border-t border-rule pt-8">
+            <SectionHeading>Similar collections</SectionHeading>
+            <p className="mt-1 text-sm text-ink-muted">
+              Collections with the most overlap in papers.
+            </p>
+            <ul className="mt-4 space-y-2">
+              {share.similar_shares.map((ss) => (
+                <li key={ss.short_code}>
+                  <Link
+                    href={`/c/${ss.short_code}`}
+                    className="group flex items-center justify-between rounded-md px-3 py-2.5 transition-colors hover:bg-paper-soft"
+                  >
+                    <span className="text-sm font-medium text-ink group-hover:underline">
+                      {ss.name}
+                    </span>
+                    <span className="ml-3 shrink-0 rounded-full bg-paper-soft px-2 py-0.5 text-xs tabular-nums text-ink-muted group-hover:bg-white">
+                      {ss.papers_in_common} in common
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <aside className="mt-16 border-t border-rule pt-8">
+          <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:text-left">
+            <div>
+              <p className="font-serif text-lg text-ink">Scan to keep this</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                {formatItemCount(itemCount)} ·{' '}
+                <code className="text-ink">/c/{share.short_code}</code>
+              </p>
+              <Link
+                href={`/c/${share.short_code}/present`}
+                className="mt-4 inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
+              >
+                <PresentIcon />
+                Present fullscreen
+              </Link>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrUrl}
+              alt={`QR code for "${share.name}"`}
+              width={160}
+              height={160}
+              className="h-40 w-40 rounded-md border border-rule bg-white p-2 sm:h-36 sm:w-36"
+            />
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={qrUrl}
-            alt={`QR code for "${share.name}"`}
-            width={160}
-            height={160}
-            className="h-40 w-40 rounded-md border border-rule bg-white p-2 sm:h-36 sm:w-36"
-          />
-        </div>
-        <div className="mt-8 flex justify-center sm:justify-start">
-          <EmailMeButton shortCode={share.short_code} />
-        </div>
-      </aside>
+          <div className="mt-8 flex justify-center sm:justify-start">
+            <EmailMeButton shortCode={share.short_code} />
+          </div>
+        </aside>
 
-      <footer className="mt-16 space-y-4 border-t border-rule pt-8">
-        <ReportButton shortCode={share.short_code} />
-        <p className="text-xs text-ink-faint">
-          Built with MyEtAl ·{' '}
-          <Link href="/" className="underline-offset-2 hover:underline">
-            myetal.app
-          </Link>
-          {' · '}
-          <Link href="/dashboard/search" className="underline-offset-2 hover:underline">
-            Search collections
-          </Link>
-          {' · '}
-          <Link href="/privacy" className="underline-offset-2 hover:underline">
-            Privacy
-          </Link>
-          {' · '}
-          <Link href="/terms" className="underline-offset-2 hover:underline">
-            Terms
-          </Link>
-        </p>
-      </footer>
+        <footer className="mt-16 space-y-4 border-t border-rule pt-8">
+          <ReportButton shortCode={share.short_code} />
+          <p className="text-sm text-ink-muted">
+            Built with{' '}
+            <Link href="/" className="underline underline-offset-2 hover:text-ink">
+              MyEtAl
+            </Link>
+          </p>
+        </footer>
 
-      <ShareSignupBar
-        shortCode={share.short_code}
-        ownerName={share.owner_name ?? null}
-        ownerId={share.owner_id ?? null}
-      />
-    </main>
+        <ShareSignupBar
+          shortCode={share.short_code}
+          ownerName={share.owner_name ?? null}
+          ownerId={share.owner_id ?? null}
+        />
+      </main>
+      <SiteFooter />
+    </>
   );
 }
 

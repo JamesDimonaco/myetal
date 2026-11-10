@@ -22,9 +22,10 @@ interface Props {
   className?: string;
 }
 
-// Small pill, but the invisible ::after stretches the tap area to 44px.
+// 32px pill; the invisible ::after stretches the tap area to 44px. Keep
+// row gaps >= 12px so tap areas on wrapped rows don't overlap.
 const chipClass =
-  "inline-flex min-h-7 relative after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] items-center rounded-full border border-rule bg-paper-soft px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink";
+  "inline-flex min-h-8 relative after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] items-center rounded-full border border-rule bg-paper-soft px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink";
 
 const staticChipClass =
   'inline-flex items-center rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium text-ink-muted';
@@ -50,7 +51,7 @@ export function TagChips({
   const shown = tags.slice(0, max);
   const overflow = tags.length - shown.length;
 
-  const wrapClass = ['flex flex-wrap items-center gap-1.5', className]
+  const wrapClass = ['flex flex-wrap items-center gap-x-1.5 gap-y-3', className]
     .filter(Boolean)
     .join(' ');
 
