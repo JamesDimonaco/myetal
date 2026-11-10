@@ -919,7 +919,7 @@ function ManualPane({ onPick }: { onPick: (p: Paper) => void }) {
         type="button"
         onClick={handleAdd}
         disabled={!canSave}
-        className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+        className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
       >
         Add to share
       </button>
@@ -1016,7 +1016,7 @@ function RepoKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
             type="button"
             onClick={handleFetch}
             disabled={loading || !input.trim()}
-            className="rounded-md bg-ink px-4 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-ink px-4 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
           >
             {loading ? '…' : 'Fetch'}
           </button>
@@ -1081,7 +1081,7 @@ function RepoKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
             type="button"
             onClick={handleAdd}
             disabled={!canSave}
-            className="mt-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+            className="mt-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
           >
             Add to share
           </button>
@@ -1150,7 +1150,7 @@ function LinkKindPane({ onPick }: { onPick: (p: AddItemPayload) => void }) {
         type="button"
         onClick={handleAdd}
         disabled={!canSave}
-        className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+        className="mt-2 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
       >
         Add to share
       </button>
@@ -1617,7 +1617,7 @@ function PdfKindPane({
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Smith et al. 2024 — ICML poster"
             disabled={busy}
-            className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent disabled:opacity-60"
+            className="rounded-md border border-rule bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent disabled:opacity-70"
           />
         </label>
       ) : null}
@@ -1683,7 +1683,7 @@ function PdfKindPane({
           type="button"
           onClick={handleUpload}
           disabled={!canUpload}
-          className="rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
         >
           {phase === 'error' ? 'Retry upload' : 'Upload PDF'}
         </button>

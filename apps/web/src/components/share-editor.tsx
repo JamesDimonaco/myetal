@@ -67,6 +67,7 @@ import type {
 import type { PaperOut } from '@/types/works';
 import { SectionHeading } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const SHARE_TYPES: ShareType[] = [
   'paper',
@@ -111,7 +112,7 @@ const itemSchema = z
       return Boolean(it.url && it.url.length > 0);
     },
     {
-      message: 'URL required for repo/link/pdf items',
+      message: 'Add a URL',
       path: ['url'],
     },
   );
@@ -135,6 +136,11 @@ function itemIssues(item: DraftItem): Record<string, string> {
   for (const issue of parsed.error.issues) {
     const field = issue.path.join('.');
     if (USER_EDITABLE_FIELDS.has(`items.*.${field}`) && !out[field]) out[field] = issue.message;
+  }
+  // PDF cards have no URL field, so a missing file shows on the title.
+  if (item.kind === 'pdf' && out.url) {
+    out.title ??= 'This PDF has no file. Remove it and upload it again.';
+    delete out.url;
   }
   return out;
 }
@@ -558,9 +564,14 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
       if (parsed.error.issues.some((issue) => issue.path[0] === 'description')) {
         setMoreOpen(true);
       }
-      // Scroll error into view so the user sees what went wrong.
+      // Take the user to the first bad field (or the message, if no field
+      // is marked). Focus also makes screen readers read its error.
       setTimeout(() => {
-        document.querySelector('[role="alert"]:not(:empty)')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const target =
+          document.querySelector<HTMLElement>('form [aria-invalid="true"]') ??
+          document.querySelector<HTMLElement>('[role="alert"]:not(:empty)');
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (target?.matches('input, textarea')) target.focus({ preventScroll: true });
       }, 50);
       return;
     }
@@ -746,14 +757,17 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
       .filter((it) => checkedItemKeys.has(it._key))
       .map((it) => [it._key, itemIssues(it)] as const),
   );
-  const openErrorCount =
-    (nameError ? 1 : 0) +
-    (itemsError ? 1 : 0) +
-    [...itemErrors.values()].reduce((n, errs) => n + Object.keys(errs).length, 0);
+  const problems = [
+    ...(nameError ? ['the name'] : []),
+    ...(itemsError ? ['the items list'] : []),
+    ...items.flatMap((it, idx) =>
+      Object.keys(itemErrors.get(it._key) ?? {}).length > 0 ? [`item ${idx + 1}`] : [],
+    ),
+  ];
   const bannerError =
     error ??
-    (openErrorCount > 0
-      ? `Fix the ${openErrorCount === 1 ? 'problem' : `${openErrorCount} problems`} marked in red above.`
+    (problems.length > 0
+      ? `Check ${new Intl.ListFormat('en', { type: 'conjunction' }).format(problems)}, marked in red above.`
       : null);
 
   return (
@@ -920,7 +934,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
             }}
             className={[
               // after: widens the tap area to 44px without changing the look.
-              "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition after:absolute after:-inset-2.5 after:content-[''] disabled:cursor-not-allowed disabled:opacity-60",
+              "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition after:absolute after:-inset-2.5 after:content-[''] disabled:cursor-not-allowed disabled:opacity-70",
               publishedAt ? 'bg-accent' : 'bg-ink-faint',
             ].join(' ')}
           >
@@ -965,7 +979,8 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
                 Items
               </SectionHeading>
               <p className="mt-1 text-sm text-ink-faint">
-                {items.length} {items.length === 1 ? 'item' : 'items'} -- use the arrows to reorder
+                {items.length} {items.length === 1 ? 'item' : 'items'}
+                {items.length > 1 ? '. Use the arrows to reorder.' : null}
               </p>
             </div>
             <button
@@ -987,27 +1002,25 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
 
           <div className="mt-3 grid gap-3">
             {items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-rule py-12 text-ink-muted">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <p className="text-sm font-medium text-ink">No items yet</p>
-                <p className="text-sm text-ink-faint">
-                  A bundle gathers papers, repos, and PDFs behind one QR. Start
-                  by adding an item.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowAddItem(true)}
-                  className="mt-2 inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                    <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <EmptyState
+                icon={
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Add item
-                </button>
-              </div>
+                }
+                headingLevel="h3"
+                title="No items yet"
+                description="A bundle gathers papers, repos, and PDFs behind one QR. Start by adding an item."
+                actions={
+                  <Button onClick={() => setShowAddItem(true)}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                      <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                    Add item
+                  </Button>
+                }
+              />
             ) : null}
 
             <DndContext
@@ -1121,7 +1134,7 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
           <button
             type="submit"
             disabled={submitting}
-            className="ml-auto inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+            className="ml-auto inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
           >
             {submitting
               ? 'Saving…'

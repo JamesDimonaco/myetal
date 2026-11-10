@@ -26,7 +26,7 @@ const buttonVariants = cva(
     'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium',
     'transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
     'focus-visible:ring-offset-2 focus-visible:ring-offset-paper',
-    'disabled:cursor-not-allowed disabled:opacity-50',
+    'disabled:cursor-not-allowed disabled:opacity-70',
   ),
   {
     variants: {

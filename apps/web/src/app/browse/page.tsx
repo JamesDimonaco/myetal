@@ -219,20 +219,20 @@ function SearchBox({ initialQuery }: { initialQuery: string }) {
         type="search"
         name="q"
         defaultValue={initialQuery}
-        placeholder="Search collections and researchers"
+        placeholder="Search collections or people"
         autoComplete="off"
-        className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2.5 text-base text-ink outline-none transition focus:border-ink"
+        className="min-h-11 min-w-0 flex-1 rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink outline-none transition focus:border-ink sm:min-h-9 sm:py-1.5 sm:text-sm"
       />
       <button
         type="submit"
-        className="inline-flex min-h-[44px] items-center rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90"
+        className="inline-flex min-h-11 items-center rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90 sm:min-h-9 sm:py-1.5"
       >
         Search
       </button>
       {initialQuery ? (
         <Link
           href="/browse"
-          className="inline-flex min-h-[44px] items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft"
+          className="inline-flex min-h-11 items-center rounded-md border border-rule bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:bg-paper-soft sm:min-h-9 sm:py-1.5"
         >
           Clear
         </Link>

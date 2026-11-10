@@ -62,8 +62,8 @@ export function OAuthButtons({
       disabled={pending !== null}
       className={
         highlightOrcid
-          ? 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60'
-          : 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60'
+          ? 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md bg-ink px-5 py-3 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70'
+          : 'inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70'
       }
     >
       <OrcidIcon size={18} />
@@ -76,7 +76,7 @@ export function OAuthButtons({
       type="button"
       onClick={() => startSocial('google')}
       disabled={pending !== null}
-      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70"
     >
       <GoogleIcon size={18} />
       {pending === 'google' ? 'Redirecting…' : 'Continue with Google'}
@@ -88,7 +88,7 @@ export function OAuthButtons({
       type="button"
       onClick={() => startSocial('github')}
       disabled={pending !== null}
-      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-60"
+      className="inline-flex min-h-[48px] items-center justify-center gap-2.5 rounded-md border border-ink/20 bg-paper px-5 py-3 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70"
     >
       <GitHubIcon size={18} />
       {pending === 'github' ? 'Redirecting…' : 'Continue with GitHub'}

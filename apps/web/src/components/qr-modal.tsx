@@ -186,7 +186,7 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
               aria-label="Download QR image"
             >
               <DownloadIcon />
-              <span className="mt-1.5 text-xs text-ink-muted">QR image</span>
+              <span className="mt-1.5 text-sm text-ink-muted">QR image</span>
             </a>
             <a
               href={posterUrl}
@@ -195,7 +195,7 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
               aria-label="Download print-ready poster PDF"
             >
               <PosterIcon />
-              <span className="mt-1.5 text-xs text-ink-muted">Poster PDF</span>
+              <span className="mt-1.5 text-sm text-ink-muted">Poster PDF</span>
             </a>
             <button
               type="button"
@@ -204,7 +204,7 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
               aria-label="Open system share sheet"
             >
               <ShareIcon />
-              <span className="mt-1.5 text-xs text-ink-muted">Share…</span>
+              <span className="mt-1.5 text-sm text-ink-muted">Share…</span>
             </button>
             <button
               type="button"
@@ -213,7 +213,7 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
               aria-label="Copy markdown citation"
             >
               <CitationIcon />
-              <span className="mt-1.5 text-xs text-ink-muted">Citation</span>
+              <span className="mt-1.5 text-sm text-ink-muted">Citation</span>
             </button>
             <a
               href={tweetUrl}
@@ -223,7 +223,7 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
               aria-label="Share on X"
             >
               <XIcon />
-              <span className="mt-1.5 text-xs text-ink-muted">Post on X</span>
+              <span className="mt-1.5 text-sm text-ink-muted">Post on X</span>
             </a>
             <a
               href={mailUrl}
@@ -231,7 +231,7 @@ export function QrModal({ shortCode, collectionName, onClose, onKeepEditing }: P
               aria-label="Email this share"
             >
               <MailIcon />
-              <span className="mt-1.5 text-xs text-ink-muted">Email</span>
+              <span className="mt-1.5 text-sm text-ink-muted">Email</span>
             </a>
           </div>
         </div>

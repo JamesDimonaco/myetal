@@ -6,6 +6,8 @@ import { ShareCard } from '@/components/share-card';
 import { UserAvatar } from '@/components/user-avatar';
 import type { BrowseResponse } from '@/types/share';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
 
 /**
  * Renders the body of ``/u/{slug}`` once a valid owner has been resolved.
@@ -103,31 +105,25 @@ export function ResearcherPageContent({ data, pageUrl, qrUrl, isOwner }: Props) 
             // Owner-on-empty: friendly nudge + a clear path to fixing the
             // emptiness. Without this the owner sees an empty page about
             // themselves and has to navigate back to /dashboard manually.
-            <div className="rounded-lg border border-rule bg-paper-soft p-8 text-center">
-              <p className="text-sm text-ink-muted">
-                Nothing published here yet. Your researcher page lists every
-                share you publish — start with one.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-                <Link
-                  href="/dashboard/share/new"
-                  className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
-                >
-                  Create your first share
-                </Link>
-                <Link
-                  href="/dashboard"
-                  className="inline-flex min-h-11 sm:min-h-9 items-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-                >
-                  Back to dashboard
-                </Link>
-              </div>
-            </div>
+            <EmptyState
+              title="Nothing published here yet"
+              description="Your researcher page lists every share you publish. Start with one."
+              actions={
+                <>
+                  <Button asChild>
+                    <Link href="/dashboard/share/new">Create your first share</Link>
+                  </Button>
+                  <Button asChild variant="secondary">
+                    <Link href="/dashboard">Back to dashboard</Link>
+                  </Button>
+                </>
+              }
+            />
           ) : (
-            <p className="py-10 text-center text-sm text-ink-muted">
-              Nothing published yet — collections will appear here as soon as
-              they go live.
-            </p>
+            <EmptyState
+              title="Nothing published yet"
+              description="Collections will appear here as soon as they go live."
+            />
           )
         ) : (
           <>

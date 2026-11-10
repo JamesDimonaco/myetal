@@ -241,7 +241,8 @@ export default async function PublicSharePage({ params }: PageProps) {
         <h1 className="break-words font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
           {share.name}
         </h1>
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+        {/* Phones drop the dot separators, which dangle when the line wraps. */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted [&>span[aria-hidden]]:hidden sm:[&>span[aria-hidden]]:inline">
           {share.owner_name ? (
             share.owner_id || share.owner_handle ? (
               <Link

@@ -351,7 +351,7 @@ export function HandleSection({ initialHandle }: Props) {
                         ? 'handle-availability'
                         : undefined
                 }
-                className="w-full bg-paper px-3 py-2.5 font-mono text-base text-ink outline-none"
+                className="min-h-11 w-full bg-paper px-3 py-2 font-mono text-base text-ink outline-none sm:min-h-9 sm:py-1.5 sm:text-sm"
               />
             </div>
           </label>
@@ -395,7 +395,7 @@ export function HandleSection({ initialHandle }: Props) {
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
                 >
                   {submitting ? 'Saving…' : 'Save'}
                 </button>
@@ -404,7 +404,7 @@ export function HandleSection({ initialHandle }: Props) {
                   type="button"
                   onClick={handleRemove}
                   disabled={submitting}
-                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-60"
+                  className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-danger/40 bg-paper px-5 py-2 sm:py-1.5 text-sm font-medium text-danger transition hover:bg-danger/5 disabled:opacity-70"
                 >
                   {submitting ? 'Removing…' : 'Remove'}
                 </button>

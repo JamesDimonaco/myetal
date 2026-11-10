@@ -105,13 +105,16 @@ export default async function DashboardPage() {
             <ShowTourButton className="inline-flex min-h-11 items-center text-ink-muted underline underline-offset-4 transition hover:text-ink sm:min-h-0" />
           </>
         }
+        // The empty state below has its own "Create a share" button.
         actions={
-          <Link
-            href="/dashboard/share/new"
-            className="inline-flex min-h-11 items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90 sm:min-h-9"
-          >
-            + New share
-          </Link>
+          shares.some((share) => share.items.length > 0) && (
+            <Link
+              href="/dashboard/share/new"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:opacity-90 sm:min-h-9"
+            >
+              + New share
+            </Link>
+          )
         }
       />
 

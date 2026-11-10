@@ -399,7 +399,7 @@ export function FeedbackForm({ userEmail }: Props) {
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex min-h-11 sm:min-h-9 w-full items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-11 sm:min-h-9 w-full items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {submitting ? 'Sending...' : 'Submit feedback'}
       </button>

@@ -50,7 +50,7 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-11 items-center sm:min-h-8 text-xs text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
+        className="inline-flex min-h-11 items-center sm:min-h-8 text-sm text-ink-faint underline-offset-2 hover:text-ink-muted hover:underline"
       >
         Report this share
       </button>
@@ -84,14 +84,14 @@ export function ReportButton({ shortCode }: { shortCode: string }) {
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex min-h-11 sm:min-h-8 items-center justify-center rounded-md bg-danger px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+          className="inline-flex min-h-11 sm:min-h-8 items-center justify-center rounded-md bg-danger px-3 py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
         >
           {submitting ? 'Sending...' : 'Submit report'}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="inline-flex min-h-11 sm:min-h-8 items-center justify-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40"
+          className="inline-flex min-h-11 sm:min-h-8 items-center justify-center rounded-md border border-ink/20 px-3 py-1.5 text-sm font-medium text-ink transition hover:border-ink/40"
         >
           Cancel
         </button>

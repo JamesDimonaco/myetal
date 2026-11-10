@@ -44,3 +44,15 @@ body {
   background: var(--color-accent);
   color: var(--color-paper);
 }
+
+/*
+ * Touch tablets are wider than the `sm` breakpoint, so they get the 14px
+ * desktop input text. iOS Safari zooms in on focus for anything under 16px.
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}

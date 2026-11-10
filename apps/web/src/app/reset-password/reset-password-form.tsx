@@ -83,7 +83,7 @@ export function ResetPasswordForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="mt-1 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-60"
+        className="mt-1 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-5 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
       >
         {submitting ? 'Saving…' : 'Set new password'}
       </button>

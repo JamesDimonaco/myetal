@@ -16,6 +16,8 @@ import type {
   ShareUpdateInput,
 } from '@/types/share';
 import type { OrcidSyncResponse, PaperOut, WorkResponse } from '@/types/works';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
 
 interface LibraryListProps {
   initialWorks: WorkResponse[];
@@ -48,6 +50,7 @@ export function LibraryList({
   });
 
   const [doi, setDoi] = useState('');
+  const [doiMissing, setDoiMissing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [banner, setBanner] = useState<SyncBanner | null>(null);
   const [addedToast, setAddedToast] = useState<AddedToast | null>(null);
@@ -312,29 +315,39 @@ export function LibraryList({
       {/* Add by DOI + Import from ORCID. On phones the form stacks above
           the ORCID button so the DOI input doesn't get squeezed to a
           handful of characters by the Add-paper button next to it. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
         <form
-          className="flex flex-1 flex-col gap-2 sm:flex-row sm:gap-3"
+          className="flex flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             const trimmed = doi.trim();
+            setDoiMissing(!trimmed);
             if (trimmed) addWork.mutate(trimmed);
           }}
         >
           <input
             type="text"
             value={doi}
-            onChange={(e) => setDoi(e.target.value)}
+            onChange={(e) => {
+              setDoi(e.target.value);
+              setDoiMissing(false);
+            }}
             placeholder="Paste a DOI (e.g. 10.1234/example)"
-            className="min-h-11 sm:min-h-9 flex-1 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-base sm:text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            aria-label="DOI"
+            aria-invalid={doiMissing || undefined}
+            aria-describedby="doi-error"
+            className="min-h-11 sm:min-h-9 flex-1 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-base sm:text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none aria-invalid:border-danger"
           />
           <button
             type="submit"
-            disabled={addWork.isPending || !doi.trim()}
-            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-50"
+            disabled={addWork.isPending}
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-ink px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition hover:opacity-90 disabled:opacity-70"
           >
             {addWork.isPending ? 'Adding...' : '+ Add paper'}
           </button>
+          <p id="doi-error" role="alert" className="text-sm text-danger empty:hidden sm:basis-full">
+            {doiMissing ? 'Paste a DOI first.' : null}
+          </p>
         </form>
         <div className="flex flex-col items-start">
           <button
@@ -342,7 +355,7 @@ export function LibraryList({
             onClick={() => syncOrcid.mutate()}
             disabled={importDisabled}
             aria-label={importLabel}
-            className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+            className="inline-flex min-h-11 sm:min-h-9 items-center gap-2 rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70"
           >
             <OrcidIcon size={16} />
             {importLabel}
@@ -375,7 +388,7 @@ export function LibraryList({
             type="button"
             onClick={() => syncOrcid.mutate()}
             disabled={syncOrcid.isPending}
-            className="inline-flex min-h-11 items-center sm:min-h-8 rounded-md border border-rule bg-paper px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-paper-soft disabled:opacity-50"
+            className="inline-flex min-h-11 items-center sm:min-h-8 rounded-md border border-rule bg-paper px-3 py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft disabled:opacity-70"
           >
             {syncOrcid.isPending ? 'Retrying…' : 'Retry'}
           </button>
@@ -429,39 +442,47 @@ function EmptyLibraryCopy({
 }) {
   if (orcidId && lastOrcidSyncAt) {
     return (
-      <p className="mt-10 max-w-prose text-center text-sm text-ink-muted sm:mx-auto">
-        We synced your ORCID record but didn&apos;t find any works yet. Add
-        your first paper at{' '}
-        <a
-          href="https://orcid.org"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="underline-offset-2 hover:underline"
-        >
-          orcid.org
-        </a>
-        , or paste a DOI here to get started.
-      </p>
+      <EmptyState
+        className="mt-10"
+        title="Your library is empty"
+        description={
+          <>
+            We synced your ORCID record but didn&apos;t find any works yet. Add your
+            first paper at{' '}
+            <a
+              href="https://orcid.org"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline underline-offset-2"
+            >
+              orcid.org
+            </a>
+            , or paste a DOI above.
+          </>
+        }
+      />
     );
   }
   if (!orcidId) {
     return (
-      <p className="mt-10 max-w-prose text-center text-sm text-ink-muted sm:mx-auto">
-        Your library is where your papers live. Add your{' '}
-        <Link
-          href="/dashboard/profile"
-          className="underline-offset-2 hover:underline"
-        >
-          ORCID iD on your profile
-        </Link>{' '}
-        to auto-import them, or paste a DOI above to add one manually.
-      </p>
+      <EmptyState
+        className="mt-10"
+        title="Your library is empty"
+        description="Add your ORCID iD to import your papers automatically, or paste a DOI above to add one."
+        actions={
+          <Button asChild variant="secondary">
+            <Link href="/dashboard/profile">Add your ORCID iD</Link>
+          </Button>
+        }
+      />
     );
   }
   return (
-    <p className="mt-10 text-center text-sm text-ink-muted">
-      Your library is empty. Paste a DOI above to get started.
-    </p>
+    <EmptyState
+      className="mt-10"
+      title="Your library is empty"
+      description="Paste a DOI above to add your first paper."
+    />
   );
 }
 
@@ -632,7 +653,7 @@ function WorkCard({
             <button
               onClick={onRestore}
               disabled={isRestoring}
-              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70"
             >
               Restore
             </button>
@@ -640,7 +661,7 @@ function WorkCard({
             <button
               onClick={onHide}
               disabled={isHiding}
-              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink-muted transition hover:border-danger hover:text-danger disabled:opacity-50"
+              className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-sm font-medium text-ink-muted transition hover:border-danger hover:text-danger disabled:opacity-70"
             >
               Hide
             </button>
@@ -658,7 +679,7 @@ function WorkCard({
  */
 function OrcidProvenanceBadge({ orcidId }: { orcidId: string | null }) {
   const baseClass =
-    'mt-1.5 inline-flex items-center gap-1 rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium text-ink-muted';
+    'mt-1.5 inline-flex items-center gap-1 rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-sm font-medium text-ink-muted';
   if (!orcidId) {
     return <span className={baseClass}>Imported from ORCID</span>;
   }
@@ -738,7 +759,7 @@ function AddToShareMenu({
         disabled={isAdding}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/40 disabled:opacity-50"
+        className="inline-flex min-h-11 sm:min-h-8 items-center rounded-md border border-ink/20 px-3 py-1.5 text-sm font-medium text-ink transition hover:border-ink/40 disabled:opacity-70"
       >
         {isAdding ? 'Adding…' : 'Add to share…'}
       </button>
@@ -757,7 +778,7 @@ function AddToShareMenu({
               <button
                 type="button"
                 onClick={() => refetch()}
-                className="inline-flex min-h-11 items-center sm:min-h-8 mt-2 rounded-md border border-ink/20 px-2 py-1 text-xs font-medium text-ink transition hover:border-ink/40"
+                className="inline-flex min-h-11 items-center sm:min-h-8 mt-2 rounded-md border border-ink/20 px-2 py-1 text-sm font-medium text-ink transition hover:border-ink/40"
               >
                 Try again
               </button>
@@ -776,7 +797,7 @@ function AddToShareMenu({
               <Link
                 href={newShareHref}
                 onClick={() => setOpen(false)}
-                className="inline-flex min-h-11 items-center sm:min-h-8 mt-3 justify-center rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper transition hover:opacity-90"
+                className="inline-flex min-h-11 items-center sm:min-h-8 mt-3 justify-center rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper transition hover:opacity-90"
               >
                 Create share with this paper
               </Link>

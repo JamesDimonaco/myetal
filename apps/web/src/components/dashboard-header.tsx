@@ -102,7 +102,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
                 user.avatar_url ? 'Account menu' : `${getInitials(user.name)} account menu`
               }
               title={user.name ?? user.email ?? 'Account'}
-              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full sm:h-9 sm:w-9 transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >
               <UserAvatar
                 name={user.name}

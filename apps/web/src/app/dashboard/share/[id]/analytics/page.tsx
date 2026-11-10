@@ -6,6 +6,7 @@ import { BackLink, PageHeader, SectionHeading } from '@/components/ui/page-heade
 import { formatDayMonth } from '@/lib/format';
 import { serverFetch } from '@/lib/server-api';
 import type { ShareResponse } from '@/types/share';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export const metadata = { title: 'Share analytics' };
 export const dynamic = 'force-dynamic';
@@ -71,7 +72,12 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
         <SectionHeading>Daily views, last 30 days</SectionHeading>
 
         {!analytics.daily_views.some((d) => d.count > 0) ? (
-          <p className="mt-4 text-sm text-ink-muted">No views recorded yet.</p>
+          <EmptyState
+            className="mt-4"
+            headingLevel="h3"
+            title="No views yet"
+            description="Views appear here when people open your share's link or scan its QR code."
+          />
         ) : (
           <>
             <div

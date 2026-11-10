@@ -15,6 +15,8 @@ import type {
   UserPublicOut,
 } from '@/types/share';
 import { SectionHeading } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -204,7 +206,7 @@ export function SearchResults() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by title, author, or topic..."
           autoFocus
-          className="min-h-[48px] w-full rounded-md border border-rule bg-paper py-3 pl-10 pr-4 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none sm:text-lg"
+          className="min-h-11 w-full rounded-md border border-rule bg-paper py-2 pl-10 pr-4 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none sm:min-h-9 sm:py-1.5 sm:text-sm"
         />
       </div>
 
@@ -267,7 +269,7 @@ export function SearchResults() {
             <button
               key={type}
               onClick={() => toggleType(type)}
-              className={`inline-flex min-h-11 sm:min-h-8 items-center rounded-full border px-3 py-1 text-xs font-medium capitalize transition ${
+              className={`inline-flex min-h-11 sm:min-h-8 items-center rounded-full border px-3 py-1 text-sm font-medium capitalize transition ${
                 activeTypes.has(type)
                   ? 'border-ink bg-ink text-paper'
                   : 'border-rule bg-paper-soft text-ink-muted hover:border-ink/40'
@@ -307,29 +309,22 @@ export function SearchResults() {
           Matches the mobile pattern (apps/mobile/app/search.tsx) so the two
           surfaces feel of-a-piece. (E5 / W-FIX-8.) */}
       {showCombinedFallback ? (
-        <div className="mt-10 text-center">
-          <h2 className="font-serif text-xl tracking-tight text-ink">
-            No matches
-          </h2>
-          <p className="mt-2 text-sm text-ink-muted">
-            No collections or people matched{' '}
-            <span className="font-medium text-ink">
-              &lsquo;{debouncedQuery}&rsquo;
-            </span>
-            .
-          </p>
-          <Link
-            href="/browse"
-            className="mt-5 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-          >
-            Browse all
-          </Link>
-          {debouncedQuery.length <= 3 ? (
-            <p className="mt-3 text-sm text-ink-faint">
-              Try a longer search term for better results.
-            </p>
-          ) : null}
-        </div>
+        <EmptyState
+          className="mt-10"
+          title="No matches"
+          description={
+            <>
+              No collections or people matched{' '}
+              <span className="font-medium text-ink">&lsquo;{debouncedQuery}&rsquo;</span>.
+              {debouncedQuery.length <= 3 ? ' Try a longer search term.' : null}
+            </>
+          }
+          actions={
+            <Button asChild variant="secondary">
+              <Link href="/browse">Browse all</Link>
+            </Button>
+          }
+        />
       ) : null}
 
       {/* users-empty branch when shares matched (E5, W-FIX-8) */}
@@ -356,20 +351,16 @@ export function SearchResults() {
 
 function SearchError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div role="alert" className="mt-10 text-center">
-      <h2 className="font-serif text-xl tracking-tight text-ink">
-        Search isn&apos;t working right now
-      </h2>
-      <p className="mt-2 text-sm text-ink-muted">
-        Something went wrong on our side. Your search is still in the box.
-      </p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-5 inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md border border-rule bg-paper px-4 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
-      >
-        Try again
-      </button>
+    <div role="alert" className="mt-10">
+      <EmptyState
+        title="Search isn't working right now"
+        description="Something went wrong on our side. Your search is still in the box."
+        actions={
+          <Button variant="secondary" onClick={onRetry}>
+            Try again
+          </Button>
+        }
+      />
     </div>
   );
 }

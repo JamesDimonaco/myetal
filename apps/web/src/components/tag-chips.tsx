@@ -22,8 +22,9 @@ interface Props {
   className?: string;
 }
 
+// Small pill, but the invisible ::after stretches the tap area to 44px.
 const chipClass =
-  'inline-flex min-h-11 sm:min-h-8 items-center rounded-full border border-rule bg-paper-soft px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink';
+  "inline-flex min-h-7 relative after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] items-center rounded-full border border-rule bg-paper-soft px-2.5 py-1 text-xs font-medium text-ink-muted transition hover:border-ink/40 hover:text-ink";
 
 const staticChipClass =
   'inline-flex items-center rounded-full border border-rule bg-paper-soft px-2 py-0.5 text-xs font-medium text-ink-muted';

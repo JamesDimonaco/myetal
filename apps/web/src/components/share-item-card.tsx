@@ -107,7 +107,12 @@ function PaperCard({
               href={oaUrlForButton}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex min-h-11 sm:min-h-8 items-center gap-1.5 rounded-md border border-ink/20 bg-paper px-3 py-1.5 text-sm font-medium text-ink transition hover:border-ink/40"
+              // The first button on a card is the filled one; a second is outlined.
+              className={
+                oa?.pdfUrl
+                  ? 'inline-flex min-h-11 sm:min-h-8 items-center gap-1.5 rounded-md border border-ink/20 bg-paper px-3 py-1.5 text-sm font-medium text-ink transition hover:border-ink/40'
+                  : 'inline-flex min-h-11 sm:min-h-8 items-center gap-1.5 rounded-md bg-ink px-3 py-1.5 text-sm font-medium text-paper transition hover:opacity-90'
+              }
             >
               Open paper <span aria-hidden>↗</span>
             </a>
