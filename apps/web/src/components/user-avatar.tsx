@@ -2,7 +2,13 @@
 
 import { useState } from 'react';
 
-export function getInitials(name: string | null): string {
+/** Accessible name for an avatar button: the initials it shows, then its purpose. */
+export function avatarLabel(name: string | null, purpose: string): string {
+  if (!name?.trim()) return purpose.charAt(0).toUpperCase() + purpose.slice(1);
+  return `${getInitials(name)} ${purpose}`;
+}
+
+function getInitials(name: string | null): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { clientApi } from '@/lib/client-api';
+import { isEmail } from '@/lib/validate';
 import { Card } from '@/components/ui/card';
 
 type FeedbackType = 'feature_request' | 'bug_report';
@@ -36,12 +37,16 @@ export function FeedbackForm({ userEmail }: Props) {
     triedSubmit && !description.trim() ? 'Add a description.' : null;
 
   const isSignedIn = userEmail !== null;
+  // Only a typed address needs checking; the account email is trusted.
+  const typedEmail = !isSignedIn || (shareEmail && useCustomEmail) ? email.trim() : '';
+  const emailError =
+    triedSubmit && typedEmail && !isEmail(typedEmail) ? 'Enter a full email address.' : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedType) return;
     setTriedSubmit(true);
-    if (!title.trim() || !description.trim()) return;
+    if (!title.trim() || !description.trim() || (typedEmail && !isEmail(typedEmail))) return;
 
     setSubmitting(true);
     setError(null);
@@ -329,8 +334,13 @@ export function FeedbackForm({ userEmail }: Props) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    aria-invalid={emailError ? true : undefined}
+                    aria-describedby="feedback-email-error"
+                    className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
+                  <p id="feedback-email-error" role="alert" className="mt-1 text-sm text-danger empty:hidden">
+                    {emailError}
+                  </p>
                 </div>
               )
             ) : (
@@ -356,8 +366,13 @@ export function FeedbackForm({ userEmail }: Props) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
-              className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby="feedback-email-error"
+              className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
+            <p id="feedback-email-error" role="alert" className="mt-1 text-sm text-danger empty:hidden">
+              {emailError}
+            </p>
             <p className="mt-1.5 text-sm text-ink-faint">
               Without an email, we can&apos;t follow up — but we still read
               every submission.

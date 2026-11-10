@@ -39,7 +39,7 @@ import { GitHubIcon } from '@/components/github-icon';
 import { QrModal } from '@/components/qr-modal';
 import { TagInput } from '@/components/tag-input';
 import { Button } from '@/components/ui/button';
-import { BackLink, PageHeader } from '@/components/ui/page-header';
+import { BackLink, PageHeader, SectionHeading } from '@/components/ui/page-header';
 import {
   Dialog,
   DialogContent,
@@ -65,9 +65,9 @@ import type {
   ShareType,
 } from '@/types/share';
 import type { PaperOut } from '@/types/works';
-import { SectionHeading } from '@/components/ui/page-header';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { isWebUrl } from '@/lib/validate';
 
 const SHARE_TYPES: ShareType[] = [
   'paper',
@@ -80,22 +80,30 @@ const SHARE_TYPES: ShareType[] = [
 // Per-kind validation. Paper only requires title. Repo and link require both
 // title and a URL — that's what makes them useful as a destination. PDF items
 // require `file_url` (set by the upload flow before the item lands here).
+// The form is noValidate, so this stands in for the browser's type="url" check.
+const webUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((v) => v === '' || isWebUrl(v), 'Use a full link starting with https://')
+  .optional();
+
 const itemSchema = z
   .object({
     _key: z.string(),
     id: z.string().optional(),
     kind: z.enum(['paper', 'repo', 'link', 'pdf']),
     title: z.string().trim().min(1, 'Item title required').max(500),
-    scholar_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    scholar_url: webUrl,
     doi: z.string().trim().max(255).optional().or(z.literal('')),
     authors: z.string().trim().optional().or(z.literal('')),
     year: z
       .union([z.string().regex(/^\d{4}$/, '4-digit year'), z.literal('')])
       .optional(),
     notes: z.string().trim().optional().or(z.literal('')),
-    url: z.string().trim().max(2000).optional().or(z.literal('')),
+    url: webUrl,
     subtitle: z.string().trim().optional().or(z.literal('')),
-    image_url: z.string().trim().max(2000).optional().or(z.literal('')),
+    image_url: webUrl,
     file_url: z.string().trim().max(2000).optional().or(z.literal('')),
     thumbnail_url: z.string().trim().max(2000).optional().or(z.literal('')),
     // nonnegative (not positive) — the empty-item placeholder defaults to 0
@@ -124,10 +132,6 @@ const shareSchema = z.object({
   items: z.array(itemSchema).min(1, 'Add at least one item'),
 });
 
-// Validation paths the user has a visible field for. Anything else
-// (file_size_bytes, file_mime, thumbnail_url, etc.) routes through the
-// hidden-field banner instead of leaking raw Zod messages — see
-// docs/tickets/to-do/form-error-surfacing.md.
 /** User-facing error per field for one item (first message wins). */
 function itemIssues(item: DraftItem): Record<string, string> {
   const parsed = itemSchema.safeParse(item);
@@ -151,6 +155,10 @@ const NO_ERRORS: Record<string, string> = {};
 /** Per-field errors for the item being rendered; read by ItemField. */
 const ItemErrorsContext = createContext<Record<string, string>>({});
 
+// Validation paths the user has a visible field for. Anything else
+// (file_size_bytes, file_mime, thumbnail_url, etc.) routes through the
+// hidden-field banner instead of leaking raw Zod messages — see
+// docs/tickets/to-do/form-error-surfacing.md.
 const USER_EDITABLE_FIELDS = new Set([
   'name',
   'description',
@@ -547,11 +555,9 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
       if (Object.keys(inline).some((key) => key.startsWith('items.'))) {
         setCheckedItemKeys(new Set(items.map((it) => it._key)));
       }
-      // Prefer surfacing a user-editable message (clear, actionable). Fall
-      // back to a generic banner only when every issue is on a hidden field
-      // — the previous code leaked raw Zod text in that case.
       // Inline errors render next to their fields, plus a summary by the
-      // save button; both are derived, so they clear as they're fixed.
+      // save button; both are derived, so they clear as they're fixed. The
+      // banner is only for issues with no visible field.
       if (Object.keys(inline).length === 0 && hidden.length > 0) {
         console.warn('[share-editor] hidden-field validation failed:', hidden);
         setError(
@@ -988,7 +994,6 @@ export function ShareEditor({ initial, id, initialPaper, header }: Props) {
             {items.length > 0 ? (
               <button
                 type="button"
-                aria-describedby={itemsError ? 'share-items-error' : undefined}
                 onClick={() => setShowAddItem(true)}
                 className="inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-md border border-rule bg-paper px-3 py-2 sm:py-1.5 text-sm font-medium text-ink transition hover:bg-paper-soft"
               >
@@ -1721,7 +1726,7 @@ function IconBtn({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30 sm:h-8 sm:w-8"
+      className="inline-flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded text-ink-muted transition hover:bg-paper hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
     >
       {children}
     </button>

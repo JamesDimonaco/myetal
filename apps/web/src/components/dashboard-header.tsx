@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getInitials, UserAvatar } from '@/components/user-avatar';
+import { avatarLabel, UserAvatar } from '@/components/user-avatar';
 import type { UserResponse } from '@/types/auth';
 
 /**
@@ -96,11 +96,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
           ))}
           <DropdownMenu>
             <DropdownMenuTrigger
-              // Starts with the visible initials so voice control users can
-              // say what they see (WCAG 2.5.3); falls back when there's a photo.
-              aria-label={
-                user.avatar_url ? 'Account menu' : `${getInitials(user.name)} account menu`
-              }
+              aria-label={avatarLabel(user.name, 'account menu')}
               title={user.name ?? user.email ?? 'Account'}
               className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full sm:h-9 sm:w-9 transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
             >
@@ -132,9 +128,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
             href="/dashboard/profile"
             className="inline-flex h-11 w-11 items-center justify-center transition hover:opacity-80"
             title={user.name ?? user.email ?? 'Profile'}
-            aria-label={
-              user.avatar_url ? 'Your profile' : `${getInitials(user.name)} profile`
-            }
+            aria-label={avatarLabel(user.name, 'profile')}
           >
             <UserAvatar
               name={user.name}

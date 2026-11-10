@@ -332,18 +332,18 @@ async def get_share_analytics(
 
     agg_row = (await db.execute(agg_stmt)).one()
 
-    # Daily breakdown (last 30 days)
+    # Daily breakdown: the same 30 UTC calendar days the chart shows, so no
+    # bucket falls outside its axis whatever the DB session timezone is.
+    today = datetime.now(UTC).date()
+    utc_day = cast(func.timezone("UTC", ShareView.viewed_at), Date)
     daily_stmt = (
-        select(
-            cast(ShareView.viewed_at, Date).label("date"),
-            func.count().label("count"),
-        )
+        select(utc_day.label("date"), func.count().label("count"))
         .where(
             ShareView.share_id == share_id,
-            ShareView.viewed_at > now_expr - text("interval '30 days'"),
+            utc_day >= today - timedelta(days=29),
         )
-        .group_by(cast(ShareView.viewed_at, Date))
-        .order_by(cast(ShareView.viewed_at, Date))
+        .group_by(utc_day)
+        .order_by(utc_day)
     )
 
     daily_rows = (await db.execute(daily_stmt)).all()
@@ -353,7 +353,7 @@ async def get_share_analytics(
         views_last_7d=agg_row.last_7d,
         views_last_30d=agg_row.last_30d,
         daily_views=fill_daily_views(
-            {str(r.date): r.count for r in daily_rows}, today=datetime.now(UTC).date()
+            {str(r.date): r.count for r in daily_rows}, today=today
         ),
     )
 

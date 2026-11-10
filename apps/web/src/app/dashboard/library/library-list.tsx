@@ -360,6 +360,14 @@ export function LibraryList({
             <OrcidIcon size={16} />
             {importLabel}
           </button>
+          {!orcidId && works.length > 0 ? (
+            <Link
+              href="/dashboard/profile"
+              className="mt-1 inline-flex min-h-11 items-center text-sm text-ink-muted underline underline-offset-2 hover:text-ink sm:min-h-0"
+            >
+              Add your ORCID iD on your profile first
+            </Link>
+          ) : null}
         </div>
       </div>
       {error ? (

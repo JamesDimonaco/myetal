@@ -1728,7 +1728,7 @@ function PaperPreview({
         {paper.container && (sr?.publication_date || paper.year) ? <span aria-hidden>·</span> : null}
         <span>{sr?.publication_date ?? paper.year}</span>
         <span aria-hidden>·</span>
-        <span className="capitalizer">{paper.source}</span>
+        <span className="capitalize">{paper.source}</span>
         {sr?.type ? (
           <span className="rounded bg-paper px-1.5 py-0.5 text-xs font-medium capitalize text-ink-muted">
             {sr.type.replace('-', ' ')}

@@ -75,7 +75,7 @@ export default async function ShareAnalyticsPage({ params }: PageProps) {
           <EmptyState
             className="mt-4"
             headingLevel="h3"
-            title="No views yet"
+            title={analytics.total_views > 0 ? 'No views in the last 30 days' : 'No views yet'}
             description="Views appear here when people open your share's link or scan its QR code."
           />
         ) : (
