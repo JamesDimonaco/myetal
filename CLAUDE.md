@@ -54,6 +54,6 @@ pnpm 10 + turbo monorepo. Node >= 22.13.
 - `generate` shells out to `apps/api/.venv/bin/python`. Run `uv sync` in `apps/api` first.
 - The container runs `alembic upgrade head` on boot. A failing migration crash-loops prod.
 - Keep `--workers 1`: slowapi rate limits live in process memory.
-- `deploy-staging.yml`, `apps/api/DEPLOY.md` and `docs/staging-and-prod-infra.md` still describe
-  the old Raspberry Pi. Ignore them; Railway is the only host.
+- `apps/api/DEPLOY.md` and `docs/staging-and-prod-infra.md` still describe the old Raspberry Pi.
+  Ignore them; Railway is the only host.
 - Railway CLI login expires. If `railway` fails on auth, ask James to run `railway login`.
