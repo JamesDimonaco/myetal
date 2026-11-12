@@ -23,13 +23,13 @@ pnpm 10 + turbo monorepo. Node >= 22.13.
 - Database: Railway service `Postgres` in the same project. Better Auth (web) and the API share it.
   Alembic owns the schema.
 - Storage: Cloudflare R2 for PDFs and thumbnails (`R2_*` vars).
-- Web: Vercel project `myetal-web`. `main` is production; `staging` gets a branch preview.
+- Web: Vercel project `myetal-web`. `main` is production.
 - Mobile: EAS project under owner `jamesdimonaco`, bundle `app.myetal.mobile`. Build from
   `apps/mobile` with `eas build --profile preview | production`.
 - PostHog project 400245: `phog personal 400245 "<HogQL>"`.
 - Env files: each app has a `.env.example` listing var names. API reads `apps/api/.env`, web reads
   `apps/web/.env.local`, mobile reads `apps/mobile/.env` and `.env.local` (`EXPO_PUBLIC_*`).
-- Branches: feature PRs target `staging`; release PRs merge `staging` into `main`.
+- Branches: work locally, then PR straight to `main`. The `staging` branch is retired; don't target it.
 
 ## Rules
 
@@ -54,6 +54,6 @@ pnpm 10 + turbo monorepo. Node >= 22.13.
 - `generate` shells out to `apps/api/.venv/bin/python`. Run `uv sync` in `apps/api` first.
 - The container runs `alembic upgrade head` on boot. A failing migration crash-loops prod.
 - Keep `--workers 1`: slowapi rate limits live in process memory.
-- `deploy-staging.yml` still SSHes to the old Raspberry Pi and fails on every staging push.
-  `apps/api/DEPLOY.md` and `docs/staging-and-prod-infra.md` also still describe the Pi.
+- `deploy-staging.yml`, `apps/api/DEPLOY.md` and `docs/staging-and-prod-infra.md` still describe
+  the old Raspberry Pi. Ignore them; Railway is the only host.
 - Railway CLI login expires. If `railway` fails on auth, ask James to run `railway login`.
