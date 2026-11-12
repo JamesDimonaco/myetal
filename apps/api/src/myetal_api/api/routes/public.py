@@ -104,7 +104,7 @@ async def list_sitemap_shares(
     request: Request,
     db: DbSession,
 ) -> list[dict[str, str]]:
-    """Return `[{short_code, updated_at}]` for every discoverable share.
+    """Return `[{short_code, updated_at, owner_slug}]` for every discoverable share.
 
     Used by the Next.js frontend to build /sitemap.xml. No auth required;
     the data is already public on the share pages themselves. Rate-limited

@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 
 /**
  * Captures a `$pageview` event on every client-side route change.
- * Must be rendered inside `<PostHogProvider>` (i.e. only when consent is given).
+ * Must be rendered inside `<PostHogProvider>`. Runs before consent too (cookieless).
  */
 export function PostHogPageview() {
   const pathname = usePathname();

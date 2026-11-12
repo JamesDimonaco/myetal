@@ -260,23 +260,32 @@ async def tombstone_share(db: AsyncSession, share: Share) -> None:
 async def list_sitemap_shares(
     db: AsyncSession,
 ) -> list[dict[str, str]]:
-    """Return `[{short_code, updated_at}]` for every share that should appear
-    in the public sitemap: `is_public=True`, `published_at IS NOT NULL`,
-    `deleted_at IS NULL`.
+    """Return `[{short_code, updated_at, owner_slug}]` for every share that
+    should appear in the public sitemap: `is_public=True`,
+    `published_at IS NOT NULL`, `deleted_at IS NULL`.
 
-    Lightweight query — only selects two columns to keep the payload small
-    even for tens-of-thousands of published shares.
+    `owner_slug` is the owner's handle, or their id when unset — the same
+    canonical form `/u/<slug>` uses — so the frontend can list profiles too.
     """
     rows = (
         await db.execute(
-            select(Share.short_code, Share.updated_at).where(
+            select(Share.short_code, Share.updated_at, User.handle, User.id)
+            .join(User, Share.owner_user_id == User.id)
+            .where(
                 Share.is_public.is_(True),
                 Share.published_at.is_not(None),
                 Share.deleted_at.is_(None),
             )
         )
     ).all()
-    return [{"short_code": r.short_code, "updated_at": r.updated_at.isoformat()} for r in rows]
+    return [
+        {
+            "short_code": r.short_code,
+            "updated_at": r.updated_at.isoformat(),
+            "owner_slug": r.handle or str(r.id),
+        }
+        for r in rows
+    ]
 
 
 async def publish_share(db: AsyncSession, share: Share) -> Share:

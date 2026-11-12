@@ -34,12 +34,24 @@ const ConsentContext = createContext<ConsentContextValue>({
 export const useConsent = () => useContext(ConsentContext);
 
 /* ------------------------------------------------------------------ */
-/*  PostHog init — ONLY called after user accepts                      */
+/*  PostHog init                                                       */
 /* ------------------------------------------------------------------ */
 
 const STORAGE_KEY = 'myetal_consent';
 
-function initPostHog() {
+// Before consent PostHog runs cookieless: memory-only storage, no recording,
+// so we still count anonymous pageviews without needing the banner.
+// ponytail: memory persistence gives a new anonymous id per full page load, so
+// unique visitors are overcounted. Switch to PostHog's server-side cookieless
+// mode if that matters.
+export function posthogConfig(consented: boolean) {
+  return {
+    persistence: consented ? 'localStorage+cookie' : 'memory',
+    disable_session_recording: !consented,
+  } as const;
+}
+
+function initPostHog(consented: boolean) {
   if (typeof window === 'undefined') return;
   if (posthog.__loaded) return; // already initialised
 
@@ -56,15 +68,21 @@ function initPostHog() {
     capture_pageview: false, // we capture manually
     capture_pageleave: true,
     person_profiles: 'identified_only',
-    disable_session_recording: true, // lazy-start below
     session_recording: {
       maskAllInputs: true,
       maskTextSelector: '[data-ph-mask]',
     },
-    loaded: (ph) => {
-      ph.startSessionRecording();
-    },
+    ...posthogConfig(consented),
   });
+}
+
+function upgradeToConsented() {
+  if (!posthog.__loaded) {
+    initPostHog(true);
+    return;
+  }
+  posthog.set_config(posthogConfig(true));
+  posthog.startSessionRecording();
 }
 
 /* ------------------------------------------------------------------ */
@@ -116,13 +134,20 @@ function CookieBanner({
 export function ConsentProvider({ children }: { children: ReactNode }) {
   const [consent, setConsent] = useState<ConsentState>('pending');
   const [showBanner, setShowBanner] = useState(false);
+  // Gates PostHogPageview: its effect runs before this provider's mount
+  // effect (children first), so rendering it earlier drops the landing
+  // pageview against an uninitialised client.
+  const [tracking, setTracking] = useState(false);
 
   // Read persisted preference on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored !== 'declined') {
+      initPostHog(stored === 'accepted');
+      setTracking(posthog.__loaded);
+    }
     if (stored === 'accepted') {
       setConsent('accepted');
-      initPostHog();
     } else if (stored === 'declined') {
       setConsent('declined');
     } else {
@@ -151,13 +176,17 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, 'accepted');
     setConsent('accepted');
     setShowBanner(false);
-    initPostHog();
+    upgradeToConsented();
+    setTracking(posthog.__loaded);
   }, []);
 
   const decline = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, 'declined');
     setConsent('declined');
     setShowBanner(false);
+    // Stops the cookieless tracking that ran before the choice.
+    if (posthog.__loaded) posthog.opt_out_capturing();
+    setTracking(false);
   }, []);
 
   const contextValue: ConsentContextValue = { consent, accept, decline };
@@ -165,14 +194,11 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   // PostHogProvider is rendered unconditionally so that `children` keeps the
   // same parent across consent flips. Toggling the wrapper used to remount the
   // entire subtree on Accept, wiping in-progress local state (e.g. an
-  // unsaved share-editor draft). The posthog SDK itself stays uninitialised
-  // until `accept()` calls `initPostHog()`, so capture calls before consent
-  // remain no-ops. PostHogPageview, which fires `$pageview`, is still gated
-  // so declined users don't get pageview events.
+  // unsaved share-editor draft).
   return (
     <ConsentContext.Provider value={contextValue}>
       <PostHogProvider client={posthog}>
-        {consent === 'accepted' ? <PostHogPageview /> : null}
+        {tracking ? <PostHogPageview /> : null}
         {children}
       </PostHogProvider>
 
