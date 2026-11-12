@@ -136,7 +136,7 @@ export function FeedbackForm({ userEmail }: Props) {
           </button>
           <Link
             href="/"
-            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-white hover:opacity-90"
+            className="inline-flex min-h-11 sm:min-h-9 items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-paper hover:opacity-90"
           >
             Back to app
           </Link>
@@ -224,7 +224,7 @@ export function FeedbackForm({ userEmail }: Props) {
           placeholder={titlePlaceholder}
           aria-invalid={titleError ? true : undefined}
           aria-describedby={titleError ? 'feedback-title-error' : undefined}
-          className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          className="mt-1.5 w-full rounded-md border border-rule bg-paper px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <div className="mt-1 flex justify-between gap-2 text-xs text-ink-faint">
           <span id="feedback-title-error" role="alert" className="text-sm text-danger">
@@ -252,7 +252,7 @@ export function FeedbackForm({ userEmail }: Props) {
           placeholder={descPlaceholder}
           aria-invalid={descriptionError ? true : undefined}
           aria-describedby={descriptionError ? 'feedback-desc-error' : undefined}
-          className="mt-1.5 w-full resize-y rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          className="mt-1.5 w-full resize-y rounded-md border border-rule bg-paper px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <div className="mt-1 flex justify-between gap-2 text-xs text-ink-faint">
           <span id="feedback-desc-error" role="alert" className="text-sm text-danger">
@@ -336,7 +336,7 @@ export function FeedbackForm({ userEmail }: Props) {
                     placeholder="your@email.com"
                     aria-invalid={emailError ? true : undefined}
                     aria-describedby={emailError ? 'feedback-email-error' : undefined}
-                    className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    className="mt-1.5 w-full rounded-md border border-rule bg-paper px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <p id="feedback-email-error" role="alert" className="mt-1 text-sm text-danger empty:hidden">
                     {emailError}
@@ -368,7 +368,7 @@ export function FeedbackForm({ userEmail }: Props) {
               placeholder="your@email.com"
               aria-invalid={emailError ? true : undefined}
               aria-describedby={emailError ? 'feedback-email-error' : undefined}
-              className="mt-1.5 w-full rounded-md border border-rule bg-white px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="mt-1.5 w-full rounded-md border border-rule bg-paper px-3 py-2 text-base aria-invalid:border-danger text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <p id="feedback-email-error" role="alert" className="mt-1 text-sm text-danger empty:hidden">
               {emailError}
@@ -414,7 +414,7 @@ export function FeedbackForm({ userEmail }: Props) {
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex min-h-11 sm:min-h-9 w-full items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+        className="inline-flex min-h-11 sm:min-h-9 w-full items-center justify-center rounded-md bg-accent px-4 py-2 sm:py-1.5 text-sm font-medium text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {submitting ? 'Sending...' : 'Submit feedback'}
       </button>

@@ -9,7 +9,9 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
+/* Plain `@theme`, not `inline`: utilities must reference the variables so
+   the `.dark` overrides below reach them. */
+@theme {
   --color-paper: #FAFAF7;
   --color-paper-soft: #F2F1EB;
   --color-ink: #1A1A1A;

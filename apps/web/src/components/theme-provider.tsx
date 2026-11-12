@@ -12,7 +12,7 @@
 import {
   createContext,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useState,
   type ReactNode,
 } from 'react';
@@ -45,10 +45,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       : 'light',
   );
 
-  useEffect(() => {
-    const active = forcedLight ? 'light' : theme;
-    document.documentElement.classList.toggle('dark', active === 'dark');
-  }, [theme, forcedLight]);
+  // Layout effect so a client navigation into a forced-light route never
+  // paints a dark frame. pathname is a dep because Next re-renders the
+  // theme-color meta per route.
+  useLayoutEffect(() => {
+    const dark = !forcedLight && theme === 'dark';
+    document.documentElement.classList.toggle('dark', dark);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', dark ? '#0F0F10' : '#FAFAF7');
+  }, [theme, forcedLight, pathname]);
 
   function toggle() {
     setTheme((current) => {

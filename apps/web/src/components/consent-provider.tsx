@@ -77,7 +77,10 @@ function initPostHog(consented: boolean) {
 }
 
 function upgradeToConsented() {
-  if (!posthog.__loaded) return;
+  if (!posthog.__loaded) {
+    initPostHog(true);
+    return;
+  }
   posthog.set_config(posthogConfig(true));
   posthog.startSessionRecording();
 }
@@ -131,11 +134,18 @@ function CookieBanner({
 export function ConsentProvider({ children }: { children: ReactNode }) {
   const [consent, setConsent] = useState<ConsentState>('pending');
   const [showBanner, setShowBanner] = useState(false);
+  // Gates PostHogPageview: its effect runs before this provider's mount
+  // effect (children first), so rendering it earlier drops the landing
+  // pageview against an uninitialised client.
+  const [tracking, setTracking] = useState(false);
 
   // Read persisted preference on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    initPostHog(stored === 'accepted');
+    if (stored !== 'declined') {
+      initPostHog(stored === 'accepted');
+      setTracking(posthog.__loaded);
+    }
     if (stored === 'accepted') {
       setConsent('accepted');
     } else if (stored === 'declined') {
@@ -167,12 +177,16 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     setConsent('accepted');
     setShowBanner(false);
     upgradeToConsented();
+    setTracking(posthog.__loaded);
   }, []);
 
   const decline = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, 'declined');
     setConsent('declined');
     setShowBanner(false);
+    // Stops the cookieless tracking that ran before the choice.
+    if (posthog.__loaded) posthog.opt_out_capturing();
+    setTracking(false);
   }, []);
 
   const contextValue: ConsentContextValue = { consent, accept, decline };
@@ -184,7 +198,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   return (
     <ConsentContext.Provider value={contextValue}>
       <PostHogProvider client={posthog}>
-        <PostHogPageview />
+        {tracking ? <PostHogPageview /> : null}
         {children}
       </PostHogProvider>
 

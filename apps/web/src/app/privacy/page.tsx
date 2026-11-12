@@ -125,7 +125,8 @@ export default function PrivacyPage() {
               We use PostHog for product analytics. Before you accept the cookie
               banner, PostHog counts page views without storing anything on your
               device. If you accept, it sets analytics cookies and records your
-              session with form inputs masked. We do not use advertising SDKs.
+              session with form inputs masked. If you decline, PostHog stops
+              collecting anything. We do not use advertising SDKs.
             </p>
           </section>
 
