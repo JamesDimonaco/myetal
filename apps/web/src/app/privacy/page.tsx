@@ -17,7 +17,7 @@ export default function PrivacyPage() {
         <h1 className="mt-8 font-serif text-3xl leading-tight tracking-tight text-ink sm:text-4xl">
           Privacy Policy
         </h1>
-        <p className="mt-4 text-sm text-ink-muted">Last updated: 27 April 2026</p>
+        <p className="mt-4 text-sm text-ink-muted">Last updated: 12 November 2026</p>
 
         <div className="mt-8 space-y-6 text-base leading-relaxed text-ink">
           <section>
@@ -95,14 +95,20 @@ export default function PrivacyPage() {
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>
-                <strong>Neon</strong>{' '}&mdash; managed PostgreSQL database hosting.
+                <strong>Railway</strong>{' '}&mdash; API and PostgreSQL database hosting.
               </li>
               <li>
                 <strong>Vercel</strong>{' '}&mdash; web application hosting and edge
                 network.
               </li>
               <li>
-                <strong>Cloudflare</strong>{' '}&mdash; CDN and DNS.
+                <strong>Cloudflare</strong>{' '}&mdash; CDN, DNS, and storage for
+                uploaded PDFs and thumbnails (R2).
+              </li>
+              <li>
+                <strong>PostHog</strong>{' '}&mdash; product analytics. See
+                Cookies below for what it records before and after you accept
+                the cookie banner.
               </li>
             </ul>
             <p className="mt-2">
