@@ -589,3 +589,21 @@ async def test_post_share_with_empty_items_succeeds(
     body = r.json()
     assert body["id"]
     assert body["items"] == []
+
+
+async def test_sitemap_shares_carry_owner_slug(db_session: AsyncSession) -> None:
+    # Harm prevented: researcher profile pages (/u/<slug>) missing from the
+    # sitemap, or listed under a non-canonical URL.
+    with_handle = await make_user(db_session, email="h@example.com")
+    with_handle.handle = "alice"
+    await db_session.commit()
+    no_handle = await make_user(db_session, email="n@example.com")
+    for owner in (with_handle, no_handle):
+        share = await share_service.create_share(
+            db_session, owner.id, ShareCreate(name="x", items=[ShareItemCreate(title="a")])
+        )
+        await share_service.publish_share(db_session, share)
+
+    rows = await share_service.list_sitemap_shares(db_session)
+
+    assert sorted(r["owner_slug"] for r in rows) == sorted(["alice", str(no_handle.id)])

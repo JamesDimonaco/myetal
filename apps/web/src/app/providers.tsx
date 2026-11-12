@@ -16,6 +16,7 @@ import { Suspense, useState, type ReactNode } from 'react';
 import { Toaster } from 'sonner';
 
 import { ConsentProvider } from '@/components/consent-provider';
+import { ThemeProvider, useTheme } from '@/components/theme-provider';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -36,27 +37,35 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={client}>
-      <Suspense fallback={null}>
-        <ConsentProvider>{children}</ConsentProvider>
-      </Suspense>
-      {/* Bottom-right matches the cookie banner's bottom-anchor, doesn't
-          collide with the dashboard header dropdown, and is the standard
-          desktop convention. Light theme to match the paper palette. */}
-      <Toaster
-        position="bottom-right"
-        theme="light"
-        richColors={false}
-        toastOptions={{
-          classNames: {
-            toast:
-              'border border-rule bg-paper text-ink shadow-md rounded-md',
-            title: 'text-sm font-medium text-ink',
-            description: 'text-sm text-ink-muted',
-            success: 'border-accent/30',
-            error: 'border-danger/40',
-          },
-        }}
-      />
+      <ThemeProvider>
+        <Suspense fallback={null}>
+          <ConsentProvider>{children}</ConsentProvider>
+        </Suspense>
+        <AppToaster />
+      </ThemeProvider>
     </QueryClientProvider>
+  );
+}
+
+// Bottom-right matches the cookie banner's bottom-anchor, doesn't collide
+// with the dashboard header dropdown, and is the standard desktop
+// convention. classNames use our paper/ink tokens, which flip with `.dark`.
+function AppToaster() {
+  const { theme } = useTheme();
+  return (
+    <Toaster
+      position="bottom-right"
+      theme={theme}
+      richColors={false}
+      toastOptions={{
+        classNames: {
+          toast: 'border border-rule bg-paper text-ink shadow-md rounded-md',
+          title: 'text-sm font-medium text-ink',
+          description: 'text-sm text-ink-muted',
+          success: 'border-accent/30',
+          error: 'border-danger/40',
+        },
+      }}
+    />
   );
 }

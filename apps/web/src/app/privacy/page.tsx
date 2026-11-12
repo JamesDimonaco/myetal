@@ -115,14 +115,17 @@ export default function PrivacyPage() {
           <section>
             <SectionHeading>Cookies</SectionHeading>
             <p className="mt-2">
-              MyEtAl sets <strong>no tracking cookies</strong>{' '}on public pages.
-              When you sign in, we set a strictly necessary httpOnly cookie
+              MyEtAl sets <strong>no tracking cookies</strong>{' '}unless you accept
+              the cookie banner. When you sign in, we set a strictly necessary httpOnly cookie
               (<code className="text-sm">myetal_session</code>) to manage your
               authenticated session. It is exempt from consent requirements
               under PECR as it is essential for the service to function.
             </p>
             <p className="mt-2">
-              We do not use third-party analytics, trackers, or advertising SDKs.
+              We use PostHog for product analytics. Before you accept the cookie
+              banner, PostHog counts page views without storing anything on your
+              device. If you accept, it sets analytics cookies and records your
+              session with form inputs masked. We do not use advertising SDKs.
             </p>
           </section>
 
@@ -131,8 +134,7 @@ export default function PrivacyPage() {
             <p className="mt-2">
               We record one view per share per visitor per 24-hour window.
               Mobile app installs send a random per-device token for de-duplication;
-              web visitors are de-duplicated by hashed IP. We do not use
-              third-party analytics, trackers, or advertising SDKs.
+              web visitors are de-duplicated by hashed IP.
             </p>
           </section>
 

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { SignOutButton } from '@/components/sign-out-button';
+import { useTheme } from '@/components/theme-provider';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +77,23 @@ function accountLinks(
 export function DashboardHeader({ user }: { user: UserResponse }) {
   const navLinks = user.is_admin ? [...NAV_LINKS, ADMIN_LINK] : NAV_LINKS;
   const menuLinks = accountLinks(user.id, user.handle ?? null);
+  // forcedLight is true on /u — DashboardHeader is reused there for authed
+  // owners viewing their own public page, which stays pinned light.
+  const { theme, forcedLight, toggle } = useTheme();
+  const themeMenuItem = !forcedLight && (
+    <DropdownMenuItem
+      onSelect={(e) => {
+        e.preventDefault();
+        toggle();
+      }}
+    >
+      {/* Text depends on localStorage, which SSR can't see — mismatch is
+          harmless (menu starts closed) and expected. */}
+      <span suppressHydrationWarning>
+        {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+      </span>
+    </DropdownMenuItem>
+  );
   return (
     <header className="border-b border-rule bg-paper">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
@@ -112,6 +130,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
                   <Link href={link.href}>{link.label}</Link>
                 </DropdownMenuItem>
               ))}
+              {themeMenuItem}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <SignOutButton className="w-full px-4 py-2.5 text-left text-ink-muted transition hover:text-ink" />
@@ -186,6 +205,7 @@ export function DashboardHeader({ user }: { user: UserResponse }) {
                   <Link href={link.href}>{link.label}</Link>
                 </DropdownMenuItem>
               ))}
+              {themeMenuItem}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <SignOutButton className="w-full px-4 py-2.5 text-left text-ink-muted transition hover:text-ink" />

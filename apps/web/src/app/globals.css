@@ -2,10 +2,13 @@
 
 /**
  * MyEtAl paper-and-ink palette. Matches the warm off-white / dark ink /
- * deep teal accent the mobile app uses. Stays light-only on web for now —
- * the public viewer should look the same in any preview crawler regardless
- * of the visitor's system theme.
+ * deep teal accent the mobile app uses. Dark mode is a user-toggled `.dark`
+ * class (see components/theme-provider.tsx), not the OS `prefers-color-
+ * scheme` — public share pages (`/u`, `/c`) force light regardless of the
+ * toggle so link-preview crawlers always see the same render.
  */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-paper: #FAFAF7;
   --color-paper-soft: #F2F1EB;
@@ -23,6 +26,21 @@
     "Helvetica Neue", Arial, sans-serif;
 }
 
+/* Mirrors apps/mobile/constants/theme.ts `Colors.dark`. */
+.dark {
+  --color-paper: #0F0F10;
+  --color-paper-soft: #1C1C1E;
+  --color-ink: #F5F5F2;
+  --color-ink-muted: #A0A0A0;
+  --color-ink-faint: #7A7A75;
+  --color-rule: #2A2A2C;
+  --color-accent: #5BAEB3;
+  --color-accent-soft: #1A2E30;
+  /* ponytail: mobile has no dark danger token — lightened B23A3A for
+     contrast against the near-black background, not mirrored from mobile. */
+  --color-danger: #D6534A;
+}
+
 html,
 body {
   background: var(--color-paper);
@@ -30,14 +48,20 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html {
   /*
-   * Force light browser UA controls regardless of OS theme. Web is
-   * intentionally light-only (see comment above) — without this, users on
-   * dark-mode OSes get dark scrollbars and form-control chrome that clash
-   * with the chalkboard palette, and the page gets a white scrollbar-track
-   * "flash" at the top of long pages (feedback round 3 #3, #6).
+   * Matches the active theme so dark-mode OSes don't paint light scrollbar/
+   * form-control chrome over a dark page (and vice versa). `.dark` overrides
+   * this below; forced-light routes (see theme-provider.tsx) never get the
+   * class, so they stay pinned to `light` (feedback round 3 #3, #6).
    */
   color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 ::selection {
