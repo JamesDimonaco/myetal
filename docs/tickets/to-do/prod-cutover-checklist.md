@@ -38,7 +38,7 @@ This doc is the runbook + checklist. Use the existing `better-auth-cutover-runbo
 
 ### 2. Env contract on Railway
 
-Compare what's currently set on Railway prod vs what's needed post-cutover. The Railway-side `.env.production` source of truth is `/Users/jamesdimonaco/Nextcloud/TheAPP/myetal/.env.production` on your Mac.
+Compare what's currently set on Railway prod vs what's needed post-cutover. The Railway-side `.env.production` source of truth is `~/me/myetal/.env.production` on your Mac.
 
 - [ ] Verify Railway has all of:
   - `BETTER_AUTH_SECRET` (the production value, not staging)
